@@ -191,17 +191,15 @@ async function startJob(id) {
             });
             qLog('ok', `Done: ${j.name} — ${j.totalItems.toLocaleString()} items`);
             try {
-                await fetch('/api/proxy/ingest', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        source: j.sourceType,
-                        title: j.name,
-                        content: `[${j.name}] Simulated. Items: ${j.totalItems}.`,
-                        author: 'Simulation'
-                    })
+                // Save simulation to local text file instead of DB
+                const safeName = j.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                await apiPost('/api/save_local_file', {
+                    folder: 'Scraped_Simulations',
+                    filename: `${safeName}_${ts}.txt`,
+                    content: `[Simulation ${new Date().toLocaleString()}]\n\nJob: ${j.name}\nSource: ${j.sourceType}\nTotal Items Scraped: ${j.totalItems}\n\nThis is a simulation record.`
                 });
-                qLog('ok', 'Saved to NetaBoard DB');
+                qLog('ok', 'Saved to DataCollected directory');
             } catch (e) { }
         } else {
             await apiPut(`/api/jobs/${id}`, { progress: j.progress, itemsProcessed: j.itemsProcessed });
@@ -380,6 +378,10 @@ function updateStats() {
     const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     setEl('qs-queued', q); setEl('qs-proc', p); setEl('qs-done', d); setEl('qs-fail', f);
     setEl('top-queued', q); setEl('top-proc', p); setEl('top-done', d); setEl('top-failed', f);
+
+    // Synchronize UI if progress updates occurred
+    if (typeof renderYtVideos === 'function') renderYtVideos();
+    if (typeof renderYtPlaylists === 'function') renderYtPlaylists();
 }
 
 function updateNavBadge(sourceType) {
@@ -470,8 +472,13 @@ async function queueDzFile(dzId, name, icon, sourceType) {
     }
     const files = dzFiles[dzId];
     if (sourceType === 'images' || sourceType === 'pdf') {
+        let extra = '';
+        if (sourceType === 'pdf') {
+            const el = document.getElementById('pdf-ocr-pipeline');
+            if (el) extra = el.value;
+        }
         for (let i = 0; i < files.length; i++) {
-            const j = await createJob(files[i].name, icon, sourceType);
+            const j = await createJob(files[i].name, icon, sourceType, extra);
             j.filePayload = files[i];
             setTimeout(() => startJob(j.id), 200 + (i * 500));
         }
@@ -634,6 +641,24 @@ function renderYtVideos() {
     if (cnt) cnt.textContent = `${ytVideos.length} video${ytVideos.length !== 1 ? 's' : ''}`;
 
     grid.innerHTML = ytVideos.map(v => {
+        // Find associated job
+        const j = jobs.find(job => (job.sourceType === 'youtube') && (job.ytUrl === v.url || job.name === v.title));
+        let badgeHtml = v.status !== 'staged' ? `<span style="margin-left:auto;color:var(--cyan);font-family:var(--mono);text-transform:uppercase">${j ? j.status : v.status}</span>` : '';
+
+        let progHtml = '';
+        if (j && j.status !== 'queued' && j.status !== 'staged') {
+            const progCol = j.status === 'failed' ? 'var(--red)' : j.status === 'done' ? 'var(--green)' : 'var(--blue)';
+            progHtml = `
+            <div style="margin-top:8px">
+                <div class="prog-track" style="margin:2px 0;height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden">
+                    <div class="prog-fill" style="width:${j.progress}%;height:100%;transition:width 0.3s;background:${progCol};${j.status === 'processing' ? 'animation:progPulse 1.5s infinite' : ''}"></div>
+                </div>
+                <div style="font-family:var(--mono);font-size:0.42rem;color:var(--text3);text-align:right">${j.status === 'done' ? '100% (Done)' : j.status === 'failed' ? 'Failed' : j.progress + '%'}</div>
+            </div>`;
+        } else if (v.status === 'queued') {
+            progHtml = `<div style="margin-top:8px;font-family:var(--mono);font-size:0.42rem;color:var(--amber);text-align:right">Queued for ingestion...</div>`;
+        }
+
         return `<div class="yt-card${v.selected ? ' selected' : ''}" id="ytc-${v.vid}" onclick="ytToggleSelect('${v.vid}')">
             <div class="yt-status-strip ${v.status}"></div>
             <div class="yt-thumb">
@@ -642,9 +667,10 @@ function renderYtVideos() {
                 <div class="yt-duration">${v.dur}</div>
                 <div class="yt-overlay"><div class="yt-play-btn">▶</div></div>
             </div>
-            <div class="yt-card-body">
+            <div class="yt-card-body" style="padding-bottom:8px">
                 <div class="yt-card-title">${v.title}</div>
-                <div class="yt-card-meta"><span>${v.channel || ''}</span></div>
+                <div class="yt-card-meta" style="display:flex"><span>${v.channel || ''}</span>${badgeHtml}</div>
+                ${progHtml}
             </div>
             <div class="yt-card-actions">
                 <button class="btn btn-xs btn-primary" onclick="event.stopPropagation();ytQueueSingle('${v.vid}')">⬇ Queue</button>
@@ -832,18 +858,19 @@ async function processYouTubeJob(j) {
                 if (d.result && d.result.segments) {
                     const tr = d.result.segments.map(s => s.text).join(' ');
                     try {
-                        await fetch('/api/proxy/ingest', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                source: 'YouTube Transcript',
-                                title: j.name,
-                                content: `[${j.name}] ${tr}`,
-                                author: 'Whisper Pipeline'
-                            })
+                        const dirName = 'youtube_transcript';
+                        const safeName = j.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                        await apiPost('/api/save_local_file', {
+                            folder: dirName,
+                            filename: `${safeName}_${ts}.txt`,
+                            content: `[YouTube Transcript ${new Date().toLocaleString()}]\n\nVideo: ${j.name}\nResult length: ${tr.length} characters.\n\n${tr}`
                         });
-                        qLog('ok', 'Transcript saved to NetaBoard DB');
-                    } catch (e) { }
+                        qLog('ok', `Transcript saved to DataCollected/${dirName}`);
+                    } catch (e) {
+                        console.error("Local save error:", e);
+                        qLog('err', 'Failed saving local transcript txt');
+                    }
                 }
             } else if (d.status === 'failed') {
                 j.status = 'failed';
@@ -864,6 +891,7 @@ async function processYouTubeJob(j) {
 async function processPdfJob(j) {
     const fd = new FormData();
     fd.append('pdf', j.filePayload);
+    fd.append('strategy', j.extraMeta || 'both');
     j.progress = 20;
     renderQueue();
 
@@ -889,21 +917,31 @@ async function processPdfJob(j) {
 
             qLog('ok', `PDF Done: ${j.name}`);
             try {
-                const fd2 = await new Promise(r => { const r2 = new FileReader(); r2.onload = e => r(e.target.result); r2.readAsDataURL(j.filePayload); });
-                await fetch('/api/proxy/ingest', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        source: 'PDF Documents',
-                        title: j.name,
-                        fileName: j.name,
-                        fileData: fd2,
-                        content: `Document [${j.name}]: ${d.result}`,
-                        author: 'System Extractor'
-                    })
+                // Save PyMuPDF extraction to local text file
+                const dirName = 'PDF_Documents';
+                const safeName = j.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                const ts = new Date().toISOString().replace(/[:.]/g, '-');
+
+                await apiPost('/api/save_local_file', {
+                    folder: dirName,
+                    filename: `${safeName}_${ts}_PyMuPDF.txt`,
+                    content: `[Extracted via PyMuPDF - ${new Date().toLocaleString()}]\n\nFile: ${j.name}\nTotal Pages Scanned: ${d.pages_total}\nResult length: ${d.result_pymupdf?.length || 0} characters.\n\n${d.result_pymupdf}`
                 });
-                qLog('ok', 'Saved to NetaBoard DB');
-            } catch (e) { }
+
+                // Save Qwen extraction to a second local text file
+                if (d.result_qwen) {
+                    await apiPost('/api/save_local_file', {
+                        folder: dirName,
+                        filename: `${safeName}_${ts}_Qwen_Vision.txt`,
+                        content: `[Extracted via Qwen Vision OCR - ${new Date().toLocaleString()}]\n\nFile: ${j.name}\n\n${d.result_qwen}`
+                    });
+                }
+
+                qLog('ok', `Both PyMuPDF and Qwen extracts saved to DataCollected/${dirName}`);
+            } catch (e) {
+                console.error("Local save error:", e);
+                qLog('err', 'Failed saving local result text');
+            }
         } else {
             j.status = 'failed';
             j.progress = 0;
@@ -950,21 +988,20 @@ async function processImageJob(j) {
 
             qLog('ok', `Qwen Done: ${j.name}`);
             try {
-                const fd2 = await new Promise(r => { const r2 = new FileReader(); r2.onload = e => r(e.target.result); r2.readAsDataURL(j.filePayload); });
-                await fetch('/api/proxy/ingest', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        source: 'Image Board',
-                        title: j.name,
-                        fileName: j.name,
-                        fileData: fd2,
-                        content: `Image [${j.name}]: ${d.result}`,
-                        author: 'Qwen-VL'
-                    })
+                // Save output to local text file instead of DB
+                const dirName = 'Image_Analysis';
+                const safeName = j.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                await apiPost('/api/save_local_file', {
+                    folder: dirName,
+                    filename: `${safeName}_${ts}.txt`,
+                    content: `[Analyzed ${new Date().toLocaleString()}]\n\nImage: ${j.name}\nResult length: ${d.result?.length || 0} characters.\n\n${d.result}`
                 });
-                qLog('ok', 'Saved to NetaBoard DB');
-            } catch (e) { }
+                qLog('ok', `Result saved to DataCollected/${dirName}`);
+            } catch (e) {
+                console.error("Local save error:", e);
+                qLog('err', 'Failed saving local result text');
+            }
         } else {
             j.status = 'failed';
             j.progress = 0;

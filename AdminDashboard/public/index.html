@@ -2574,12 +2574,10 @@
                   </select>
                 </div>
                 <div class="fg">
-                  <div class="fl">OCR Pipeline</div><select class="fs">
-                    <option>Smart — text extract → OCR fallback (default)</option>
-                    <option>In-house Vision Model OCR</option>
-                    <option>Tesseract OCR (scanned)</option>
-                    <option>PyMuPDF text only</option>
-                    <option>Table extraction + text</option>
+                  <div class="fl">OCR Pipeline</div><select class="fs" id="pdf-ocr-pipeline">
+                    <option value="both">Smart Hybrid (PyMuPDF Text + Qwen Vision OCR)</option>
+                    <option value="text_only">PyMuPDF Text Only (Fast)</option>
+                    <option value="vision_only">Qwen Vision OCR Only (Scanned/Images)</option>
                   </select>
                 </div>
                 <div class="fg">
@@ -3206,4 +3204,5 @@
 
   <script src="admin.js"></script>
 </body>
+
 </html>

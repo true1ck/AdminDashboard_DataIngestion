@@ -51,32 +51,49 @@
         el.style.display = 'none';
     }
 
-    // ========== Image Upload Handling ==========
+    // ========== File Upload Handling ==========
     function handleFile(file) {
         // Validate file type
-        const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp', 'image/webp', 'image/tiff'];
+        const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp', 'image/webp', 'image/tiff', 'application/pdf'];
         if (!validTypes.includes(file.type)) {
-            showError('Invalid file type. Please upload a PNG, JPG, GIF, WebP, or BMP image.');
+            showError('Invalid file type. Please upload a PNG, JPG, GIF, WebP, BMP, or PDF document.');
             return;
         }
 
-        // Validate file size (10MB)
-        if (file.size > 10 * 1024 * 1024) {
-            showError('File too large. Maximum size is 10MB.');
-            return;
+        // Validate file size limit
+        if (file.type === 'application/pdf') {
+            if (file.size > 150 * 1024 * 1024) { // 150MB for PDFs
+                showError('PDF too large. Maximum size is 150MB.');
+                return;
+            }
+        } else {
+            // 10MB limit for images being sent to Qwen AI
+            if (file.size > 10 * 1024 * 1024) {
+                showError('Image too large. Maximum size is 10MB.');
+                return;
+            }
         }
 
         selectedFile = file;
         hideError();
 
-        // Show image preview
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            previewImg.src = e.target.result;
+        // Show file preview
+        if (file.type === 'application/pdf') {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="%234facfe" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`;
+            previewImg.src = `data:image/svg+xml;utf8,${svg}`;
+            previewImg.style.padding = '20px';
             hideElement(dropZoneContent);
             showElement(imagePreview);
-        };
-        reader.readAsDataURL(file);
+        } else {
+            previewImg.style.padding = '0';
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                previewImg.src = e.target.result;
+                hideElement(dropZoneContent);
+                showElement(imagePreview);
+            };
+            reader.readAsDataURL(file);
+        }
 
         // Show file info
         fileName.textContent = file.name;
@@ -168,11 +185,19 @@
         hideElement(resultSection);
 
         const formData = new FormData();
-        formData.append('image', selectedFile);
-        formData.append('prompt', promptInput.value || 'Describe this image in detail. If there are any people or entities in the picture, please attempt to identify who they are. If there is any text in the image, extract and include it.');
+        let apiUrl = '';
+
+        if (selectedFile.type === 'application/pdf') {
+            formData.append('pdf', selectedFile);
+            apiUrl = `${API_BASE}/api/analyze-pdf`;
+        } else {
+            formData.append('image', selectedFile);
+            formData.append('prompt', promptInput.value || 'Describe this image in detail. If there are any people or entities in the picture, please attempt to identify who they are. If there is any text in the image, extract and include it.');
+            apiUrl = `${API_BASE}/api/analyze`;
+        }
 
         try {
-            const response = await fetch(`${API_BASE}/api/analyze`, {
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 body: formData
             });
@@ -202,11 +227,22 @@
     }
 
     function displayResult(data) {
-        resultBody.textContent = data.result;
-        resultMeta.innerHTML = `
-            <span>Model: ${data.model}</span>
-            <span>Prompt: "${truncateText(data.prompt, 60)}"</span>
-        `;
+        if (data.result_pymupdf) {
+            let combinedHTML = `<div style="margin-bottom: 20px;"><strong>📄 PyMuPDF Output (All Pages):</strong><br><pre style="white-space: pre-wrap; font-family: monospace; background: var(--bg2); border: 1px solid var(--border); padding: 12px; border-radius: 6px; margin-top: 8px; font-size: 0.85rem;">${data.result_pymupdf}</pre></div>`;
+
+            if (data.result_qwen && data.result_qwen.trim() !== '' && !data.result_qwen.includes('not configured')) {
+                combinedHTML += `<div><strong>👁️ Qwen Vision Output (First 3 Pages visually scanned):</strong><br><pre style="white-space: pre-wrap; font-family: monospace; background: var(--bg2); border: 1px solid var(--border); padding: 12px; border-radius: 6px; margin-top: 8px; font-size: 0.85rem;">${data.result_qwen}</pre></div>`;
+            }
+
+            resultBody.innerHTML = combinedHTML;
+            resultMeta.innerHTML = `<span>Model: ${data.model}</span> <span>Total Pages: ${data.pages_total || 'Unknown'}</span>`;
+        } else {
+            resultBody.textContent = data.result;
+            resultMeta.innerHTML = `
+                <span>Model: ${data.model}</span>
+                <span>Prompt: "${truncateText(data.prompt, 60)}"</span>
+            `;
+        }
         showElement(resultSection);
 
         // Scroll to result
