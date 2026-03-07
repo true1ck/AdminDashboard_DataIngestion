@@ -73,14 +73,28 @@ open_tab "MediaToTextWhisper :8000" \
   "cd '${BASE}/MediaToTextWhisper/backend' && source venv/bin/activate && python3 main.py"
 wait_for_url "http://localhost:8000/api/health" "MediaToTextWhisper"
 
-# 4. AdminDashboard Server (Express)
-echo -e "\n${GREEN}[4/5]${RESET} ${BOLD}Admin Dashboard${RESET} → http://localhost:4000"
+# 4. TwitterIngestionServer (Flask)
+echo -e "\n${GREEN}[4/7]${RESET} ${BOLD}TwitterIngestionServer${RESET} → http://localhost:6060"
+setup_python_venv "${BASE}/TwitterIngestionServer/backend" "requirements.txt"
+open_tab "TwitterIngestionServer :6060" \
+  "cd '${BASE}/TwitterIngestionServer/backend' && source venv/bin/activate && python3 app.py"
+wait_for_url "http://localhost:6060/api/health" "TwitterIngestionServer"
+
+# 5. FacebookIngestionServer (Flask)
+echo -e "\n${GREEN}[5/7]${RESET} ${BOLD}FacebookIngestionServer${RESET} → http://localhost:7070"
+setup_python_venv "${BASE}/FacebookIngestionServer/backend" "requirements.txt"
+open_tab "FacebookIngestionServer :7070" \
+  "cd '${BASE}/FacebookIngestionServer/backend' && source venv/bin/activate && python3 app.py"
+wait_for_url "http://localhost:7070/api/health" "FacebookIngestionServer"
+
+# 6. AdminDashboard Server (Express)
+echo -e "\n${GREEN}[6/7]${RESET} ${BOLD}Admin Dashboard${RESET} → http://localhost:4000"
 open_tab "Admin Dashboard :4000" \
   "cd '${BASE}/AdminDashboard' && npm install --silent && node server.js"
 wait_for_url "http://localhost:4000/api/health" "AdminDashboard"
 
-# 5. NetaBoardV5 Frontend (Vite)
-echo -e "\n${GREEN}[5/5]${RESET} ${BOLD}NetaBoard Frontend${RESET} → http://localhost:5180"
+# 7. NetaBoardV5 Frontend (Vite)
+echo -e "\n${GREEN}[7/7]${RESET} ${BOLD}NetaBoard Frontend${RESET} → http://localhost:5180"
 open_tab "NetaBoard Frontend :5180" \
   "cd '${BASE}/NetaBoardV5' && npm install --silent && npm run dev"
 

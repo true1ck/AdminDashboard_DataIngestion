@@ -1069,7 +1069,8 @@ function regenToken(id) {
 }
 
 /* ═══ DATABASE ═══ */
-let dbType = 'pg';
+let dbType = 'sqlite';
+let dbPrismaStudioOpen = false;
 
 function dbSelectType(el, type, port, uri) {
     document.querySelectorAll('.dbtype-btn').forEach(b => b.classList.remove('active'));
@@ -1079,22 +1080,203 @@ function dbSelectType(el, type, port, uri) {
     document.getElementById('db-uri').placeholder = uri;
     document.getElementById('db-type-badge').textContent = el.querySelector('.dbtype-lbl').textContent;
     document.getElementById('db-test-status').textContent = '';
+
+    const isSqlite = type === 'sqlite';
+    ['db-host', 'db-port', 'db-name', 'db-user', 'db-pass'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.disabled = isSqlite;
+            input.style.opacity = isSqlite ? '0.5' : '1';
+        }
+    });
 }
 
-function dbTest() {
+function dbTogglePassword() {
+    const inp = document.getElementById('db-pass');
+    const btn = document.getElementById('db-pass-toggle');
+    if (!inp || !btn) return;
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        btn.textContent = '👁‍🗨';
+        btn.title = 'Hide password';
+    } else {
+        inp.type = 'password';
+        btn.textContent = '👁';
+        btn.title = 'Show password';
+    }
+}
+
+async function dbTest() {
     const el = document.getElementById('db-test-status');
-    el.textContent = '⟲ Connecting...';
+    const prismaSection = document.getElementById('db-prisma-section');
+    el.textContent = '⟲ Testing connection...';
     el.style.color = 'var(--amber)';
-    setTimeout(() => {
-        el.textContent = '✓ Connected';
-        el.style.color = 'var(--green)';
-        qLog('ok', `DB OK: ${dbType.toUpperCase()} @ ${document.getElementById('db-host').value}`);
-    }, 1200);
+
+    try {
+        const res = await fetch('/api/db/test-connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                host: document.getElementById('db-host').value,
+                port: document.getElementById('db-port').value,
+                dbName: document.getElementById('db-name').value,
+                user: document.getElementById('db-user').value,
+                password: document.getElementById('db-pass').value,
+                uri: document.getElementById('db-uri').value,
+                dbType
+            })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            el.textContent = '✓ Connected — Prisma Studio launching...';
+            el.style.color = 'var(--green)';
+            qLog('ok', `DB connection OK: NetaBoardV5 @ localhost:3000`);
+
+            // Show Prisma Studio iframe
+            if (prismaSection) {
+                prismaSection.style.display = 'block';
+                const iframe = document.getElementById('db-prisma-iframe');
+                if (iframe) {
+                    iframe.src = data.prismaStudioUrl || 'http://localhost:5555';
+                }
+                dbPrismaStudioOpen = true;
+                setTimeout(() => {
+                    el.textContent = '✓ Connected — Prisma Studio ready';
+                }, 2000);
+            }
+
+            // Auto-load tables
+            dbLoadTables();
+        } else {
+            el.textContent = '✕ ' + (data.error || 'Connection failed');
+            el.style.color = 'var(--red)';
+            qLog('err', `DB connection failed: ${data.error || 'Unknown error'}`);
+            if (prismaSection) prismaSection.style.display = 'none';
+            dbPrismaStudioOpen = false;
+        }
+    } catch (err) {
+        el.textContent = '✕ Network error — is the server running?';
+        el.style.color = 'var(--red)';
+        qLog('err', `DB test error: ${err.message}`);
+        if (prismaSection) prismaSection.style.display = 'none';
+        dbPrismaStudioOpen = false;
+    }
 }
 
-function dbLoadTables() {
-    const t = ['posts', 'tweets', 'articles', 'users', 'media_items', 'comments'];
-    document.getElementById('db-table').value = t[Math.floor(Math.random() * t.length)];
+async function dbLoadTables() {
+    const tableInput = document.getElementById('db-table');
+    const tableList = document.getElementById('db-table-chips');
+
+    try {
+        const res = await fetch('/api/db/tables');
+        const data = await res.json();
+
+        if (data.tables && data.tables.length) {
+            if (tableList) {
+                tableList.innerHTML = data.tables.map(t =>
+                    `<span class="db-table-chip" onclick="dbSelectTable('${t}')">${t}</span>`
+                ).join('');
+                tableList.style.display = 'flex';
+            }
+            if (tableInput && !tableInput.value) {
+                tableInput.value = data.tables[0];
+            }
+            qLog('info', `Loaded ${data.tables.length} tables from Prisma schema`);
+        } else {
+            qLog('warn', 'No models found in Prisma schema');
+        }
+    } catch (err) {
+        // Fallback to mock list
+        const t = ['Archetype', 'Constituency', 'PillarScore', 'SansadRecord', 'Feedback', 'SocialItem', 'Alert'];
+        if (tableList) {
+            tableList.innerHTML = t.map(name =>
+                `<span class="db-table-chip" onclick="dbSelectTable('${name}')">${name}</span>`
+            ).join('');
+            tableList.style.display = 'flex';
+        }
+        if (tableInput) tableInput.value = t[0];
+    }
+}
+
+function dbSelectTable(name) {
+    document.getElementById('db-table').value = name;
+    // Highlight selected chip
+    document.querySelectorAll('.db-table-chip').forEach(c => {
+        c.classList.toggle('active', c.textContent === name);
+    });
+    // Auto-run preview query
+    dbRunQuery();
+}
+
+async function dbRunQuery() {
+    const table = document.getElementById('db-table').value;
+    const queryEl = document.getElementById('db-query');
+    const resultsSection = document.getElementById('db-query-results');
+    if (!table) { alert('Select a table first.'); return; }
+
+    const resultsBody = document.getElementById('db-results-body');
+    const resultsHeader = document.getElementById('db-results-header');
+    const resultsCount = document.getElementById('db-results-count');
+
+    if (resultsSection) resultsSection.style.display = 'block';
+    if (resultsBody) resultsBody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--amber);padding:1rem;">⟲ Querying...</td></tr>';
+
+    try {
+        const res = await fetch('/api/db/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                table,
+                query: queryEl ? queryEl.value : '',
+                limit: 20,
+                host: document.getElementById('db-host').value,
+                port: document.getElementById('db-port').value,
+                dbName: document.getElementById('db-name').value,
+                user: document.getElementById('db-user').value,
+                password: document.getElementById('db-pass').value,
+                uri: document.getElementById('db-uri').value,
+                dbType
+            })
+        });
+        const data = await res.json();
+
+        if (data.ok && data.rows && data.rows.length) {
+            const cols = Object.keys(data.rows[0]);
+            if (resultsHeader) {
+                resultsHeader.innerHTML = cols.map(c => `<th>${c}</th>`).join('');
+            }
+            if (resultsBody) {
+                resultsBody.innerHTML = data.rows.map(row =>
+                    '<tr>' + cols.map(c => {
+                        let val = row[c];
+                        if (val === null || val === undefined) val = '<span style="color:var(--text4)">null</span>';
+                        else if (typeof val === 'object') val = '<span style="color:var(--purple);font-size:0.5rem">' + JSON.stringify(val).slice(0, 60) + '</span>';
+                        else if (String(val).length > 50) val = String(val).slice(0, 50) + '…';
+                        return `<td>${val}</td>`;
+                    }).join('') + '</tr>'
+                ).join('');
+            }
+            if (resultsCount) resultsCount.textContent = `${data.rows.length} row${data.rows.length !== 1 ? 's' : ''}`;
+            qLog('ok', `Query OK: ${table} → ${data.rows.length} rows`);
+        } else if (data.note) {
+            if (resultsBody) resultsBody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--amber);padding:1rem;">${data.note}</td></tr>`;
+            if (resultsCount) resultsCount.textContent = '0 rows';
+        } else {
+            if (resultsBody) resultsBody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:1rem;">No data returned</td></tr>';
+            if (resultsCount) resultsCount.textContent = '0 rows';
+        }
+    } catch (err) {
+        if (resultsBody) resultsBody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--red);padding:1rem;">Error: ${err.message}</td></tr>`;
+    }
+}
+
+function dbClosePrisma() {
+    const sec = document.getElementById('db-prisma-section');
+    const iframe = document.getElementById('db-prisma-iframe');
+    if (sec) sec.style.display = 'none';
+    if (iframe) iframe.src = 'about:blank';
+    dbPrismaStudioOpen = false;
 }
 
 async function dbQueue() {

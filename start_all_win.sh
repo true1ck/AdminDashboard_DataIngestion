@@ -212,14 +212,40 @@ else
   wait_for_url "http://localhost:8000/api/health" "MediaToTextWhisper" "$HEALTH_TIMEOUT"
 fi
 
-# 4. AdminDashboard Server (Express)
-echo -e "\n${GREEN}[4/5]${RESET} ${BOLD}Admin Dashboard${RESET} → http://localhost:4000"
+# 4. TwitterIngestionServer (Flask)
+echo -e "\n${GREEN}[4/7]${RESET} ${BOLD}TwitterIngestionServer${RESET} → http://localhost:6060"
+setup_python_venv "${BASE}/TwitterIngestionServer/backend" "requirements.txt"
+TWITTER_BACKEND="${BASE}/TwitterIngestionServer/backend"
+TWITTER_VENV_BIN="$(venv_bin_dir "${TWITTER_BACKEND}")"
+if [ -z "${TWITTER_VENV_BIN}" ]; then
+  echo -e "  ${YELLOW}Error:${RESET} TwitterIngestionServer venv not found; skipping service start."
+else
+  open_tab "TwitterIngestionServer :6060" \
+    "cd '${TWITTER_BACKEND}' && source '${TWITTER_VENV_BIN}/activate' && python app.py"
+  wait_for_url "http://localhost:6060/api/health" "TwitterIngestionServer" "$HEALTH_TIMEOUT"
+fi
+
+# 5. FacebookIngestionServer (Flask)
+echo -e "\n${GREEN}[5/7]${RESET} ${BOLD}FacebookIngestionServer${RESET} → http://localhost:7070"
+setup_python_venv "${BASE}/FacebookIngestionServer/backend" "requirements.txt"
+FB_BACKEND="${BASE}/FacebookIngestionServer/backend"
+FB_VENV_BIN="$(venv_bin_dir "${FB_BACKEND}")"
+if [ -z "${FB_VENV_BIN}" ]; then
+  echo -e "  ${YELLOW}Error:${RESET} FacebookIngestionServer venv not found; skipping service start."
+else
+  open_tab "FacebookIngestionServer :7070" \
+    "cd '${FB_BACKEND}' && source '${FB_VENV_BIN}/activate' && python app.py"
+  wait_for_url "http://localhost:7070/api/health" "FacebookIngestionServer" "$HEALTH_TIMEOUT"
+fi
+
+# 6. AdminDashboard Server (Express)
+echo -e "\n${GREEN}[6/7]${RESET} ${BOLD}Admin Dashboard${RESET} → http://localhost:4000"
 open_tab "Admin Dashboard :4000" \
   "cd '${BASE}/AdminDashboard' && npm install --silent && node server.js"
 wait_for_url "http://localhost:4000/api/health" "AdminDashboard"
 
-# 5. NetaBoardV5 Frontend (Vite)
-echo -e "\n${GREEN}[5/5]${RESET} ${BOLD}NetaBoard Frontend${RESET} → http://localhost:5180"
+# 7. NetaBoardV5 Frontend (Vite)
+echo -e "\n${GREEN}[7/7]${RESET} ${BOLD}NetaBoard Frontend${RESET} → http://localhost:5180"
 open_tab "NetaBoard Frontend :5180" \
   "cd '${BASE}/NetaBoardV5' && npm install --silent && npm run dev"
 

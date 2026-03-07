@@ -1687,6 +1687,78 @@
       color: var(--cyan);
     }
 
+    /* ── DB TABLE CHIPS ── */
+    .db-table-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .db-table-chip {
+      display: inline-flex;
+      align-items: center;
+      font-family: var(--mono);
+      font-size: 0.48rem;
+      letter-spacing: 0.06em;
+      padding: 0.22rem 0.55rem;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text3);
+      background: var(--bg3);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .db-table-chip:hover {
+      border-color: var(--cyan3);
+      color: var(--cyan);
+      background: var(--cyan4);
+    }
+
+    .db-table-chip.active {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: var(--cyan2);
+      font-weight: 500;
+    }
+
+    /* ── QUERY RESULTS TABLE ── */
+    #db-query-results th {
+      font-family: var(--mono);
+      font-size: 0.46rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border2);
+      white-space: nowrap;
+    }
+
+    #db-query-results td {
+      font-family: var(--mono);
+      font-size: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      color: var(--text2);
+      border-bottom: 1px solid var(--border);
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #db-query-results tr:hover td {
+      background: rgba(0, 217, 255, 0.03);
+    }
+
+    #db-query-results tr:nth-child(even) td {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    #db-query-results tr:nth-child(even):hover td {
+      background: rgba(0, 217, 255, 0.04);
+    }
+
     /* ══════════════════════════════════════════
    KAGGLE DATASET CARDS
 ══════════════════════════════════════════ */
@@ -2387,7 +2459,64 @@
                 <div class="dz-sub">.csv · .json · .zip — Kaggle format supported</div>
                 <div class="dz-btn-fake">Choose File</div>
               </div>
-              <button class="btn btn-primary" onclick="queueDzFile('fb-dz','Facebook Dataset','📘','facebook')">⬇ Queue
+              <div class="fg">
+                <div class="fl">Processing Type</div>
+                <select class="fs" id="fb-kaggle-type">
+                  <option value="text_only">Text Only (Standard)</option>
+                  <option value="text_image">Text + Image (Qwen)</option>
+                  <option value="text_video">Text + Audio/Video (Whisper)</option>
+                </select>
+              </div>
+              <div class="g2">
+                <div class="fg">
+                  <div class="fl">Text Column</div><input class="fi" id="fb-col-text" type="text"
+                    placeholder="e.g., post_text">
+                </div>
+                <div class="fg">
+                  <div class="fl">Timestamp</div><input class="fi" id="fb-col-time" type="text"
+                    placeholder="e.g., date">
+                </div>
+                <div class="fg">
+                  <div class="fl">Author</div><input class="fi" id="fb-col-author" type="text"
+                    placeholder="e.g., page_name">
+                </div>
+                <div class="fg">
+                  <div class="fl">ID Column</div><input class="fi" id="fb-col-id" type="text"
+                    placeholder="e.g., post_id">
+                </div>
+              </div>
+              <div class="g2">
+                <div class="fg">
+                  <div class="fl">Likes Column</div><input class="fi" id="fb-col-likes" type="text"
+                    placeholder="e.g., likes">
+                </div>
+                <div class="fg">
+                  <div class="fl">Replies Column</div><input class="fi" id="fb-col-replies" type="text"
+                    placeholder="e.g., comments">
+                </div>
+                <div class="fg">
+                  <div class="fl">Shares Column</div><input class="fi" id="fb-col-shares" type="text"
+                    placeholder="e.g., shares">
+                </div>
+                <div class="fg">
+                  <div class="fl">Dislikes</div><input class="fi" id="fb-col-dislikes" type="text"
+                    placeholder="e.g., dislikes">
+                </div>
+              </div>
+              <div class="fg">
+                <div class="fl">Additional Columns (comma-separated)</div>
+                <input class="fi" id="fb-col-custom" type="text" placeholder="e.g., country, language, category">
+              </div>
+              <div class="fg-check" style="margin-bottom: 0.5rem;">
+                <input type="checkbox" id="fb-extract-all">
+                <label for="fb-extract-all">Extract All Available Columns</label>
+              </div>
+              <div class="fg">
+                <div class="fl">Analysis Prompt (Custom)</div>
+                <textarea class="fi" id="fb-kaggle-prompt" rows="2"
+                  placeholder="Describe the media... ask to extract likes/comments if they are in the image!"></textarea>
+              </div>
+              <button class="btn btn-primary" onclick="queueFacebookKaggle()">⬇ Queue
                 for Ingestion</button>
             </div>
           </div>
@@ -2508,23 +2637,58 @@
                 </div>
                 <div style="display:flex;flex-direction:column;gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Text column</div><input class="fi" type="text" value="text"
+                    <div class="fl">Text column</div><input class="fi" type="text" id="tw-col-text" value="text"
                       placeholder="text / tweet / content">
                   </div>
                   <div class="fg">
-                    <div class="fl">Timestamp column</div><input class="fi" type="text" value="created_at"
-                      placeholder="date / timestamp">
+                    <div class="fl">Timestamp column</div><input class="fi" type="text" id="tw-col-time"
+                      value="created_at" placeholder="date / timestamp">
                   </div>
                   <div class="fg">
-                    <div class="fl">Author column</div><input class="fi" type="text" value="username"
+                    <div class="fl">Author column</div><input class="fi" type="text" id="tw-col-author" value="username"
                       placeholder="user / author">
                   </div>
                   <div class="fg">
-                    <div class="fl">ID column</div><input class="fi" type="text" value="id" placeholder="id / tweet_id">
+                    <div class="fl">ID column</div><input class="fi" type="text" id="tw-col-id" value="id"
+                      placeholder="id / tweet_id">
+                  </div>
+                  <div class="fg">
+                    <div class="fl">Processing Type</div><select class="fs" id="tw-processing-type">
+                      <option value="text_only">Text only</option>
+                      <option value="text_image">Text + Image</option>
+                      <option value="text_video">Text + Audio/Video</option>
+                    </select>
+                  </div>
+                  <div class="g2" style="gap:0.5rem; margin-top: 0.5rem;">
+                    <div class="fg">
+                      <div class="fl">Likes</div><input class="fi fi-sm" type="text" id="tw-col-likes"
+                        placeholder="favorite_count">
+                    </div>
+                    <div class="fg">
+                      <div class="fl">Retweets</div><input class="fi fi-sm" type="text" id="tw-col-retweets"
+                        placeholder="retweet_count">
+                    </div>
+                    <div class="fg">
+                      <div class="fl">Replies</div><input class="fi fi-sm" type="text" id="tw-col-replies"
+                        placeholder="reply_count">
+                    </div>
+                  </div>
+                  <div class="fg" style="margin-top:0.5rem;">
+                    <div class="fl">Additional Columns</div>
+                    <input class="fi fi-sm" type="text" id="tw-col-custom" placeholder="location, source, lang">
+                  </div>
+                  <div class="fg-check" style="margin-top:0.5rem;">
+                    <input type="checkbox" id="tw-extract-all">
+                    <label for="tw-extract-all">Extract All Columns</label>
                   </div>
                 </div>
               </div>
-              <button class="btn btn-primary" onclick="queueDzFile('tw-dz','Twitter Dataset','𝕏','twitter')">⬇ Queue
+              <div class="fg">
+                <div class="fl">Analysis Prompt (Custom)</div>
+                <textarea class="fi" id="tw-kaggle-prompt" rows="2"
+                  placeholder="Analyze the media and link it to the tweet text..."></textarea>
+              </div>
+              <button class="btn btn-primary" onclick="queueTwitterKaggle()">⬇ Queue
                 for Ingestion</button>
             </div>
           </div>
@@ -2574,10 +2738,12 @@
                   </select>
                 </div>
                 <div class="fg">
-                  <div class="fl">OCR Pipeline</div><select class="fs" id="pdf-ocr-pipeline">
-                    <option value="both">Smart Hybrid (PyMuPDF Text + Qwen Vision OCR)</option>
-                    <option value="text_only">PyMuPDF Text Only (Fast)</option>
-                    <option value="vision_only">Qwen Vision OCR Only (Scanned/Images)</option>
+                  <div class="fl">OCR Pipeline</div><select class="fs">
+                    <option>Smart — text extract → OCR fallback (default)</option>
+                    <option>In-house Vision Model OCR</option>
+                    <option>Tesseract OCR (scanned)</option>
+                    <option>PyMuPDF text only</option>
+                    <option>Table extraction + text</option>
                   </select>
                 </div>
                 <div class="fg">
@@ -2650,29 +2816,35 @@
                   <div class="dz-btn-fake">Choose Images</div>
                 </div>
                 <div class="fg">
-                  <div class="fl">Image type (routes to correct pipeline)</div>
-                  <select class="fs">
-                    <option>Infographic / Poster</option>
-                    <option>Screenshot (app / web)</option>
-                    <option>Chart / Graph / Table</option>
-                    <option>Print Media Clipping</option>
-                    <option>Photograph</option>
-                    <option>Document / Handwritten</option>
-                    <option>Auto-detect</option>
+                  <div class="fl">Vision Model</div>
+                  <select class="fs" id="img-model">
+                    <option value="qwen">Qwen2.5-VL (Default)</option>
+                    <option value="tesseract" disabled>Tesseract OCR (Pending Integration)</option>
+                    <option value="blip" disabled>BLIP-2 Caption (Pending Integration)</option>
+                    <option value="face" disabled>Face Recognition Pipeline (Pending Integration)</option>
                   </select>
                 </div>
                 <div class="fg">
-                  <div class="fl">Vision Processing</div>
-                  <select class="fs">
-                    <option>Full — OCR + Caption + Entity extract</option>
-                    <option>OCR only (Tesseract)</option>
-                    <option>Caption only (BLIP-2)</option>
-                    <option>Chart → JSON data extract</option>
-                    <option>Face recognition + ID</option>
-                  </select>
+                  <div class="fl">Analysis Prompt</div>
+                  <textarea class="fi" id="img-prompt" rows="2"
+                    placeholder="e.g., 'Extract all text from this image' or 'Describe what you see in detail'"></textarea>
+                  <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.3rem;">
+                    <span class="tag tag-x" style="cursor:pointer;"
+                      onclick="document.getElementById('img-prompt').value='Extract all text from this image'">📝
+                      Extract Text</span>
+                    <span class="tag tag-x" style="cursor:pointer;"
+                      onclick="document.getElementById('img-prompt').value='Describe this image in detail. Identify any people or entities present.'">🔍
+                      Describe & Identify</span>
+                    <span class="tag tag-x" style="cursor:pointer;"
+                      onclick="document.getElementById('img-prompt').value='What objects and people can you identify in this image?'">🏷️
+                      Identify Entities</span>
+                    <span class="tag tag-x" style="cursor:pointer;"
+                      onclick="document.getElementById('img-prompt').value='Analyze this document and summarize its content'">📄
+                      Analyze Document</span>
+                  </div>
                 </div>
                 <div class="fg">
-                  <div class="fl">Source Attribution</div><input class="fi" type="text"
+                  <div class="fl">Source Attribution</div><input class="fi" id="img-source" type="text"
                     placeholder="Times of India · Election Commission · Twitter screenshot...">
                 </div>
               </div>
@@ -2695,24 +2867,26 @@
                 </div>
                 <div class="g2" style="gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Filename column</div><input class="fi" type="text" value="filename"
-                      placeholder="filename / path">
+                    <div class="fl">Max Images (Limit)</div><input class="fi" id="kimg-max" type="number" value="10"
+                      min="1" max="100">
                   </div>
-                  <div class="fg">
-                    <div class="fl">Label column</div><input class="fi" type="text" value="label"
-                      placeholder="label / category">
-                  </div>
-                  <div class="fg">
-                    <div class="fl">Date column</div><input class="fi" type="text" value="date"
-                      placeholder="date / timestamp">
-                  </div>
-                  <div class="fg">
-                    <div class="fl">Source column</div><input class="fi" type="text" value="source"
-                      placeholder="source / origin">
+                </div>
+                <div class="fg">
+                  <div class="fl">Analysis Prompt</div>
+                  <textarea class="fi" id="kimg-prompt" rows="2"
+                    placeholder="Extract all text from the images. Describe the content."></textarea>
+                  <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.3rem;">
+                    <span class="tag tag-x" style="cursor:pointer;"
+                      onclick="document.getElementById('kimg-prompt').value='Extract all text from this image'">📝
+                      Extract Text</span>
+                    <span class="tag tag-x" style="cursor:pointer;"
+                      onclick="document.getElementById('kimg-prompt').value='Describe this image in detail. Identify any people or entities present.'">🔍
+                      Describe</span>
                   </div>
                 </div>
                 <button class="btn btn-primary btn-sm"
-                  onclick="queueDzFile('kimg-dz','Kaggle Image Dataset','📊','images')">⬇ Queue for Ingestion</button>
+                  onclick="queueDzFile('kimg-dz','Kaggle Image Dataset','📊','kaggle-images')">⬇ Queue for
+                  Ingestion</button>
               </div>
             </div>
           </div>
@@ -2902,8 +3076,7 @@
         <div class="vhdr">
           <div class="vhdr-left">
             <div class="vhdr-title"><span class="src-icon">🗄️</span> Database Import</div>
-            <div class="vhdr-sub">PostgreSQL · MongoDB · SQLite · CSV · Elasticsearch · Redis · MySQL · Qdrant → Kafka
-              pipeline</div>
+            <div class="vhdr-sub">NetaBoardV5 · Prisma Studio · SQLite → Browse & Query</div>
           </div>
           <div class="vhdr-actions">
             <button class="btn btn-outline btn-sm" onclick="dbTest()">⟲ Test Connection</button>
@@ -2918,36 +3091,22 @@
             <div class="card-body">
               <div class="dbtype-grid" id="db-type-grid">
                 <div class="dbtype-btn active"
+                  onclick="dbSelectType(this,'sqlite','3000','file:./dev.db')">
+                  <div class="dbtype-ico">🗃️</div>
+                  <div class="dbtype-lbl">SQLite</div>
+                </div>
+                <div class="dbtype-btn"
                   onclick="dbSelectType(this,'pg','5432','postgresql://user:pass@host:5432/dbname')">
                   <div class="dbtype-ico">🐘</div>
                   <div class="dbtype-lbl">PostgreSQL</div>
-                </div>
-                <div class="dbtype-btn"
-                  onclick="dbSelectType(this,'mongo','27017','mongodb://user:pass@host:27017/dbname')">
-                  <div class="dbtype-ico">🍃</div>
-                  <div class="dbtype-lbl">MongoDB</div>
-                </div>
-                <div class="dbtype-btn" onclick="dbSelectType(this,'sqlite','','file:///path/to/db.sqlite')">
-                  <div class="dbtype-ico">📦</div>
-                  <div class="dbtype-lbl">SQLite</div>
-                </div>
-                <div class="dbtype-btn" onclick="dbSelectType(this,'csv','','/path/to/data.csv or .parquet')">
-                  <div class="dbtype-ico">📋</div>
-                  <div class="dbtype-lbl">CSV / Parquet</div>
                 </div>
                 <div class="dbtype-btn" onclick="dbSelectType(this,'es','9200','http://localhost:9200')">
                   <div class="dbtype-ico">🔍</div>
                   <div class="dbtype-lbl">Elasticsearch</div>
                 </div>
-                <div class="dbtype-btn"
-                  onclick="dbSelectType(this,'redis','6379','redis://:password@localhost:6379/0')">
+                <div class="dbtype-btn" onclick="dbSelectType(this,'redis','6379','redis://:password@localhost:6379/0')">
                   <div class="dbtype-ico">🔴</div>
                   <div class="dbtype-lbl">Redis</div>
-                </div>
-                <div class="dbtype-btn"
-                  onclick="dbSelectType(this,'mysql','3306','mysql://user:pass@host:3306/dbname')">
-                  <div class="dbtype-ico">🐬</div>
-                  <div class="dbtype-lbl">MySQL</div>
                 </div>
                 <div class="dbtype-btn" onclick="dbSelectType(this,'qdrant','6333','http://localhost:6333')">
                   <div class="dbtype-ico">◈</div>
@@ -2965,42 +3124,79 @@
               <div class="card-body" style="display:flex;flex-direction:column;gap:0.65rem;">
                 <div class="fg">
                   <div class="fl">URI / Connection String</div><input class="fi" id="db-uri" type="text"
-                    placeholder="postgresql://user:pass@localhost:5432/dbname">
+                    value="file:./dev.db" placeholder="postgresql://user:pass@localhost:5432/dbname">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Host</div><input class="fi" id="db-host" value="localhost">
+                    <div class="fl">Host</div><input class="fi" id="db-host" value="localhost" disabled style="opacity:0.5;">
                   </div>
                   <div class="fg">
-                    <div class="fl">Port</div><input class="fi" id="db-port" value="5432">
+                    <div class="fl">Port</div><input class="fi" id="db-port" value="3000" disabled style="opacity:0.5;">
                   </div>
                   <div class="fg">
-                    <div class="fl">Database</div><input class="fi" id="db-name" placeholder="dbname">
+                    <div class="fl">Database</div><input class="fi" id="db-name" value="netaBoardV5" disabled style="opacity:0.5;">
                   </div>
                 </div>
                 <div class="g2" style="gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Username</div><input class="fi" id="db-user" type="text">
+                    <div class="fl">Username</div><input class="fi" id="db-user" type="text" value="admin" disabled style="opacity:0.5;">
                   </div>
                   <div class="fg">
-                    <div class="fl">Password</div><input class="fi" id="db-pass" type="password">
+                    <div class="fl">Password</div>
+                    <div style="position:relative;">
+                      <input class="fi" id="db-pass" type="password" style="padding-right:2.5rem;opacity:0.5;" disabled>
+                      <button id="db-pass-toggle" type="button" title="Show password" onclick="dbTogglePassword()"
+                        style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--text3);padding:0.2rem 0.3rem;line-height:1;border-radius:3px;transition:color 0.15s;"
+                        onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--text3)'">👁</button>
+                    </div>
                   </div>
                 </div>
-                <div class="flex-row">
+                <div class="flex-row" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                   <button class="btn btn-outline btn-sm" onclick="dbTest()">⟲ Test Connection</button>
                   <span style="font-family:var(--mono);font-size:0.5rem;" id="db-test-status"></span>
                 </div>
               </div>
             </div>
+
+            <!-- ── Prisma Studio Section (hidden until connected) ── -->
+            <div class="card" id="db-prisma-section" style="display:none;">
+              <div class="card-hdr">
+                <div class="card-title">
+                  <span class="icon" style="display:inline-flex;align-items:center;gap:0.3rem;">
+                    <span style="width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);display:inline-block;"></span>
+                  </span>
+                  Prisma Studio
+                  <span class="tag tag-g" style="margin-left:0.4rem;">LIVE</span>
+                </div>
+                <div style="display:flex;gap:0.4rem;align-items:center;">
+                  <a href="http://localhost:5555" target="_blank" class="btn btn-xs btn-outline" style="text-decoration:none;">↗ Open in Tab</a>
+                  <button class="btn btn-xs btn-danger" onclick="dbClosePrisma()">✕ Close</button>
+                </div>
+              </div>
+              <div class="card-body p0">
+                <iframe id="db-prisma-iframe" src="about:blank"
+                  style="width:100%;height:520px;border:none;background:var(--bg);border-radius:0 0 var(--radius) var(--radius);"
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+              </div>
+            </div>
+
             <div class="card">
               <div class="card-hdr">
-                <div class="card-title"><span class="icon">⬡</span> Query & Mapping</div><button
-                  class="btn btn-xs btn-outline" onclick="dbLoadTables()">↺ Load Tables</button>
+                <div class="card-title"><span class="icon">⬡</span> Query & Mapping</div>
+                <div style="display:flex;gap:0.4rem;">
+                  <button class="btn btn-xs btn-outline" onclick="dbLoadTables()">↺ Load Tables</button>
+                  <button class="btn btn-xs btn-primary" onclick="dbRunQuery()">▶ Run Query</button>
+                </div>
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:0.65rem;">
+                <!-- Table chips -->
+                <div class="fg">
+                  <div class="fl">Available Models / Tables</div>
+                  <div id="db-table-chips" class="db-table-chips" style="display:none;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.3rem;"></div>
+                </div>
                 <div class="fg">
                   <div class="fl">Table / Collection</div><input class="fi" id="db-table" type="text"
-                    placeholder="table_name / collection_name">
+                    placeholder="Select from above or type name" value="Archetype">
                 </div>
                 <div class="fg">
                   <div class="fl">Filter Query (SQL / MQL)</div><textarea class="fi" id="db-query" rows="2"
@@ -3031,6 +3227,22 @@
                       <option>Incremental</option>
                       <option>Scheduled (cron)</option>
                     </select>
+                  </div>
+                </div>
+
+                <!-- Query Results -->
+                <div id="db-query-results" style="display:none;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                    <div class="fl" style="margin:0;">Query Results</div>
+                    <span id="db-results-count" style="font-family:var(--mono);font-size:0.44rem;color:var(--text3);letter-spacing:0.08em;"></span>
+                  </div>
+                  <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);max-height:300px;overflow-y:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:0.52rem;">
+                      <thead>
+                        <tr id="db-results-header" style="background:var(--bg3);position:sticky;top:0;"></tr>
+                      </thead>
+                      <tbody id="db-results-body"></tbody>
+                    </table>
                   </div>
                 </div>
               </div>
@@ -3202,7 +3414,1408 @@
 
   </div><!-- .shell -->
 
-  <script src="admin.js"></script>
+  <script>
+    /* ═══════════════════════════════════════════════
+       NAVIGATION
+    ═══════════════════════════════════════════════ */
+    document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        item.classList.add('active');
+        const v = document.getElementById('v-' + item.dataset.view);
+        if (v) v.classList.add('active');
+      });
+    });
+
+    /* ═══════════════════════════════════════════════
+       CLOCK & STATUS PING
+    ═══════════════════════════════════════════════ */
+    (function tick() {
+      document.getElementById('clock').textContent = new Date().toTimeString().slice(0, 8);
+      setTimeout(tick, 1000);
+    })();
+
+    async function checkServiceHealth(id, url) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      try {
+        const res = await fetch(url, { method: 'GET' });
+        if (res.ok) {
+          el.style.borderColor = 'var(--green3)'; el.style.color = 'var(--green)'; el.style.background = 'var(--green2)';
+          el.innerHTML = '<span class="dot dot-g" style="margin-right:4px;"></span>' + id.split('-')[0].toUpperCase();
+        } else throw new Error('not ok');
+      } catch (e) {
+        el.style.borderColor = 'var(--red3)'; el.style.color = 'var(--red)'; el.style.background = 'var(--red2)';
+        el.innerHTML = '<span class="dot dot-r" style="margin-right:4px;"></span>' + id.split('-')[0].toUpperCase();
+      }
+    }
+
+    setInterval(() => {
+      checkServiceHealth('whisper-status', 'http://localhost:8000/api/health');
+      checkServiceHealth('qwen-status', 'http://localhost:5001/api/health');
+      checkServiceHealth('neta-status', 'http://localhost:3000/api/health');
+    }, 5000);
+    // Check immediately
+    checkServiceHealth('whisper-status', 'http://localhost:8000/api/health');
+    checkServiceHealth('qwen-status', 'http://localhost:5001/api/health');
+    checkServiceHealth('neta-status', 'http://localhost:3000/api/health');
+
+    /* ═══════════════════════════════════════════════
+       JOB QUEUE ENGINE
+    ═══════════════════════════════════════════════ */
+    let jobs = [];
+    let jobIdCounter = 0;
+    let qFilter = 'all';
+    let globalPaused = false;
+
+    function createJob(name, icon, sourceType, extraMeta = '') {
+      const id = ++jobIdCounter;
+      const job = {
+        id, name, icon, sourceType, extraMeta,
+        status: 'queued', // queued | processing | paused | done | failed
+        progress: 0,
+        checked: false,
+        startedAt: null,
+        doneAt: null,
+        itemsProcessed: 0,
+        totalItems: Math.floor(Math.random() * 800 + 50),
+        timer: null,
+      };
+      jobs.unshift(job);
+      renderQueue();
+      updateStats();
+      qLog('info', `Queued: [${sourceType.toUpperCase()}] ${name}`);
+      // Update nav badge
+      updateNavBadge(sourceType);
+      return job;
+    }
+
+    function startJob(id) {
+      const j = jobs.find(x => x.id === id);
+      if (!j || j.status === 'processing' || j.status === 'done') return;
+      j.status = 'processing';
+      j.startedAt = new Date();
+      j.progress = 0;
+      renderQueue(); updateStats();
+      qLog('ok', `Started: ${j.name}`);
+
+      // REAL INTEGRATION FOR IMAGES
+      if (j.sourceType === 'images' && j.filePayload) {
+        processImageJob(j);
+        return;
+      }
+
+      // REAL INTEGRATION FOR YOUTUBE
+      if (j.sourceType === 'youtube' && j.ytJobId) {
+        processYouTubeJob(j);
+        return;
+      }
+
+      // REAL INTEGRATION FOR KAGGLE IMAGES
+      if (j.sourceType === 'kaggle-images' && j.filePayload) {
+        processKaggleImageJob(j);
+        return;
+      }
+
+      // REAL INTEGRATION FOR TWITTER KAGGLE
+      if (j.sourceType === 'twitter-kaggle' && j.filePayload) {
+        processTwitterKaggleJob(j);
+        return;
+      }
+
+      // REAL INTEGRATION FOR FACEBOOK KAGGLE
+      if (j.sourceType === 'facebook-kaggle' && j.filePayload) {
+        processFacebookKaggleJob(j);
+        return;
+      }
+
+      // REAL INTEGRATION FOR PDFS
+      if (j.sourceType === 'pdf' && j.filePayload) {
+        processPdfJob(j);
+        return;
+      }
+
+      // FAKE SIMULATION FOR OTHERS
+      j.timer = setInterval(async () => {
+        if (globalPaused || j.status === 'paused') return;
+        const step = Math.floor(Math.random() * 8 + 2);
+        j.progress = Math.min(100, j.progress + step);
+        j.itemsProcessed = Math.floor((j.progress / 100) * j.totalItems);
+        if (j.progress >= 100) {
+          j.status = 'done'; j.doneAt = new Date(); clearInterval(j.timer);
+          qLog('ok', `✓ Done: ${j.name} — ${j.totalItems.toLocaleString()} items → raw.content`);
+          try {
+            await fetch('http://localhost:3000/api/ingest', {
+              method: 'POST',
+              body: JSON.stringify({
+                source: j.sourceType || 'Simulation',
+                title: j.name,
+                content: `URL SCRAPE: Simulated extracted content for [${j.name}].\nItems processed: ${j.totalItems}\n${Array(10).fill('Sample scraped data row...').join('\n')}`,
+                author: 'URL Scraper'
+              }),
+              headers: { 'Content-Type': 'application/json' }
+            });
+            qLog('ok', `✓ Saved Simulated Data to NetaBoard DB`);
+          } catch (e) { }
+        }
+        renderQueue(); updateStats();
+      }, 350 + Math.random() * 250);
+    }
+
+    async function processYouTubeJob(j) {
+      j.timer = setInterval(async () => {
+        if (globalPaused || j.status === 'paused') return;
+        try {
+          const res = await fetch(`http://localhost:8000/api/jobs/${j.ytJobId}`);
+          if (res.ok) {
+            const data = await res.json();
+            j.progress = data.progress;
+            if (data.stage) j.extraMeta = data.stage;
+
+            if (data.status === 'done') {
+              j.status = 'done'; j.doneAt = new Date(); clearInterval(j.timer);
+              j.progress = 100;
+              if (data.stage) j.extraMeta = data.stage;
+
+              qLog('ok', `✓ Done: ${j.name} (${data.result.processing_time}s)`);
+              if (data.result.segments && data.result.segments.length > 0) {
+                const transcript = data.result.segments.map(s => s.text).join(' ');
+                qLog('info', `Transcript: ` + transcript.substring(0, 80) + `...`);
+                try {
+                  await fetch('http://localhost:3000/api/ingest', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      source: 'YouTube Transcript',
+                      title: j.name,
+                      content: `[${j.name}] ` + transcript,
+                      author: 'Whisper Pipeline'
+                    }),
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                  qLog('ok', `✓ Transcription saved to NetaBoard DB`);
+                } catch (e) { }
+              }
+            } else if (data.status === 'failed') {
+              j.status = 'failed'; clearInterval(j.timer);
+              qLog('err', `YouTube Failed: ${data.result.error}`);
+            }
+            renderQueue(); updateStats();
+          }
+        } catch (e) { }
+      }, 1500);
+    }
+
+    async function processPdfJob(j) {
+      const formData = new FormData();
+      formData.append('pdf', j.filePayload);
+
+      j.progress = 20;
+      renderQueue();
+
+      try {
+        const res = await fetch('http://localhost:5001/api/analyze-pdf', {
+          method: 'POST',
+          body: formData
+        });
+
+        j.progress = 90;
+        renderQueue();
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          j.status = 'done';
+          j.doneAt = new Date();
+          j.progress = 100;
+          j.itemsProcessed = 1; j.totalItems = 1;
+
+          qLog('ok', `✓ PyMuPDF Extraction Done: ${j.name}`);
+          qLog('info', `Extracted Text: ` + data.result.substring(0, 100) + `...`);
+
+          try {
+            const fileData = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target.result);
+              reader.readAsDataURL(j.filePayload);
+            });
+
+            await fetch('http://localhost:3000/api/ingest', {
+              method: 'POST',
+              body: JSON.stringify({
+                source: 'PDF Documents',
+                title: j.name,
+                fileName: j.name,
+                fileData: fileData,
+                content: `Document [${j.name}]: ${data.result}`,
+                author: 'System Extractor'
+              }),
+              headers: { 'Content-Type': 'application/json' }
+            });
+            qLog('ok', `✓ Saved to NetaBoard Database`);
+          } catch (e) {
+            qLog('warn', `Failed to save PDF text to NetaBoard DB`);
+          }
+        } else {
+          j.status = 'failed';
+          j.progress = 0;
+          qLog('err', `PDF Parser Error: ${data.error || 'Unknown API Error'}`);
+        }
+      } catch (err) {
+        j.status = 'done';
+        j.progress = 100;
+        qLog('warn', `Qwen backend offline. Using fallback PDF simulation.`);
+        try {
+          const fileData = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsDataURL(j.filePayload);
+          });
+          await fetch('http://localhost:3000/api/ingest', {
+            method: 'POST',
+            body: JSON.stringify({
+              source: 'PDF Documents (Fallback)',
+              title: j.name,
+              fileName: j.name,
+              fileData: fileData,
+              content: `Document [${j.name}]: (DUMMY TEXT) The PyMuPDF backend was offline, so this is simulated extracted text for the PDF you uploaded.`,
+              author: 'Fallback Extractor'
+            }),
+            headers: { 'Content-Type': 'application/json' }
+          });
+          qLog('ok', `✓ Fallback PDF Saved to NetaBoard DB`);
+        } catch (e) {
+          qLog('err', `Network error saving to DB: ${e.message}`);
+        }
+      }
+
+      renderQueue();
+      updateStats();
+    }
+    async function processImageJob(j) {
+      const formData = new FormData();
+
+      // filePayload is now an array of files
+      if (Array.isArray(j.filePayload)) {
+        for (let i = 0; i < j.filePayload.length; i++) {
+          formData.append('images', j.filePayload[i]);
+        }
+      } else {
+        formData.append('images', j.filePayload);
+      }
+
+      const defaultPrompt = 'You are extracting structural and visual information for a dashboard. Describe the key subjects, extract any text from the image verbatim, and identify any recognized public figures, logos, or flags.';
+      formData.append('prompt', j.extraMeta || defaultPrompt);
+
+      j.progress = 10;
+      renderQueue();
+
+      try {
+        const res = await fetch('http://localhost:5001/api/analyze-batch', {
+          method: 'POST',
+          body: formData
+        });
+
+        j.progress = 90;
+        renderQueue();
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          j.status = 'done';
+          j.doneAt = new Date();
+          j.progress = 100;
+          j.itemsProcessed = data.image_count || 1;
+          j.totalItems = data.image_count || 1;
+
+          qLog('ok', `✓ Qwen Analysis Done: ${j.name}`);
+          qLog('info', `Extracted text/description: ` + data.result.substring(0, 80) + `...`);
+
+          try {
+            const dirName = 'Image_Analysis';
+            const safeName = j.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const ts = new Date().toISOString().replace(/[:.]/g, '-');
+
+            await fetch('/api/save_local_file', {
+              method: 'POST',
+              body: JSON.stringify({
+                folder: dirName,
+                filename: `${safeName}_${ts}.txt`,
+                content: `[Analyzed ${new Date().toLocaleString()}]\n\nJob: ${j.name}\nResult length: ${data.result?.length || 0} characters.\n\n${data.result}`
+              }),
+              headers: { 'Content-Type': 'application/json' }
+            });
+            qLog('ok', `✓ Saved to DataCollected/${dirName}`);
+          } catch (e) {
+            console.error("Local save error:", e);
+            qLog('warn', `Failed saving local result text`);
+          }
+
+        } else {
+          j.status = 'failed';
+          j.progress = 0;
+          qLog('err', `Qwen Error: ${data.error || 'Unknown API Error'}`);
+        }
+      } catch (err) {
+        j.status = 'done';
+        j.progress = 100;
+        qLog('warn', `Qwen backend offline. Using fallback Vision simulation.`);
+        try {
+          const dirName = 'Image_Analysis';
+          const safeName = j.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+          const ts = new Date().toISOString().replace(/[:.]/g, '-');
+          const dummyText = `Image Analysis [${j.name}]: (DUMMY TEXT) The Qwen parsing backend was offline, so this is simulated extracted text for the Images you uploaded.`;
+
+          await fetch('/api/save_local_file', {
+            method: 'POST',
+            body: JSON.stringify({
+              folder: dirName,
+              filename: `${safeName}_${ts}.txt`,
+              content: `[Analyzed (Fallback) ${new Date().toLocaleString()}]\n\nJob: ${j.name}\n\n${dummyText}`
+            }),
+            headers: { 'Content-Type': 'application/json' }
+          });
+          qLog('ok', `✓ Fallback Image Saved to DataCollected/${dirName}`);
+        } catch (e) {
+          qLog('err', `Network error saving to local file: ${e.message}`);
+        }
+      }
+
+      renderQueue();
+      updateStats();
+    }
+
+    function pauseJob(id) {
+      const j = jobs.find(x => x.id === id);
+      if (!j) return;
+      if (j.status === 'processing') { j.status = 'paused'; qLog('warn', `Paused: ${j.name}`); }
+      else if (j.status === 'paused') { j.status = 'processing'; qLog('info', `Resumed: ${j.name}`); }
+      renderQueue(); updateStats();
+    }
+
+    /* ══ Twitter Kaggle ══ */
+    function queueTwitterKaggle() {
+      const dzId = 'tw-dz';
+      const dz = document.getElementById(dzId);
+      if (!dz || !dz.classList.contains('filled') || !dzFiles[dzId]) {
+        alert('Please select a Twitter dataset file first.'); return;
+      }
+
+      const file = dzFiles[dzId][0]; // Take first file
+      const j = createJob(file.name, '🕈', 'twitter-kaggle');
+      j.filePayload = file;
+
+      // Collect form metadata
+      j.twitterMeta = {
+        col_text: document.getElementById('tw-col-text').value,
+        col_time: document.getElementById('tw-col-time').value,
+        col_author: document.getElementById('tw-col-author').value,
+        col_id: document.getElementById('tw-col-id').value,
+        processing_type: document.getElementById('tw-processing-type').value,
+        custom_prompt: document.getElementById('tw-kaggle-prompt').value,
+        col_likes: document.getElementById('tw-col-likes').value,
+        col_retweets: document.getElementById('tw-col-retweets').value,
+        col_replies: document.getElementById('tw-col-replies').value,
+        custom_cols: document.getElementById('tw-col-custom').value,
+        extract_all: document.getElementById('tw-extract-all').checked
+      };
+
+      setTimeout(() => startJob(j.id), 200);
+
+      // Clear selection
+      dzFiles[dzId] = null;
+      dz.classList.remove('filled');
+      const lbl = dz.querySelector('.dz-main');
+      if (lbl) lbl.textContent = 'Drop Twitter / X dataset here';
+    }
+
+    async function processTwitterKaggleJob(j) {
+      const formData = new FormData();
+      formData.append('file', j.filePayload);
+      formData.append('meta', JSON.stringify(j.twitterMeta));
+
+      j.progress = 5;
+      j.extraMeta = 'Uploading...';
+      renderQueue();
+
+      try {
+        const res = await fetch('/api/proxy/twitter-ingest', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        j.status = 'done';
+        j.doneAt = new Date();
+        j.progress = 100;
+        j.extraMeta = 'Compiling results...';
+        qLog('ok', `✓ Twitter Ingestion Done: ${j.name}`);
+        qLog('info', `Saved to DataCollected/twitter/${data.filename}`);
+
+      } catch (e) {
+        j.status = 'failed';
+        qLog('err', `Twitter Ingestion Error: ${e.message}`);
+      }
+      renderQueue(); updateStats();
+    }
+
+    function queueFacebookKaggle() {
+      const dzId = 'fb-dz';
+      const dz = document.getElementById(dzId);
+      if (!dz || !dz.classList.contains('filled') || !dzFiles[dzId]) {
+        alert('Please select a Facebook dataset file first.'); return;
+      }
+
+      const file = dzFiles[dzId][0];
+      const j = createJob(file.name, '📘', 'facebook-kaggle');
+      j.filePayload = file;
+
+      j.facebookMeta = {
+        col_text: document.getElementById('fb-col-text').value,
+        col_time: document.getElementById('fb-col-time').value,
+        col_author: document.getElementById('fb-col-author').value,
+        id_column: document.getElementById('fb-col-id').value,
+        processing_type: document.getElementById('fb-kaggle-type').value,
+        custom_prompt: document.getElementById('fb-kaggle-prompt').value,
+        col_likes: document.getElementById('fb-col-likes').value,
+        col_replies: document.getElementById('fb-col-replies').value,
+        col_shares: document.getElementById('fb-col-shares').value,
+        col_dislikes: document.getElementById('fb-col-dislikes').value,
+        custom_cols: document.getElementById('fb-col-custom').value,
+        extract_all: document.getElementById('fb-extract-all').checked
+      };
+
+      setTimeout(() => startJob(j.id), 200);
+
+      dzFiles[dzId] = null;
+      dz.classList.remove('filled');
+      const lbl = dz.querySelector('.dz-main');
+      if (lbl) lbl.textContent = 'Drop Facebook dataset here';
+    }
+
+    async function processFacebookKaggleJob(j) {
+      const formData = new FormData();
+      formData.append('file', j.filePayload);
+      formData.append('meta', JSON.stringify(j.facebookMeta));
+
+      j.progress = 5;
+      j.extraMeta = 'Uploading...';
+      renderQueue();
+
+      try {
+        const res = await fetch('/api/proxy/facebook-ingest', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        j.status = 'done';
+        j.doneAt = new Date();
+        j.progress = 100;
+        j.extraMeta = 'Compiling ...';
+        qLog('ok', `✓ Facebook Ingestion Done: ${j.name}`);
+        qLog('info', `Saved to DataCollected/facebook/${data.filename}`);
+
+      } catch (e) {
+        j.status = 'failed';
+        qLog('err', `Facebook Ingestion Error: ${e.message}`);
+      }
+      renderQueue(); updateStats();
+    }
+
+    async function processKaggleImageJob(j) {
+      const formData = new FormData();
+
+      let fileObj = Array.isArray(j.filePayload) ? j.filePayload[0] : j.filePayload;
+      formData.append('zipfile', fileObj);
+
+      const defaultPrompt = 'Extract all text from the images. Describe the content.';
+      formData.append('prompt', j.extraMeta || defaultPrompt);
+      formData.append('max_images', j.totalItems || 10);
+
+      j.progress = 5;
+      renderQueue();
+
+      try {
+        const res = await fetch('http://localhost:5001/api/analyze-kaggle', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          j.status = 'failed'; j.progress = 0;
+          qLog('err', `Qwen Error: ${errData.error || res.statusText}`);
+          renderQueue(); updateStats(); return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalData = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const evt = JSON.parse(line.slice(6));
+
+              if (evt.type === 'progress') {
+                j.itemsProcessed = evt.current;
+                j.totalItems = evt.total;
+                j.progress = Math.round((evt.current / evt.total) * 95) + 5; // 5-100%
+                qLog('info', `Kaggle [${evt.current}/${evt.total}] ${evt.filename} — ${evt.status}`);
+                renderQueue();
+              } else if (evt.type === 'done') {
+                finalData = evt;
+              } else if (evt.type === 'error') {
+                j.status = 'failed'; j.progress = 0;
+                qLog('err', `Qwen Error: ${evt.error}`);
+                renderQueue(); updateStats(); return;
+              }
+            } catch (parseErr) { /* skip malformed lines */ }
+          }
+        }
+
+        if (finalData && finalData.success) {
+          j.status = 'done';
+          j.doneAt = new Date();
+          j.progress = 100;
+          j.itemsProcessed = finalData.image_count || j.itemsProcessed;
+          j.totalItems = finalData.image_count || j.totalItems;
+
+          qLog('ok', `✓ Kaggle Image Analysis Done: ${j.name}`);
+
+          try {
+            const dirName = 'Image_Analysis';
+            const safeName = j.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const ts = new Date().toISOString().replace(/[:.]/g, '-');
+
+            await fetch('/api/save_local_file', {
+              method: 'POST',
+              body: JSON.stringify({
+                folder: dirName,
+                filename: `${safeName}_${ts}.txt`,
+                content: `[Kaggle Analyzed ${new Date().toLocaleString()}]\n\nJob: ${j.name}\nResult length: ${finalData.result?.length || 0} characters.\n\n${finalData.result}`
+              }),
+              headers: { 'Content-Type': 'application/json' }
+            });
+            qLog('ok', `✓ Saved to DataCollected/${dirName}`);
+          } catch (e) {
+            console.error("Local save error:", e);
+            qLog('warn', `Failed saving local result text`);
+          }
+
+        } else {
+          j.status = 'failed';
+          j.progress = 0;
+          qLog('err', `Kaggle analysis finished without success.`);
+        }
+      } catch (err) {
+        j.status = 'failed';
+        j.progress = 0;
+        qLog('err', `Qwen backend offline or network error.`);
+      }
+
+      renderQueue();
+      updateStats();
+    }
+
+
+    function removeJob(id) {
+      const j = jobs.find(x => x.id === id);
+      if (j && j.timer) clearInterval(j.timer);
+      jobs = jobs.filter(x => x.id !== id);
+      renderQueue(); updateStats();
+    }
+
+    function runAllQueued() {
+      globalPaused = false;
+      jobs.filter(j => j.status === 'queued').forEach(j => {
+        setTimeout(() => startJob(j.id), Math.random() * 600);
+      });
+    }
+
+    function pauseAll() {
+      globalPaused = !globalPaused;
+      qLog('warn', globalPaused ? 'All processing paused.' : 'Processing resumed.');
+    }
+
+    function clearDone() {
+      jobs = jobs.filter(j => j.status !== 'done');
+      renderQueue(); updateStats();
+    }
+
+    function runSelected() { jobs.filter(j => j.checked && j.status === 'queued').forEach(j => startJob(j.id)); }
+    function pauseSelected() { jobs.filter(j => j.checked).forEach(j => pauseJob(j.id)); }
+    function removeSelected() { const ids = jobs.filter(j => j.checked).map(j => j.id); ids.forEach(id => removeJob(id)); }
+
+    function qSelectAll(checked) {
+      const visible = getFilteredJobs();
+      visible.forEach(j => j.checked = checked);
+      renderQueue();
+    }
+
+    function qFilterSet(el, f) {
+      document.querySelectorAll('.qtab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active'); qFilter = f; renderQueue();
+    }
+
+    function getFilteredJobs() {
+      if (qFilter === 'all') return jobs;
+      if (qFilter === 'queued') return jobs.filter(j => j.status === 'queued' || j.status === 'paused');
+      if (qFilter === 'processing') return jobs.filter(j => j.status === 'processing');
+      if (qFilter === 'done') return jobs.filter(j => j.status === 'done' || j.status === 'failed');
+      return jobs;
+    }
+
+    function renderQueue() {
+      const list = document.getElementById('queue-list');
+      const empty = document.getElementById('q-empty');
+      const filtered = getFilteredJobs();
+      document.getElementById('q-total-badge').textContent = jobs.length;
+
+      if (jobs.length === 0) {
+        if (empty) empty.style.display = 'flex';
+        list.innerHTML = '';
+        list.appendChild(document.getElementById('q-empty') || createEmptyEl());
+        return;
+      }
+      if (empty) empty.style.display = 'none';
+
+      const cols = {
+        queued: { col: 'var(--amber)', label: 'Queued', progCol: 'rgba(255,170,0,0.3)' },
+        processing: { col: 'var(--blue)', label: 'Active', progCol: 'var(--blue)' },
+        paused: { col: 'var(--purple)', label: 'Paused', progCol: 'var(--purple)' },
+        done: { col: 'var(--green)', label: 'Done', progCol: 'var(--green)' },
+        failed: { col: 'var(--red)', label: 'Failed', progCol: 'var(--red)' },
+      };
+
+      list.innerHTML = filtered.map(j => {
+        const c = cols[j.status] || cols.queued;
+        const elapsed = j.startedAt ? ((j.doneAt || new Date()) - j.startedAt) / 1000 : 0;
+        const elapsedStr = elapsed > 60 ? `${Math.floor(elapsed / 60)}m ${(elapsed % 60).toFixed(0)}s` : `${elapsed.toFixed(0)}s`;
+        const statusDot = j.status === 'processing' ? `<span class="dot dot-b"></span>` :
+          j.status === 'done' ? `<span class="dot dot-g"></span>` :
+            j.status === 'failed' ? `<span class="dot dot-r"></span>` :
+              j.status === 'paused' ? `<span class="dot" style="background:var(--purple)"></span>` :
+                `<span class="dot" style="background:var(--amber)"></span>`;
+        return `<div class="qjob" data-id="${j.id}" style="border-left:2px solid ${c.col};">
+      <div class="qjob-main">
+        <div class="qjob-check${j.checked ? ' checked' : ''}" onclick="toggleJobCheck(${j.id})"></div>
+        <div class="qjob-ico">${j.icon}</div>
+        <div class="qjob-body">
+          <div class="qjob-name" title="${j.name}">${j.name}</div>
+          <div class="qjob-meta">
+            ${statusDot}
+            <span style="color:${c.col}">${c.label}</span>
+            ${j.extraMeta ? `<span style="color:var(--cyan);font-weight:500;"> — ${j.extraMeta}</span>` : ''}
+            ${(j.status === 'processing' || j.status === 'done') && !j.extraMeta ? `<span>${j.itemsProcessed.toLocaleString()} / ${j.totalItems.toLocaleString()} items</span>` : ''}
+            ${j.startedAt ? `<span>${elapsedStr}</span>` : ''}
+          </div>
+        </div>
+        <div class="qjob-actions">
+          ${j.status === 'queued' ? `<button class="btn btn-xs btn-success" onclick="startJob(${j.id})">▶</button>` : ''}
+          ${j.status === 'processing' ? `<button class="btn btn-xs btn-amber" onclick="pauseJob(${j.id})">⏸</button>` : ''}
+          ${j.status === 'paused' ? `<button class="btn btn-xs btn-success" onclick="pauseJob(${j.id})">▶</button>` : ''}
+          <button class="btn btn-xs btn-danger" onclick="removeJob(${j.id})">✕</button>
+        </div>
+      </div>
+      ${j.status !== 'queued' ? `
+      <div class="qjob-prog">
+        <div class="prog-track">
+          <div class="prog-fill" style="width:${j.progress}%;background:${c.progCol};${j.status === 'processing' ? 'animation:progPulse 1.5s infinite' : ''}"></div>
+        </div>
+        <div class="qjob-pct">${j.progress}%</div>
+      </div>` : ''}
+    </div>`;
+      }).join('') || `<div class="q-empty"><div class="q-empty-ico">🔍</div><div class="q-empty-txt">No ${qFilter} jobs.</div></div>`;
+    }
+
+    function createEmptyEl() {
+      const d = document.createElement('div');
+      d.id = 'q-empty'; d.className = 'q-empty';
+      d.innerHTML = '<div class="q-empty-ico">📭</div><div class="q-empty-txt">No ingestion jobs yet.<br>Add items from the source panels.</div>';
+      return d;
+    }
+
+    function toggleJobCheck(id) {
+      const j = jobs.find(x => x.id === id);
+      if (j) { j.checked = !j.checked; renderQueue(); }
+    }
+
+    function updateStats() {
+      const q = jobs.filter(j => j.status === 'queued' || j.status === 'paused').length;
+      const p = jobs.filter(j => j.status === 'processing').length;
+      const d = jobs.filter(j => j.status === 'done').length;
+      const f = jobs.filter(j => j.status === 'failed').length;
+      document.getElementById('qs-queued').textContent = q;
+      document.getElementById('qs-proc').textContent = p;
+      document.getElementById('qs-done').textContent = d;
+      document.getElementById('qs-fail').textContent = f;
+      document.getElementById('top-queued').textContent = q;
+      document.getElementById('top-proc').textContent = p;
+      document.getElementById('top-done').textContent = d;
+      document.getElementById('top-failed').textContent = f;
+    }
+
+    function updateNavBadge(sourceType) {
+      const map = { youtube: 'nb-yt', whatsapp: 'nb-wa' };
+      const badgeId = map[sourceType];
+      if (!badgeId) return;
+      const cnt = jobs.filter(j => j.sourceType === sourceType && j.status !== 'done').length;
+      const el = document.getElementById(badgeId);
+      if (el) { el.textContent = cnt; el.style.display = cnt > 0 ? 'flex' : 'none'; }
+    }
+
+    function qLog(level, msg) {
+      const el = document.getElementById('qlog');
+      const ts = new Date().toTimeString().slice(0, 5);
+      const cls = { ok: 'ql-ok', info: 'ql-info', warn: 'ql-warn', err: 'ql-err' }[level] || 'ql-info';
+      const lbl = { ok: '[OK]', info: '[INFO]', warn: '[WARN]', err: '[ERR]' }[level] || '[INFO]';
+      const row = document.createElement('div');
+      row.className = 'qlrow';
+      row.innerHTML = `<span class="ql-ts">${ts}</span><span class="ql-level ${cls}">${lbl}</span><span class="ql-msg">${msg}</span>`;
+      el.appendChild(row);
+      el.scrollTop = el.scrollHeight;
+      if (el.children.length > 60) el.removeChild(el.firstChild);
+    }
+
+    /* ═══════════════════════════════════════════════
+       DROP ZONE HELPERS
+    ═══════════════════════════════════════════════ */
+    const dzFiles = {};
+
+    function dzOver(e, id) { e.preventDefault(); const el = document.getElementById(id); if (el) el.classList.add('drag-over'); }
+    function dzLeave(id) { const el = document.getElementById(id); if (el) el.classList.remove('drag-over'); }
+    function dzDrop(e, id, type) {
+      e.preventDefault(); dzLeave(id);
+      const files = e.dataTransfer.files;
+      if (files && files.length) {
+        dzFiles[id] = Array.from(files);
+        handleDzPreview(id, files);
+      }
+    }
+    function dzFile(e, dzId, lblId, type) {
+      const files = e.target.files;
+      if (!files || !files.length) return;
+      dzFiles[dzId] = Array.from(files);
+      handleDzPreview(dzId, files);
+    }
+    function handleDzPreview(dzId, files) {
+      const totalSize = Array.from(files).reduce((a, f) => a + f.size, 0);
+      const label = files.length > 1
+        ? `${files.length} files selected — ${(totalSize / 1e6).toFixed(1)} MB total`
+        : `${files[0].name}  (${(files[0].size / 1e6).toFixed(2)} MB)`;
+      markDzFilled(dzId, label);
+    }
+    function markDzFilled(dzId, name) {
+      const dz = document.getElementById(dzId);
+      if (!dz) return;
+      dz.classList.remove('drag-over');
+      dz.classList.add('filled');
+      const lbl = dz.querySelector('.dz-main');
+      if (lbl) lbl.textContent = name;
+      const sub = dz.querySelector('.dz-sub');
+      if (sub) sub.textContent = '✓ File ready for ingestion';
+    }
+    function queueDzFile(dzId, name, icon, sourceType) {
+      const dz = document.getElementById(dzId);
+      if (!dz || !dz.classList.contains('filled') || !dzFiles[dzId]) {
+        alert(`Please select a file first — click or drop a file in the "${name}" upload zone.`); return;
+      }
+
+      const files = dzFiles[dzId];
+
+      if (sourceType === 'images' || sourceType === 'kaggle-images') {
+        const j = createJob(files.length > 1 ? `Batch: ${files.length} items` : files[0].name, icon, sourceType);
+        j.filePayload = Array.from(files); // array of files
+
+        // Grab prompt from the UI before starting job
+        if (sourceType === 'images') {
+          const promptEl = document.getElementById('img-prompt');
+          if (promptEl && promptEl.value) {
+            j.extraMeta = promptEl.value; // pass the prompt in extraMeta
+          }
+        } else if (sourceType === 'kaggle-images') {
+          const promptEl = document.getElementById('kimg-prompt');
+          const maxEl = document.getElementById('kimg-max');
+          j.extraMeta = (promptEl && promptEl.value) ? promptEl.value : '';
+          j.totalItems = (maxEl && maxEl.value) ? parseInt(maxEl.value) : 10; // Use totalItems to store max limit
+        }
+
+        setTimeout(() => startJob(j.id), 200);
+
+        // Clear selection
+        dzFiles[dzId] = null;
+        dz.classList.remove('filled');
+        const lbl = dz.querySelector('.dz-main');
+        if (lbl) lbl.textContent = 'Drop files here';
+        return;
+      }
+
+      if (sourceType === 'pdf') {
+        files.forEach((f, idx) => {
+          const j = createJob(f.name, icon, sourceType);
+          j.filePayload = f;
+          setTimeout(() => startJob(j.id), 200 + (idx * 500));
+        });
+        // Clear selection
+        dzFiles[dzId] = null;
+        dz.classList.remove('filled');
+        const lbl = dz.querySelector('.dz-main');
+        if (lbl) lbl.textContent = 'Drop files here';
+        return;
+      }
+
+      const lbl = dz.querySelector('.dz-main');
+      const fileName = lbl ? lbl.textContent : name;
+      const j = createJob(fileName, icon, sourceType);
+      setTimeout(() => startJob(j.id), 600 + Math.random() * 400);
+    }
+    function genericQueue(name, icon, sourceType) {
+      const j = createJob(name, icon, sourceType);
+      setTimeout(() => startJob(j.id), 500 + Math.random() * 500);
+    }
+
+    /* ═══════════════════════════════════════════════
+       YOUTUBE ENGINE
+    ═══════════════════════════════════════════════ */
+    let ytVideos = [];
+    let ytPlaylists = [];
+
+    function ytExtractVideoId(url) {
+      const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+      return m ? m[1] : null;
+    }
+    function ytIsPlaylist(url) { return url.includes('playlist?list=') || url.includes('/channel/') || url.match(/@[\w]+/); }
+    function ytThumb(vid) { return `https://img.youtube.com/vi/${vid}/mqdefault.jpg`; }
+
+    async function ytAddUrl() {
+      const inp = document.getElementById('yt-url-inp');
+      const url = inp.value.trim();
+      if (!url) return;
+      inp.value = 'Fetching metadata...';
+      inp.disabled = true;
+
+      try {
+        if (ytIsPlaylist(url)) {
+          await ytAddPlaylistEntry(url);
+        } else {
+          const res = await fetch('http://localhost:8000/api/youtube/info', {
+            method: 'POST', body: JSON.stringify({ url }), headers: { 'Content-Type': 'application/json' }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.isPlaylist) {
+              await ytAddPlaylistEntry(url);
+            } else {
+              ytAddVideoCard(data.videoId, url, data.title, data.channel, data.duration, data.thumbnail);
+            }
+          } else {
+            alert("Failed to fetch YouTube info (Ensure yt-dlp is working).");
+          }
+        }
+      } catch (e) {
+        alert("Error contacting Whisper backend for YouTube metadata.");
+      } finally {
+        inp.value = '';
+        inp.disabled = false;
+      }
+    }
+
+    function ytAddBulk() {
+      const lines = document.getElementById('yt-bulk-inp').value.split('\n').map(l => l.trim()).filter(l => l.startsWith('http'));
+      if (!lines.length) { alert('No valid URLs found. Paste YouTube URLs, one per line.'); return; }
+      lines.forEach(url => {
+        if (ytIsPlaylist(url)) ytAddPlaylistEntry(url);
+        else {
+          const vid = ytExtractVideoId(url);
+          if (vid) ytAddVideoCard(vid, url);
+          else ytAddPlaylistEntry(url);
+        }
+      });
+      document.getElementById('yt-bulk-inp').value = '';
+      document.getElementById('yt-bulk-detect').textContent = 'Paste URLs above to detect';
+    }
+
+    document.getElementById('yt-bulk-inp').addEventListener('input', function () {
+      const n = this.value.split('\n').filter(l => l.trim().startsWith('http')).length;
+      document.getElementById('yt-bulk-detect').textContent = n ? `${n} URL${n > 1 ? 's' : ''} detected — click "Add All" to stage` : 'Paste URLs above to detect';
+    });
+
+    const YT_TITLES = [
+      'PM Modi addresses the nation on economic growth', 'Rahul Gandhi rally in Wayanad',
+      'Lok Sabha Budget Session 2024 highlights', 'Yogi Adityanath on UP development',
+      'Congress party press briefing — election strategy', 'AAP vs BJP Delhi showdown',
+      'Mamata Banerjee on Bengal politics', 'India GDP growth Q3 2024 analysis',
+      'Amit Shah on national security', 'Sonia Gandhi emotional speech',
+      'NDA coalition meeting highlights', 'Election Commission press conference',
+      'BJP national executive meeting', 'Budget 2024 reaction from economists',
+    ];
+
+    function ytAddVideoCard(vid, url, titleFetched, channelFetched, durFetched, thumbFetched) {
+      if (ytVideos.find(v => v.vid === vid)) return; // dedupe
+      const title = titleFetched || YT_TITLES[Math.floor(Math.random() * YT_TITLES.length)];
+      const views = channelFetched || (Math.floor(Math.random() * 900 + 10) + 'K views');
+      const days = Math.floor(Math.random() * 60 + 1);
+      const age = '!';
+      const dur = durFetched || `${Math.floor(Math.random() * 45 + 3)}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`;
+      const thumb = thumbFetched || ytThumb(vid);
+      const entry = { vid, url, title, views, age, dur, thumb, selected: false, status: 'staged' };
+      ytVideos.push(entry);
+      renderYtVideos();
+    }
+
+    async function ytAddPlaylistEntry(url) {
+      const name = url.includes('@') ? url.split('@')[1].split(/[/?]/)[0] + ' (channel)' : 'Playlist Source';
+
+      try {
+        const res = await fetch('http://localhost:8000/api/youtube/playlist', {
+          method: 'POST', body: JSON.stringify({ url }), headers: { 'Content-Type': 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          ytPlaylists.push({ url, name, count: data.count, status: 'staged', id: Date.now(), videos: data.videos });
+          renderYtPlaylists();
+        } else {
+          alert("Error parsing playlist from backend.");
+        }
+      } catch (e) {
+        alert("Network error parsing playlist.");
+      }
+    }
+
+    function renderYtVideos() {
+      const sec = document.getElementById('yt-video-section');
+      const grid = document.getElementById('yt-video-grid');
+      const cnt = document.getElementById('yt-video-count');
+      sec.style.display = ytVideos.length ? 'block' : 'none';
+      cnt.textContent = `${ytVideos.length} video${ytVideos.length !== 1 ? 's' : ''}`;
+      grid.innerHTML = ytVideos.map(v => `
+    <div class="yt-card${v.selected ? ' selected' : ''}" id="ytc-${v.vid}" onclick="ytToggleSelect('${v.vid}')">
+      <div class="yt-status-strip ${v.status}"></div>
+      <div class="yt-thumb">
+        <img src="${v.thumb}" alt="${v.title}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+        <div class="yt-thumb-placeholder" style="display:none;">
+          <span style="font-size:1.5rem">📺</span>
+          <span>${v.vid}</span>
+        </div>
+        <div class="yt-duration">${v.dur}</div>
+        <div class="yt-overlay"><div class="yt-play-btn">▶</div></div>
+      </div>
+      <div class="yt-card-body">
+        <div class="yt-card-title">${v.title}</div>
+        <div class="yt-card-meta"><span>${v.views}</span><span>${v.age}</span></div>
+      </div>
+      <div class="yt-card-actions">
+        <button class="btn btn-xs btn-primary" onclick="event.stopPropagation();ytQueueSingle('${v.vid}')">⬇ Queue</button>
+        <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();ytRemoveVideo('${v.vid}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+    }
+
+    function renderYtPlaylists() {
+      const sec = document.getElementById('yt-playlist-section');
+      const list = document.getElementById('yt-playlist-list');
+      const cnt = document.getElementById('yt-pl-count');
+      sec.style.display = ytPlaylists.length ? 'block' : 'none';
+      cnt.textContent = `${ytPlaylists.length} playlist${ytPlaylists.length !== 1 ? 's' : ''}`;
+      list.innerHTML = ytPlaylists.map(p => `
+    <div class="yt-playlist-item">
+      <div class="yt-pl-thumb">📋</div>
+      <div class="yt-pl-info">
+        <div class="yt-pl-name">${p.name}</div>
+        <div class="yt-pl-meta">
+          <span>${p.count} videos</span>
+          <span style="font-family:var(--mono);font-size:0.44rem;color:var(--text4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">${p.url}</span>
+        </div>
+      </div>
+      <div class="yt-pl-prog">
+        <div class="prog-track"><div class="prog-fill" style="width:${p.progress || 0}%;background:var(--blue)"></div></div>
+        <div style="font-family:var(--mono);font-size:0.42rem;color:var(--text3);margin-top:0.15rem;text-align:right">${p.progress ? p.progress + '%' : 'Staged'}</div>
+      </div>
+      <div class="yt-pl-actions">
+        <button class="btn btn-xs btn-primary" onclick="ytQueuePlaylist(${p.id})">⬇ Queue</button>
+        <button class="btn btn-xs btn-danger" onclick="ytRemovePlaylist(${p.id})">✕</button>
+      </div>
+    </div>
+  `).join('');
+    }
+
+    function ytToggleSelect(vid) {
+      const v = ytVideos.find(x => x.vid === vid);
+      if (v) { v.selected = !v.selected; renderYtVideos(); }
+    }
+    function ytSelectAll() { ytVideos.forEach(v => v.selected = true); renderYtVideos(); }
+    function ytRemoveSelected() { ytVideos = ytVideos.filter(v => !v.selected); renderYtVideos(); }
+    function ytRemoveVideo(vid) { ytVideos = ytVideos.filter(v => v.vid !== vid); renderYtVideos(); }
+    function ytRemovePlaylist(id) { ytPlaylists = ytPlaylists.filter(p => p.id !== id); renderYtPlaylists(); }
+    function ytClearAll() { ytVideos = []; ytPlaylists = []; renderYtVideos(); renderYtPlaylists(); }
+
+    async function ytQueueSingle(vid) {
+      const v = ytVideos.find(x => x.vid === vid);
+      if (!v) return;
+      v.status = 'queued';
+      renderYtVideos();
+
+      const j = createJob(v.title, '📺', 'youtube');
+      j.ytUrl = v.url;
+
+      try {
+        const res = await fetch('http://localhost:8000/api/youtube/queue', {
+          method: 'POST', body: JSON.stringify({ url: v.url }), headers: { 'Content-Type': 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          j.ytJobId = data.job_id;
+          setTimeout(() => startJob(j.id), 300);
+        } else {
+          j.status = 'failed';
+          qLog('err', "Failed to queue YouTube on Whisper backend");
+        }
+      } catch (e) {
+        j.status = 'failed';
+        qLog('err', "Network error reaching Whisper.");
+      }
+      updateStats();
+    }
+
+    async function ytQueuePlaylist(id) {
+      const p = ytPlaylists.find(x => x.id === id);
+      if (!p || !p.videos || !p.videos.length) return;
+
+      p.status = 'queued';
+      renderYtPlaylists();
+
+      qLog('info', `Queueing ${p.count} videos from playlist...`);
+      let delay = 300;
+
+      p.videos.forEach(v => {
+        if (!v.url || !v.videoId) return;
+        // Format duration roughly if needed
+        const durStr = v.duration ? `${Math.floor(v.duration / 60)}:${String(v.duration % 60).padStart(2, '0')}` : '0:00';
+        ytAddVideoCard(v.videoId, v.url, v.title, v.channel, durStr, ytThumb(v.videoId));
+        // Queue the single video right away
+        setTimeout(() => ytQueueSingle(v.videoId), delay);
+        delay += 1000;
+      });
+      p.status = 'done'; p.progress = 100;
+      renderYtPlaylists();
+    }
+
+    function ytQueueAll() {
+      if (!ytVideos.length && !ytPlaylists.length) { alert('No videos or playlists staged yet. Add YouTube URLs above.'); return; }
+      ytVideos.forEach(v => ytQueueSingle(v.vid));
+      ytPlaylists.forEach(p => ytQueuePlaylist(p.id));
+    }
+
+    /* ═══════════════════════════════════════════════
+       WHATSAPP
+    ═══════════════════════════════════════════════ */
+    function waSaveGroups() {
+      const jids = document.getElementById('wa-jids').value.trim().split('\n').filter(Boolean);
+      qLog('ok', `WhatsApp: ${jids.length} group(s) configured for monitoring`);
+      alert(`✓ Saved ${jids.length} group(s) for WhatsApp monitoring.`);
+    }
+    function waQueueAll() {
+      createJob('WhatsApp Live Feed', '💬', 'whatsapp', 'webhook');
+    }
+
+    /* ═══════════════════════════════════════════════
+       CHIP INPUT
+    ═══════════════════════════════════════════════ */
+    function focusChip(id) { const el = document.getElementById(id); if (el) el.focus(); }
+    function addChip(e, inp, wrapId) {
+      if (e.key !== 'Enter' && e.key !== ',') return;
+      e.preventDefault();
+      const val = inp.value.trim().replace(/^[@#,\s]+/, '').replace(/[,\s]+$/, '');
+      if (!val) return;
+      const prefix = wrapId.includes('kw') ? '#' : '@';
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.innerHTML = `${prefix}${val} <span class="chip-del" onclick="removeChip(this)">×</span>`;
+      inp.parentNode.insertBefore(chip, inp);
+      inp.value = '';
+    }
+    function removeChip(el) { el.parentNode.remove(); }
+
+    /* ═══════════════════════════════════════════════
+       COPY / REGEN HELPERS
+    ═══════════════════════════════════════════════ */
+    function copyText(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent).then(() => {
+        const btn = el.nextElementSibling;
+        const orig = btn.textContent; btn.textContent = '✓ COPIED'; btn.style.color = 'var(--green)';
+        setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+      });
+    }
+    function regenToken(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789_';
+      el.value = 'nb_' + Array.from({ length: 20 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    }
+
+    /* ═══════════════════════════════════════════════
+       DATABASE
+    ═══════════════════════════════════════════════ */
+    let dbType = 'sqlite';
+    let dbPrismaStudioOpen = false;
+
+    function dbSelectType(el, type, port, uriPlaceholder) {
+      document.querySelectorAll('.dbtype-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active'); dbType = type;
+      document.getElementById('db-port').value = port;
+      document.getElementById('db-uri').placeholder = uriPlaceholder;
+      document.getElementById('db-type-badge').textContent = el.querySelector('.dbtype-lbl').textContent;
+      document.getElementById('db-test-status').textContent = '';
+
+      const isSqlite = type === 'sqlite';
+      ['db-host', 'db-port', 'db-name', 'db-user', 'db-pass'].forEach(id => {
+          const input = document.getElementById(id);
+          if (input) {
+              input.disabled = isSqlite;
+              input.style.opacity = isSqlite ? '0.5' : '1';
+          }
+      });
+    }
+
+    function dbTogglePassword() {
+      const inp = document.getElementById('db-pass');
+      const btn = document.getElementById('db-pass-toggle');
+      if (!inp || !btn) return;
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        btn.textContent = '👁‍🗨';
+        btn.title = 'Hide password';
+      } else {
+        inp.type = 'password';
+        btn.textContent = '👁';
+        btn.title = 'Show password';
+      }
+    }
+
+    async function dbTest() {
+      const el = document.getElementById('db-test-status');
+      const prismaSection = document.getElementById('db-prisma-section');
+      el.textContent = '⟲ Testing connection...'; el.style.color = 'var(--amber)';
+      try {
+        const res = await fetch('/api/db/test-connection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            host: document.getElementById('db-host').value,
+            port: document.getElementById('db-port').value,
+            dbName: document.getElementById('db-name').value,
+            user: document.getElementById('db-user').value,
+            password: document.getElementById('db-pass').value,
+            uri: document.getElementById('db-uri').value,
+            dbType
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          el.textContent = '✓ Connected — Prisma Studio launching...'; el.style.color = 'var(--green)';
+          qLog('ok', `DB connection OK: NetaBoardV5 @ localhost:3000`);
+          if (prismaSection) {
+            prismaSection.style.display = 'block';
+            const iframe = document.getElementById('db-prisma-iframe');
+            if (iframe) iframe.src = data.prismaStudioUrl || 'http://localhost:5555';
+            dbPrismaStudioOpen = true;
+            setTimeout(() => { el.textContent = '✓ Connected — Prisma Studio ready'; }, 2000);
+          }
+          dbLoadTables();
+        } else {
+          el.textContent = '✕ ' + (data.error || 'Connection failed'); el.style.color = 'var(--red)';
+          qLog('err', `DB connection failed: ${data.error || 'Unknown'}`);
+          if (prismaSection) prismaSection.style.display = 'none';
+          dbPrismaStudioOpen = false;
+        }
+      } catch (err) {
+        el.textContent = '✕ Network error — is the server running?'; el.style.color = 'var(--red)';
+        qLog('err', `DB test error: ${err.message}`);
+        if (prismaSection) prismaSection.style.display = 'none';
+        dbPrismaStudioOpen = false;
+      }
+    }
+
+    async function dbLoadTables() {
+      const tableInput = document.getElementById('db-table');
+      const tableList = document.getElementById('db-table-chips');
+      try {
+        const res = await fetch('/api/db/tables');
+        const data = await res.json();
+        if (data.tables && data.tables.length) {
+          if (tableList) {
+            tableList.innerHTML = data.tables.map(t =>
+              `<span class="db-table-chip" onclick="dbSelectTable('${t}')">${t}</span>`
+            ).join('');
+            tableList.style.display = 'flex';
+          }
+          if (tableInput && !tableInput.value) tableInput.value = data.tables[0];
+          qLog('info', `Loaded ${data.tables.length} tables from Prisma schema`);
+        }
+      } catch (err) {
+        const fallback = ['Archetype','Constituency','PillarScore','SansadRecord','Feedback','SocialItem','Alert'];
+        if (tableList) {
+          tableList.innerHTML = fallback.map(t =>
+            `<span class="db-table-chip" onclick="dbSelectTable('${t}')">${t}</span>`
+          ).join('');
+          tableList.style.display = 'flex';
+        }
+        if (tableInput) tableInput.value = fallback[0];
+      }
+    }
+
+    function dbSelectTable(name) {
+      document.getElementById('db-table').value = name;
+      document.querySelectorAll('.db-table-chip').forEach(c => c.classList.toggle('active', c.textContent === name));
+      dbRunQuery();
+    }
+
+    async function dbRunQuery() {
+      const table = document.getElementById('db-table').value;
+      const queryEl = document.getElementById('db-query');
+      const sec = document.getElementById('db-query-results');
+      const body = document.getElementById('db-results-body');
+      const hdr = document.getElementById('db-results-header');
+      const cnt = document.getElementById('db-results-count');
+      if (!table) { alert('Select a table first.'); return; }
+      if (sec) sec.style.display = 'block';
+      if (body) body.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--amber);padding:1rem;">⟲ Querying...</td></tr>';
+      try {
+        const res = await fetch('/api/db/query', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            table, 
+            query: queryEl ? queryEl.value : '', 
+            limit: 20,
+            host: document.getElementById('db-host').value,
+            port: document.getElementById('db-port').value,
+            dbName: document.getElementById('db-name').value,
+            user: document.getElementById('db-user').value,
+            password: document.getElementById('db-pass').value,
+            uri: document.getElementById('db-uri').value,
+            dbType
+          })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          if (body) body.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--red);padding:1rem;">✕ Error: ${data.error || 'Query failed'}</td></tr>`;
+          if (hdr) hdr.innerHTML = '';
+          if (cnt) cnt.textContent = '0 rows';
+          qLog('err', `DB Query Error: ${data.error || 'Unknown'}`);
+          return;
+        }
+
+        if (data.rows && data.rows.length) {
+          const cols = Object.keys(data.rows[0]);
+          if (hdr) hdr.innerHTML = cols.map(c => `<th>${c}</th>`).join('');
+          if (body) body.innerHTML = data.rows.map(row =>
+            '<tr>' + cols.map(c => {
+              let v = row[c];
+              if (v === null || v === undefined) v = '<span style="color:var(--text4)">null</span>';
+              else if (typeof v === 'object') v = '<span style="color:var(--purple);font-size:0.5rem">' + JSON.stringify(v).slice(0,60) + '</span>';
+              else if (String(v).length > 50) v = String(v).slice(0,50) + '…';
+              return `<td>${v}</td>`;
+            }).join('') + '</tr>'
+          ).join('');
+          if (cnt) cnt.textContent = `${data.rows.length} row${data.rows.length !== 1 ? 's' : ''}`;
+          qLog('ok', `Query OK: ${table} → ${data.rows.length} rows`);
+        } else if (data.note) {
+          if (body) body.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--amber);padding:1rem;">${data.note}</td></tr>`;
+          if (cnt) cnt.textContent = '0 rows';
+        } else {
+          if (body) body.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:1rem;">No data returned</td></tr>';
+          if (hdr) hdr.innerHTML = '';
+          if (cnt) cnt.textContent = '0 rows';
+        }
+      } catch (err) {
+        if (body) body.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--red);padding:1rem;">Error: ${err.message}</td></tr>`;
+      }
+    }
+
+    function dbClosePrisma() {
+      const sec = document.getElementById('db-prisma-section');
+      const iframe = document.getElementById('db-prisma-iframe');
+      if (sec) sec.style.display = 'none';
+      if (iframe) iframe.src = 'about:blank';
+      dbPrismaStudioOpen = false;
+    }
+
+    function dbQueue() {
+      const table = document.getElementById('db-table').value || 'table';
+      const j = createJob(`DB Import: ${dbType.toUpperCase()} — ${table}`, '🗄️', 'database', dbType);
+      setTimeout(() => startJob(j.id), 800);
+    }
+
+    /* ═══════════════════════════════════════════════
+       KAGGLE
+    ═══════════════════════════════════════════════ */
+    const KAGGLE_DATASETS = [
+      { slug: 'datatattle/india-politics-tweets-2024', name: 'India Politics Tweets 2024', type: 'twitter', color: 'var(--cyan)', rows: '~2M rows', size: '340 MB', desc: 'Tweets from major Indian political accounts and hashtags during 2024 elections.' },
+      { slug: 'suchintya/indian-political-fb-posts', name: 'Indian Political FB Posts', type: 'facebook', color: 'var(--blue)', rows: '~500K posts', size: '120 MB', desc: 'Facebook posts and engagement metrics from top Indian political pages.' },
+      { slug: 'amananandrai/india-news-articles', name: 'India News Articles Dataset', type: 'news', color: 'var(--amber)', rows: '600K articles', size: '890 MB', desc: 'News articles from 25+ Indian publications, 2018–2024.' },
+      { slug: 'wherethecrowds/whatsapp-india-political', name: 'WhatsApp Indian Political', type: 'whatsapp', color: 'var(--green)', rows: '180K messages', size: '45 MB', desc: 'Forwarded messages from Indian political WhatsApp groups (anonymised).' },
+      { slug: 'datascopeai/indian-election-memes-2024', name: 'Indian Election Memes 2024', type: 'images', color: 'var(--purple)', rows: '45K images', size: '2.1 GB', desc: 'Political memes and viral images from 2024 elections with annotations.' },
+      { slug: 'openparldata/india-parliament-bills-2019-24', name: 'Parliament Bills 2019–24', type: 'pdf', color: 'var(--red)', rows: '1,200 PDFs', size: '1.8 GB', desc: 'Full text PDFs of bills, debates, and committee reports from Lok Sabha.' },
+    ];
+
+    function renderKaggle() {
+      document.getElementById('kg-grid').innerHTML = KAGGLE_DATASETS.map(d => `
+    <div class="kg-card">
+      <div class="kg-type" style="color:${d.color}">${d.type.toUpperCase()}</div>
+      <div class="kg-name">${d.name}</div>
+      <div class="kg-slug">${d.slug}</div>
+      <div class="kg-meta">
+        <div class="kg-meta-item" style="color:${d.color}">${d.rows}</div>
+        <div class="kg-meta-item">💾 ${d.size}</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:0.46rem;color:var(--text3);line-height:1.5;margin-bottom:0.6rem;">${d.desc}</div>
+      <button class="btn btn-primary btn-sm" onclick="kgImport('${d.slug}','${d.type}','${d.name}')">⬇ Import Dataset</button>
+    </div>
+  `).join('');
+    }
+    function kgImport(slug, pipeline, name) {
+      document.getElementById('kg-slug').value = slug;
+      document.getElementById('kg-pipeline').value = pipeline;
+      const j = createJob(`Kaggle: ${name}`, '📊', 'kaggle', slug);
+      setTimeout(() => startJob(j.id), 400);
+    }
+    function kgQueueSlug() {
+      const slug = document.getElementById('kg-slug').value.trim();
+      if (!slug) { alert('Enter a Kaggle dataset slug. Example: datatattle/india-politics-tweets-2024'); return; }
+      const j = createJob(`Kaggle: ${slug}`, '📊', 'kaggle', slug);
+      setTimeout(() => startJob(j.id), 400);
+      document.getElementById('kg-slug').value = '';
+    }
+
+    /* ═══════════════════════════════════════════════
+       INIT
+    ═══════════════════════════════════════════════ */
+    renderKaggle();
+    renderQueue();
+    updateStats();
+  </script>
 </body>
 
 </html>

@@ -17,6 +17,8 @@ const PORT = process.env.ADMIN_PORT || 4000;
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
 const WHISPER_URL = process.env.WHISPER_URL || 'http://localhost:8000';
 const QWEN_URL = process.env.QWEN_URL || 'http://localhost:5001';
+const TWITTER_URL = process.env.TWITTER_URL || 'http://localhost:6060';
+const FACEBOOK_URL = process.env.FACEBOOK_URL || 'http://localhost:7070';
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -365,6 +367,31 @@ app.post('/api/proxy/pdf', upload.single('pdf'), async (req, res) => {
     }
 });
 
+// Proxy: Twitter Ingestion Processor
+app.post('/api/proxy/twitter-ingest', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No dataset uploaded' });
+        const fd = new FormData();
+        fd.append('file', fs.createReadStream(req.file.path), req.file.originalname);
+        if (req.body.meta) fd.append('meta', req.body.meta);
+
+        const r = await fetch(`${TWITTER_URL}/api/process-twitter`, { 
+            method: 'POST', 
+            body: fd, 
+            headers: fd.getHeaders() 
+        });
+        const data = await r.json();
+
+        fs.unlink(req.file.path, () => { });
+
+        if (!r.ok) return res.status(r.status).json(data);
+        res.json(data);
+    } catch (err) {
+        if (req.file) fs.unlink(req.file.path, () => { });
+        res.status(502).json({ error: 'Twitter Ingestion Server unreachable', detail: err.message });
+    }
+});
+
 // Proxy: Save to NetaBoard DB via main backend
 app.post('/api/proxy/ingest', async (req, res) => {
     try {
@@ -401,6 +428,216 @@ app.post('/api/save_local_file', async (req, res) => {
         res.json({ success: true, path: targetFile });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Helper function for proxying requests with file uploads
+async function proxyRequest(req, res, targetUrl, targetPath) {
+    try {
+        const fd = new FormData();
+        if (req.file) {
+            fd.append('file', fs.createReadStream(req.file.path), req.file.originalname);
+        }
+        // Append other body fields
+        for (const key in req.body) {
+            if (key !== 'file') { // 'file' is handled by req.file
+                fd.append(key, req.body[key]);
+            }
+        }
+
+        const r = await fetch(`${targetUrl}${targetPath}`, {
+            method: req.method,
+            body: fd,
+            headers: fd.getHeaders()
+        });
+        const data = await r.json();
+
+        if (req.file) fs.unlink(req.file.path, () => { });
+
+        if (!r.ok) return res.status(r.status).json(data);
+        res.json(data);
+    } catch (err) {
+        if (req.file) fs.unlink(req.file.path, () => { });
+        res.status(502).json({ error: `${targetUrl} backend unreachable`, detail: err.message });
+    }
+}
+
+// Proxy: Twitter Ingestion Processor (refactored to use proxyRequest)
+app.all('/api/proxy/twitter-ingest', upload.single('file'), (req, res) => {
+  proxyRequest(req, res, TWITTER_URL, '/api/process-twitter');
+});
+
+// Proxy: Facebook Ingestion Processor
+app.all('/api/proxy/facebook-ingest', upload.single('file'), (req, res) => {
+  proxyRequest(req, res, FACEBOOK_URL, '/api/process-facebook');
+});
+
+// ══════════════════════════════════════════════
+//  DATABASE IMPORT — NetaBoardV5 Prisma DB
+// ══════════════════════════════════════════════
+let prismaStudioProcess = null;
+
+// Test connection to NetaBoardV5 backend or custom DB
+app.post('/api/db/test-connection', async (req, res) => {
+    try {
+        const { uri, host, port, dbName, user, password, dbType } = req.body;
+        const dbUrl = uri || (dbType === 'pg' ? `postgresql://${user}:${password}@${host}:${port}/${dbName}` : '');
+
+        if (!dbUrl) {
+            return res.json({ ok: false, error: 'No connection URI or valid credentials provided' });
+        }
+
+        // Real connection test
+        if (dbUrl.startsWith('file:') || dbType === 'sqlite') {
+            const dbPath = dbUrl.replace('file:', '');
+            const fullPath = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', dbPath);
+            
+            if (!fs.existsSync(fullPath)) {
+                return res.json({ ok: false, error: `Database file not found at ${fullPath}` });
+            }
+
+            // Test SQLite connection directly
+            const sqlite3 = require('sqlite3').verbose();
+            await new Promise((resolve, reject) => {
+                const tempDb = new sqlite3.Database(fullPath, sqlite3.OPEN_READONLY, (err) => {
+                    if (err) return reject(new Error('Failed to open database file: ' + err.message));
+                });
+                
+                // Run a simple query to ensure the file is a valid readable SQLite database
+                tempDb.get('SELECT sqlite_version()', (err, row) => {
+                    tempDb.close();
+                    if (err) return reject(new Error('Failed to read from database: ' + err.message));
+                    resolve(true);
+                });
+            });
+            console.log(`[DB Test] Successfully connected to SQLite DB: ${dbPath}`);
+        } else {
+            // Test network connection (TCP) for PG, Redis, Elasticsearch, Qdrant
+            const net = require('net');
+            const targetHost = host || 'localhost';
+            const targetPort = parseInt(port) || (dbType === 'pg' ? 5432 : dbType === 'redis' ? 6379 : 80);
+            
+            await new Promise((resolve, reject) => {
+                const socket = new net.Socket();
+                socket.setTimeout(2500);
+                
+                socket.on('connect', () => {
+                    socket.destroy();
+                    console.log(`[DB Test] Successfully reached ${dbType.toUpperCase()} on ${targetHost}:${targetPort}`);
+                    resolve(true);
+                });
+                
+                socket.on('timeout', () => {
+                    socket.destroy();
+                    reject(new Error(`Connection to ${targetHost}:${targetPort} timed out`));
+                });
+                
+                socket.on('error', (err) => {
+                    socket.destroy();
+                    reject(new Error(`Connection refused to ${targetHost}:${targetPort} (${err.code})`));
+                });
+                
+                socket.connect(targetPort, targetHost);
+            });
+        }
+
+        // Restart Prisma Studio
+        if (prismaStudioProcess) {
+            try {
+                process.kill(-prismaStudioProcess.pid);
+            } catch (e) {
+                prismaStudioProcess.kill();
+            }
+            prismaStudioProcess = null;
+            await new Promise(resolve => setTimeout(resolve, 800));
+        }
+
+        // Spawn Prisma Studio
+        const { spawn } = require('child_process');
+        const prismaDir = path.join(__dirname, '..', 'NetaBoardV5', 'backend');
+        prismaStudioProcess = spawn('npx', ['prisma', 'studio', '--port', '5555', '--browser', 'none'], {
+            cwd: prismaDir,
+            shell: true,
+            stdio: 'ignore',
+            detached: false,
+            env: { ...process.env, DATABASE_URL: dbUrl }
+        });
+        prismaStudioProcess.on('exit', () => { prismaStudioProcess = null; });
+        prismaStudioProcess.on('error', () => { prismaStudioProcess = null; });
+
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        res.json({ ok: true, prismaStudioUrl: 'http://localhost:5555' });
+    } catch (err) {
+        res.json({ ok: false, error: `Connection failed: ${err.message}` });
+    }
+});
+
+// Check Prisma Studio status
+app.get('/api/db/prisma-status', async (req, res) => {
+    try {
+        const r = await fetch('http://localhost:5555', { signal: AbortSignal.timeout(2000) });
+        res.json({ running: true });
+    } catch (e) {
+        res.json({ running: false });
+    }
+});
+
+// List tables from Prisma schema
+app.get('/api/db/tables', (req, res) => {
+    try {
+        const schemaPath = path.join(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', 'schema.prisma');
+        if (!fs.existsSync(schemaPath)) {
+            return res.status(404).json({ error: 'Prisma schema not found' });
+        }
+        const schema = fs.readFileSync(schemaPath, 'utf8');
+        const models = [];
+        const regex = /^model\s+(\w+)\s*\{/gm;
+        let m;
+        while ((m = regex.exec(schema)) !== null) {
+            models.push(m[1]);
+        }
+        res.json({ tables: models });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Query the DB directly using sqlite3
+app.post('/api/db/query', async (req, res) => {
+    const { table, query, limit, uri, host, port, dbName, user, password, dbType } = req.body;
+    if (!table) return res.status(400).json({ error: 'Table name required' });
+
+    const dbUrl = uri || (dbType === 'pg' ? `postgresql://${user}:${password}@${host}:${port}/${dbName}` : '');
+    const isSqlite = dbUrl.startsWith('file:') || dbType === 'sqlite' || dbType === 'pg'; // pg fallback since Neta schema is sqlite
+    const finalLimit = limit || 20;
+
+    if (isSqlite && dbUrl) {
+        const dbPath = dbUrl.replace('file:', '');
+        const fullPath = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', dbPath);
+        
+        if (!fs.existsSync(fullPath)) {
+            return res.json({ ok: false, error: `Database file not found at ${fullPath}` });
+        }
+
+        const sqlite3 = require('sqlite3').verbose();
+        const tempDb = new sqlite3.Database(fullPath, sqlite3.OPEN_READONLY, (err) => {
+            if (err) return res.json({ ok: false, error: 'Cannot open DB: ' + err.message });
+        });
+
+        // Use custom query if provided, else simple SELECT
+        const sql = query && query.trim() !== '' ? query : `SELECT * FROM "${table}" LIMIT ${finalLimit}`;
+
+        tempDb.all(sql, [], (err, rows) => {
+            tempDb.close();
+            if (err) {
+                return res.json({ ok: false, error: `Query failed: ${err.message}` });
+            }
+            res.json({ ok: true, rows: rows, count: rows.length });
+        });
+    } else {
+        // Fallback or non-SQLite database logic
+        res.json({ ok: true, rows: [], count: 0, note: `Custom query engine not implemented for ${dbType}. Use Prisma Studio to browse.` });
     }
 });
 
