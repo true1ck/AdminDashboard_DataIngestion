@@ -9,6 +9,7 @@ const multer = require('multer');
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const fs = require('fs');
+const sqlite3 = require('sqlite3').verbose();
 
 const db = require('./db');
 
@@ -662,6 +663,187 @@ app.get('/api/proxy/health', async (req, res) => {
         res.json({ admin: 'online', backend: 'offline', qwen: 'offline', whisper: 'offline' });
     }
 });
+
+const DATA_COLLECTED_DIR = path.join(__dirname, '..', 'DataCollected', 'database');
+if (!fs.existsSync(DATA_COLLECTED_DIR)) fs.mkdirSync(DATA_COLLECTED_DIR, { recursive: true });
+
+// ══════════════════════════════════════════════
+//  SAVED QUERIES API
+// ══════════════════════════════════════════════
+app.get('/api/db/saved-queries', async (req, res) => {
+    try { res.json(await db.getSavedQueries()); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/db/saved-queries', async (req, res) => {
+    try { res.json(await db.createSavedQuery(req.body)); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/db/saved-queries/:id', async (req, res) => {
+    try {
+        await db.deleteSavedQuery(parseInt(req.params.id));
+        res.json({ ok: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ══════════════════════════════════════════════
+//  DATABASE IMPORT ENGINE (Phase 2)
+// ══════════════════════════════════════════════
+const activeDbImports = {};
+
+app.post('/api/db/import', async (req, res) => {
+    try {
+        const { jobId, config } = req.body;
+        if (!jobId || !config) return res.status(400).json({ error: 'Missing jobId or config' });
+
+        activeDbImports[jobId] = { status: 'running', progress: 0, processed: 0, total: 0 };
+
+        runImport(jobId, config).catch(err => {
+            console.error(`[Import ${jobId}] Critical:`, err);
+            db.updateJob(jobId, { status: 'failed', errorMsg: err.message });
+            if (activeDbImports[jobId]) {
+                activeDbImports[jobId].status = 'failed';
+                activeDbImports[jobId].error = err.message;
+            }
+        });
+
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/db/import/status/:jobId', (req, res) => {
+    res.json(activeDbImports[req.params.jobId] || { status: 'unknown' });
+});
+
+async function runImport(jobId, config) {
+    const { dbType, uri, table, query, mapping, tables, batch } = config;
+    const state = activeDbImports[jobId];
+    const logPrefix = `[Import ${jobId}]`;
+
+    try {
+        if (dbType !== 'sqlite') throw new Error(`Only SQLite currently supported for ingestion.`);
+
+        let dbPath = uri.startsWith('file:') ? path.resolve(uri.replace('file:', '')) : path.resolve(uri);
+        
+        // Robust relative path checking
+        if (!fs.existsSync(dbPath)) {
+            const relPath1 = path.resolve(__dirname, uri.replace('file:', ''));
+            const relPath2 = path.resolve(__dirname, '..', uri.replace('file:', ''));
+            const relPath3 = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', uri.replace('file:', ''));
+            
+            if (fs.existsSync(relPath1)) dbPath = relPath1;
+            else if (fs.existsSync(relPath2)) dbPath = relPath2;
+            else if (fs.existsSync(relPath3)) dbPath = relPath3;
+            else throw new Error(`Database not found: ${dbPath} (checked project-specific locations)`);
+        }
+
+        console.log(`${logPrefix} Connecting to: ${dbPath}`);
+        const sourceDb = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
+        
+        // Descriptive filename generation
+        let baseName = "db_import";
+        if (tables === 'all') baseName = "Full_DB_Sync";
+        else if (batch && batch.length) baseName = `Batch_Import_${batch.length}_Queries`;
+        else if (table) baseName = `Table_${table}`;
+        else if (query) baseName = `Query_Result`;
+        
+        const safeName = baseName.replace(/[^a-z0-9_\-]/gi, '_');
+        const outputPath = path.join(DATA_COLLECTED_DIR, `${safeName}_${jobId}.txt`);
+        const fileStream = fs.createWriteStream(outputPath);
+
+        // 1. Build the list of tasks (table or query)
+        let tasks = [];
+        if (batch && Array.isArray(batch)) {
+            tasks = batch; // [{ name, query, mapping }]
+        } else if (tables === 'all') {
+            const allTables = await new Promise((res, rej) => {
+                sourceDb.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'prisma_%'", [], (err, rows) => err ? rej(err) : res(rows));
+            });
+            tasks = allTables.map(t => ({ name: t.name, table: t.name, mapping }));
+        } else {
+            tasks = [{ name: table || 'Custom Query', table, query, mapping }];
+        }
+
+        // 2. Count total rows across all tasks
+        let totalRows = 0;
+        for (const t of tasks) {
+            const countSql = t.query ? `SELECT COUNT(*) as cnt FROM (${t.query})` : `SELECT COUNT(*) as cnt FROM ${t.table}`;
+            const count = await new Promise((res, rej) => sourceDb.get(countSql, [], (err, row) => err ? rej(err) : res(row.cnt)));
+            t.total = count;
+            totalRows += count;
+        }
+        state.total = totalRows;
+        await db.updateJob(jobId, { status: 'processing', progress: 0 });
+
+        // 3. Process sequentially
+        let globalIdx = 0;
+        fileStream.write(`# Consolidated DB Import Job #${jobId}\n# Date: ${new Date().toISOString()}\n# Source: ${dbPath}\n\n`);
+
+        for (const t of tasks) {
+            console.log(`${logPrefix} Processing ${t.name}...`);
+            const sql = t.query || `SELECT * FROM ${t.table}`;
+            
+            fileStream.write(`\n## SECTION: ${t.name}\n`);
+            if (t.query) fileStream.write(`### SQL: ${t.query}\n`);
+            fileStream.write(`${'='.repeat(20)}\n\n`);
+            
+            const rows = await new Promise((res, rej) => sourceDb.all(sql, [], (err, rows) => err ? rej(err) : res(rows)));
+
+            for (const row of rows) {
+                // Formatting
+                const contentBlock = Object.entries(row)
+                    .map(([k, v]) => `- **${k}**: ${v}`)
+                    .join('\n');
+                
+                const payload = {
+                    source: `DB_IMPORT:${t.name}`,
+                    title: `${t.name} — Entry #${globalIdx + 1}`,
+                    content: `### Row Details\n${contentBlock}`,
+                    author: t.mapping && row[t.mapping.author] ? String(row[t.mapping.author]) : 'DB Import',
+                    timestamp: t.mapping && row[t.mapping.time] ? new Date(row[t.mapping.time]).toISOString() : new Date().toISOString()
+                };
+
+                // Push to NetaBoard
+                try {
+                    await fetch(`${BACKEND_URL}/api/ingest`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } catch (e) { console.warn(`${logPrefix} Push error:`, e.message); }
+
+                // Save to file
+                fileStream.write(`${'#'.repeat(10)}\n${payload.title}\n${payload.content}\n\n`);
+
+                globalIdx++;
+                state.processed = globalIdx;
+                state.progress = Math.round((globalIdx / totalRows) * 100);
+                
+                if (globalIdx % 10 === 0) {
+                    await db.updateJob(jobId, { progress: state.progress, itemsProcessed: globalIdx });
+                }
+                
+                // Throttle
+                await new Promise(r => setTimeout(r, 10));
+            }
+        }
+
+        fileStream.end();
+        sourceDb.close();
+        
+        state.status = 'done';
+        await db.updateJob(jobId, { status: 'done', progress: 100, itemsProcessed: totalRows });
+        console.log(`${logPrefix} Successfully saved to ${outputPath}`);
+
+    } catch (err) {
+        state.status = 'failed';
+        state.error = err.message;
+        throw err;
+    }
+}
 
 // ── Serve index.html for all routes (SPA fallback) ──
 app.get('*', (req, res) => {

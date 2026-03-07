@@ -3158,6 +3158,90 @@
               </div>
             </div>
 
+            <!-- ── Query & Mapping Section ── -->
+            <div class="card">
+              <div class="card-hdr">
+                <div class="card-title"><span class="icon">⬡</span> Query & Mapping</div>
+                <div style="display:flex;gap:0.4rem;">
+                  <button class="btn btn-xs btn-outline" onclick="dbLoadTables()">↺ Load Tables</button>
+                  <button class="btn btn-xs btn-primary" onclick="dbRunQuery()">▶ Run Query</button>
+                </div>
+              </div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:0.65rem;">
+                
+                <div style="display:flex;gap:1rem;margin-bottom:0.2rem;padding:0.4rem;background:var(--bg2);border-radius:var(--radius);border:1px dashed var(--border);">
+                   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.55rem;">
+                     <input type="checkbox" id="db-ingest-all" onchange="dbToggleIngestAll(this)"> Ingest All Tables
+                   </label>
+                   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.55rem;">
+                     <input type="checkbox" id="db-include-rows" checked> Include All Columns
+                   </label>
+                </div>
+
+                <!-- Table chips -->
+                <div class="fg" id="db-tables-container">
+                  <div class="fl">Available Models / Tables</div>
+                  <div id="db-table-chips" class="db-table-chips" style="display:none;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.3rem;"></div>
+                </div>
+                <div class="fg" id="db-table-input-container">
+                  <div class="fl">Table / Collection</div><input class="fi" id="db-table" type="text"
+                    placeholder="Select from above or type name" value="Archetype">
+                </div>
+                <div class="fg">
+                  <div class="fl">Custom Query / Filter (SQL)</div><textarea class="fi" id="db-query" rows="2"
+                    placeholder="SELECT * FROM posts WHERE created_at > '2024-01-01'"></textarea>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                  <div class="fg">
+                    <div class="fl">Text field mapping</div><input class="fi" id="db-map-text" value="text" placeholder="content / body...">
+                  </div>
+                  <div class="fg">
+                    <div class="fl">Timestamp mapping</div><input class="fi" id="db-map-time" value="created_at"
+                      placeholder="date / time...">
+                  </div>
+                  <div class="fg">
+                    <div class="fl">Author mapping</div><input class="fi" id="db-map-author" value="author" placeholder="user / source...">
+                  </div>
+                  <div class="fg">
+                    <div class="fl">ID mapping</div><input class="fi" id="db-map-id" value="id" placeholder="id / _id...">
+                  </div>
+                </div>
+                
+                <div style="display:flex;justify-content:flex-end;margin-top:0.2rem;">
+                  <button class="btn btn-xs btn-outline" style="border-style:dashed;color:var(--amber)" onclick="dbSaveQuery()">+ Save Current Mapping</button>
+                </div>
+
+                <!-- Query Results -->
+                <div id="db-query-results" style="display:none;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                    <div class="fl" style="margin:0;">Query Results</div>
+                    <span id="db-results-count" style="font-family:var(--mono);font-size:0.44rem;color:var(--text3);letter-spacing:0.08em;"></span>
+                  </div>
+                  <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);max-height:300px;overflow-y:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:0.52rem;">
+                      <thead>
+                        <tr id="db-results-header" style="background:var(--bg3);position:sticky;top:0;"></tr>
+                      </thead>
+                      <tbody id="db-results-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Saved Queries Repository ── -->
+            <div class="card">
+              <div class="card-hdr">
+                <div class="card-title"><span class="icon">🔖</span> Saved Migrations / Queries</div>
+                <button class="btn btn-xs btn-primary" onclick="dbBatchQueue()">🚀 Ingest Selected</button>
+              </div>
+              <div class="card-body" style="padding:0;">
+                <div id="db-saved-list" style="max-height:300px;overflow-y:auto;">
+                  <div style="padding:1rem;text-align:center;color:var(--text4);font-size:0.55rem;">No saved queries yet.</div>
+                </div>
+              </div>
+            </div>
+
             <!-- ── Prisma Studio Section (hidden until connected) ── -->
             <div class="card" id="db-prisma-section" style="display:none;">
               <div class="card-hdr">
@@ -3177,74 +3261,6 @@
                 <iframe id="db-prisma-iframe" src="about:blank"
                   style="width:100%;height:520px;border:none;background:var(--bg);border-radius:0 0 var(--radius) var(--radius);"
                   sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-hdr">
-                <div class="card-title"><span class="icon">⬡</span> Query & Mapping</div>
-                <div style="display:flex;gap:0.4rem;">
-                  <button class="btn btn-xs btn-outline" onclick="dbLoadTables()">↺ Load Tables</button>
-                  <button class="btn btn-xs btn-primary" onclick="dbRunQuery()">▶ Run Query</button>
-                </div>
-              </div>
-              <div class="card-body" style="display:flex;flex-direction:column;gap:0.65rem;">
-                <!-- Table chips -->
-                <div class="fg">
-                  <div class="fl">Available Models / Tables</div>
-                  <div id="db-table-chips" class="db-table-chips" style="display:none;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.3rem;"></div>
-                </div>
-                <div class="fg">
-                  <div class="fl">Table / Collection</div><input class="fi" id="db-table" type="text"
-                    placeholder="Select from above or type name" value="Archetype">
-                </div>
-                <div class="fg">
-                  <div class="fl">Filter Query (SQL / MQL)</div><textarea class="fi" id="db-query" rows="2"
-                    placeholder="SELECT * FROM posts WHERE created_at > '2024-01-01'"></textarea>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
-                  <div class="fg">
-                    <div class="fl">Text field ★</div><input class="fi" value="text" placeholder="content / body...">
-                  </div>
-                  <div class="fg">
-                    <div class="fl">Timestamp field ★</div><input class="fi" value="created_at"
-                      placeholder="date / time...">
-                  </div>
-                  <div class="fg">
-                    <div class="fl">Author field</div><input class="fi" value="author" placeholder="user / source...">
-                  </div>
-                  <div class="fg">
-                    <div class="fl">ID field</div><input class="fi" value="id" placeholder="id / _id...">
-                  </div>
-                </div>
-                <div class="g2" style="gap:0.5rem;">
-                  <div class="fg">
-                    <div class="fl">Batch size</div><input class="fi" type="number" value="500">
-                  </div>
-                  <div class="fg">
-                    <div class="fl">Import mode</div><select class="fs">
-                      <option>One-time full</option>
-                      <option>Incremental</option>
-                      <option>Scheduled (cron)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- Query Results -->
-                <div id="db-query-results" style="display:none;">
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
-                    <div class="fl" style="margin:0;">Query Results</div>
-                    <span id="db-results-count" style="font-family:var(--mono);font-size:0.44rem;color:var(--text3);letter-spacing:0.08em;"></span>
-                  </div>
-                  <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);max-height:300px;overflow-y:auto;">
-                    <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:0.52rem;">
-                      <thead>
-                        <tr id="db-results-header" style="background:var(--bg3);position:sticky;top:0;"></tr>
-                      </thead>
-                      <tbody id="db-results-body"></tbody>
-                    </table>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -4762,11 +4778,195 @@
       dbPrismaStudioOpen = false;
     }
 
-    function dbQueue() {
-      const table = document.getElementById('db-table').value || 'table';
-      const j = createJob(`DB Import: ${dbType.toUpperCase()} — ${table}`, '🗄️', 'database', dbType);
-      setTimeout(() => startJob(j.id), 800);
+    function dbToggleIngestAll(el) {
+      const isAll = el.checked;
+      document.getElementById('db-tables-container').style.opacity = isAll ? '0.5' : '1';
+      document.getElementById('db-table-input-container').style.opacity = isAll ? '0.5' : '1';
+      document.getElementById('db-table').disabled = isAll;
+      document.getElementById('db-query').disabled = isAll;
+      if (isAll) {
+        document.getElementById('db-query').value = '';
+        qLog('info', 'Multi-table mode: All user tables will be processed sequentially.');
+      }
     }
+
+    async function dbSaveQuery() {
+      const table = document.getElementById('db-table').value;
+      const query = document.getElementById('db-query').value;
+      const autoName = query ? `Query: ${query.substring(0, 20)}...` : `Table: ${table}`;
+      
+      const payload = {
+        name: autoName + " (" + new Date().toLocaleTimeString() + ")",
+        query: query,
+        dbType: dbType,
+        mapping: {
+          text: document.getElementById('db-map-text').value,
+          time: document.getElementById('db-map-time').value,
+          author: document.getElementById('db-map-author').value,
+          id: document.getElementById('db-map-id').value
+        }
+      };
+
+      try {
+        qLog('info', 'Saving migration mapping...');
+        const res = await fetch('/api/db/saved-queries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          qLog('ok', `Saved migration: ${data.name}`);
+          dbLoadSavedQueries();
+        } else {
+          qLog('err', `Save failed: ${data.error || 'Unknown server error'}`);
+        }
+      } catch (e) { 
+        qLog('err', `Save network error: ${e.message}`); 
+        console.error("Save Error:", e);
+      }
+    }
+
+    async function dbLoadSavedQueries() {
+      const list = document.getElementById('db-saved-list');
+      try {
+        const res = await fetch('/api/db/saved-queries');
+        const data = await res.json();
+        if (!data || !data.length) {
+          list.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--text4);font-size:0.55rem;">No saved queries yet.</div>`;
+          return;
+        }
+        list.innerHTML = data.map(q => `
+          <div style="display:flex;align-items:center;padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);gap:0.6rem;">
+            <input type="checkbox" class="db-saved-check" data-id="${q.id}" style="cursor:pointer;">
+            <div style="flex:1;">
+              <div style="font-size:0.55rem;font-weight:600;color:var(--text);">${q.name}</div>
+              <div style="font-family:var(--mono);font-size:0.44rem;color:var(--text4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">${q.query || 'Full Table Sync'}</div>
+            </div>
+            <div style="display:flex;gap:0.3rem;">
+              <button class="btn btn-xs btn-outline" onclick="dbApplySaved(${q.id})">📂</button>
+              <button class="btn btn-xs btn-danger" onclick="dbDeleteSavedQuery(${q.id})">✕</button>
+            </div>
+          </div>
+        `).join('');
+        // Store for apply
+        window._savedQueries = data;
+      } catch (e) { qLog('err', `Load queries error: ${e.message}`); }
+    }
+
+    function dbApplySaved(id) {
+       const q = window._savedQueries.find(x => x.id === id);
+       if (!q) return;
+       document.getElementById('db-query').value = q.query || '';
+       document.getElementById('db-map-text').value = q.mapping.text || 'text';
+       document.getElementById('db-map-time').value = q.mapping.time || 'created_at';
+       document.getElementById('db-map-author').value = q.mapping.author || 'author';
+       document.getElementById('db-map-id').value = q.mapping.id || 'id';
+       qLog('info', `Applied mapping: ${q.name}`);
+    }
+
+    async function dbDeleteSavedQuery(id) {
+      if (!confirm("Delete this saved query?")) return;
+      try {
+        await fetch(`/api/db/saved-queries/${id}`, { method: 'DELETE' });
+        dbLoadSavedQueries();
+      } catch (e) { qLog('err', `Delete error: ${e.message}`); }
+    }
+
+    async function dbBatchQueue() {
+      const checked = Array.from(document.querySelectorAll('.db-saved-check:checked')).map(cb => parseInt(cb.dataset.id));
+      if (!checked.length) { alert("Please select at least one saved query to ingest."); return; }
+
+      const batchData = checked.map(id => {
+        const q = window._savedQueries.find(x => x.id === id);
+        return { name: q.name, query: q.query, mapping: q.mapping };
+      });
+
+      const config = {
+        dbType,
+        uri: document.getElementById('db-uri').value,
+        batch: batchData,
+        includeAll: document.getElementById('db-include-rows').checked
+      };
+
+      const j = createJob(`Batch Import: ${checked.length} Queries`, '🗂️', 'database-batch');
+      await dbTriggerImport(j, config);
+    }
+
+    async function dbQueue() {
+      const isAll = document.getElementById('db-ingest-all').checked;
+      const table = document.getElementById('db-table').value || 'table';
+      
+      const config = {
+        host: document.getElementById('db-host').value,
+        port: document.getElementById('db-port').value,
+        dbName: document.getElementById('db-name').value,
+        user: document.getElementById('db-user').value,
+        pass: document.getElementById('db-pass').value,
+        uri: document.getElementById('db-uri').value,
+        dbType: dbType,
+        table: table,
+        query: document.getElementById('db-query').value,
+        tables: isAll ? 'all' : undefined,
+        mapping: {
+          text: document.getElementById('db-map-text').value,
+          time: document.getElementById('db-map-time').value,
+          author: document.getElementById('db-map-author').value,
+          id: document.getElementById('db-map-id').value
+        },
+        includeAll: document.getElementById('db-include-rows').checked
+      };
+
+      const name = isAll ? `Full DB Sync: ${dbType.toUpperCase()}` : `DB Import: ${table}`;
+      const j = createJob(name, '🗄️', 'database', dbType);
+      await dbTriggerImport(j, config);
+    }
+
+    async function dbTriggerImport(j, config) {
+      qLog('info', `Queuing ${j.name}...`);
+      try {
+        const res = await fetch('/api/db/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: j.id, config: config })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          qLog('ok', `Import task synchronized with background worker.`);
+          // Status Poller
+          const poller = setInterval(async () => {
+             const sRes = await fetch(`/api/db/import/status/${j.id}`);
+             const sData = await sRes.json();
+             if (sData.status === 'running' || sData.status === 'processing') {
+                j.status = 'processing';
+                j.progress = sData.progress;
+                j.itemsProcessed = sData.processed;
+                j.totalItems = sData.total;
+                renderQueue();
+             } else if (sData.status === 'done' || sData.status === 'completed') {
+                j.status = 'done';
+                j.progress = 100;
+                j.itemsProcessed = sData.total;
+                j.doneAt = new Date();
+                clearInterval(poller);
+                renderQueue(); updateStats();
+                qLog('ok', `✓ Job ${j.id} completed successfully.`);
+             } else if (sData.status === 'failed') {
+                j.status = 'failed';
+                clearInterval(poller);
+                qLog('err', `Import ${j.id} failed: ${sData.error}`);
+                renderQueue();
+             }
+          }, 1000);
+        }
+      } catch (err) {
+        qLog('err', `Import trigger error: ${err.message}`);
+        j.status = 'failed'; renderQueue();
+      }
+    }
+
+    // Initialize Saved Queries
+    setTimeout(dbLoadSavedQueries, 500);
 
     /* ═══════════════════════════════════════════════
        KAGGLE

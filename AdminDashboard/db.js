@@ -86,6 +86,15 @@ async function initDb() {
     level    TEXT DEFAULT 'info',
     message  TEXT NOT NULL
   )`);
+
+    await run(`CREATE TABLE IF NOT EXISTS saved_queries (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    query         TEXT NOT NULL,
+    db_type       TEXT NOT NULL,
+    mapping_json  TEXT,
+    created_at    TEXT DEFAULT (datetime('now'))
+  )`);
 }
 
 // Initialize on load
@@ -200,6 +209,26 @@ async function getRecentLogs() {
     return rows.reverse();
 }
 
+// ═══════════════════════════════════
+//  SAVED QUERIES
+// ═══════════════════════════════════
+async function createSavedQuery(data) {
+    const { lastID } = await run(
+        `INSERT INTO saved_queries (name, query, db_type, mapping_json) VALUES (?,?,?,?)`,
+        [data.name, data.query, data.dbType, JSON.stringify(data.mapping)]
+    );
+    return get(`SELECT * FROM saved_queries WHERE id = ?`, [lastID]);
+}
+
+async function getSavedQueries() {
+    const rows = await all(`SELECT * FROM saved_queries ORDER BY created_at DESC`);
+    return rows.map(r => ({ ...r, mapping: JSON.parse(r.mapping_json || '{}') }));
+}
+
+async function deleteSavedQuery(id) {
+    await run(`DELETE FROM saved_queries WHERE id = ?`, [id]);
+}
+
 module.exports = {
     // Jobs
     createJob, updateJob, getJobs, deleteJob, clearDoneJobs,
@@ -210,4 +239,6 @@ module.exports = {
     saveSetting, getSetting, getAllSettings,
     // Logs
     appendLog, getRecentLogs,
+    // Saved Queries
+    createSavedQuery, getSavedQueries, deleteSavedQuery,
 };
