@@ -350,6 +350,7 @@ app.post('/api/proxy/pdf', upload.single('pdf'), async (req, res) => {
         if (!req.file) return res.status(400).json({ error: 'No PDF uploaded' });
         const fd = new FormData();
         fd.append('pdf', fs.createReadStream(req.file.path), req.file.originalname);
+        if (req.body.strategy) fd.append('strategy', req.body.strategy);
 
         const r = await fetch(`${QWEN_URL}/api/analyze-pdf`, { method: 'POST', body: fd, headers: fd.getHeaders() });
         const data = await r.json();
@@ -376,6 +377,30 @@ app.post('/api/proxy/ingest', async (req, res) => {
         res.status(r.status).json(data);
     } catch (err) {
         res.status(502).json({ error: 'NetaBoard backend unreachable', detail: err.message });
+    }
+});
+
+// Write scraped results to local DataCollected folder
+app.post('/api/save_local_file', async (req, res) => {
+    try {
+        const { folder, filename, content } = req.body;
+        if (!folder || !filename) {
+            return res.status(400).json({ error: 'Missing folder or filename' });
+        }
+
+        // DataCollected is located one level up from AdminDashboard
+        const targetDir = path.join(__dirname, '..', 'DataCollected', folder);
+
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        const targetFile = path.join(targetDir, filename);
+        fs.writeFileSync(targetFile, content, 'utf8');
+
+        res.json({ success: true, path: targetFile });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

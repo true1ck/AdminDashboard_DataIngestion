@@ -177,21 +177,65 @@ def analyze_pdf():
         return jsonify({'error': 'Invalid file type. Must be PDF.'}), 400
 
     try:
+        strategy = request.form.get('strategy', 'both')
         pdf_bytes = file.read()
         doc = fitz.open("pdf", pdf_bytes)
-        extracted_text = ""
-        for page in doc:
-            extracted_text += page.get_text() + "\n"
+        page_count = len(doc)
+        
+        result_pymupdf = None
+        result_qwen = None
+        
+        # 1. Fast PyMuPDF Text Extraction (ALL pages)
+        if strategy in ['both', 'text_only']:
+            extracted_text = ""
+            for page in doc:
+                extracted_text += page.get_text() + "\n"
+            
+            result_pymupdf = extracted_text.strip()
+            if not result_pymupdf:
+                result_pymupdf = "No machine-readable text found in PDF (might be scanned images)."
+            
+        # 2. Qwen Vision OCR / Analysis (First 3 pages max to prevent timeout/rate limits)
+        if strategy in ['both', 'vision_only']:
+            result_qwen = ""
+            if HF_API_TOKEN and HF_API_TOKEN != 'your_huggingface_token_here':
+                client = InferenceClient(api_key=HF_API_TOKEN)
+                max_q_pages = min(page_count, 3)
+                for i in range(max_q_pages):
+                    try:
+                        pix = doc[i].get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+                        buffer = io.BytesIO(pix.tobytes("jpeg"))
+                        b64 = base64.b64encode(buffer.read()).decode('utf-8')
+                        
+                        comp = client.chat.completions.create(
+                            model=MODEL_ID,
+                            messages=[{"role": "user", "content": [
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+                                {"type": "text", "text": "Extract all text verbatim and describe any visual elements, charts, or diagrams on this document page in extreme detail."}
+                            ]}],
+                            max_tokens=2048
+                        )
+                        result_qwen += f"\n--- Page {i+1} ---\n{comp.choices[0].message.content}\n"
+                    except Exception as e:
+                        result_qwen += f"\n--- Page {i+1} ---\n[Qwen Vision API Error: {str(e)}]\n"
+                
+                if page_count > max_q_pages:
+                    result_qwen += f"\n[System Note: Qwen processing was limited to the first {max_q_pages} pages to prevent timeouts. The full {page_count} pages text is available in the PyMuPDF extraction.]"
+            else:
+                result_qwen = "Qwen API not configured."
+                
         doc.close()
         
-        result_text = extracted_text.strip()
-        if not result_text:
-            result_text = "No machine-readable text found in PDF (might be scanned images)."
+        model_name = "PyMuPDF + Qwen Vision Hybrid"
+        if strategy == 'text_only': model_name = "PyMuPDF Only"
+        if strategy == 'vision_only': model_name = "Qwen Vision OCR Only"
             
         return jsonify({
             'success': True,
-            'result': result_text,
-            'model': 'PyMuPDF'
+            'result_pymupdf': result_pymupdf,
+            'result_qwen': result_qwen,
+            'pages_total': page_count,
+            'model': model_name
         })
     except Exception as e:
         traceback.print_exc()
