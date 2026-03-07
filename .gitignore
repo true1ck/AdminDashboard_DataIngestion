@@ -1,0 +1,123 @@
+# ═══════════════════════════════════════════════════
+#  NetaBoard Imple — Root .gitignore
+# ═══════════════════════════════════════════════════
+
+# ── OS & Editor ───────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Python Virtual Environments ───────────────────
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Node / npm ────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# ── Build Outputs ─────────────────────────────────
+NetaBoardV5/dist/
+NetaBoardV5/backend/dist/
+AdminDashboard/dist/
+
+# ── Environment / Secrets ─────────────────────────
+.env
+.env.local
+.env.*.local
+# Keep the examples
+!.env.example
+
+# ── AI Model Weights & Cache ──────────────────────
+# Whisper models
+MediaToTextWhisper/backend/models/
+MediaToTextWhisper/backend/faster_whisper_models/
+MediaToTextWhisper/backend/.cache/
+~/.cache/huggingface/
+
+# Qwen / HuggingFace cache
+ImageToTextQwen/backend/models/
+ImageToTextQwen/backend/.cache/
+*.bin
+*.safetensors
+*.gguf
+*.onnx
+*.pt
+*.pth
+*.h5
+
+# ── Downloaded / Uploaded Media ───────────────────
+MediaToTextWhisper/uploads/
+MediaToTextWhisper/backend/uploads/
+ImageToTextQwen/uploads/
+uploads/
+*.mp4
+*.mp3
+*.m4a
+*.mkv
+*.webm
+*.wav
+*.flac
+*.ogg
+*.opus
+
+# ── Collected Data (raw ingest output) ────────────
+# Keep folder structure but not the actual data files
+DataCollected/**/*.txt
+DataCollected/**/*.pdf
+DataCollected/**/*.jpg
+DataCollected/**/*.jpeg
+DataCollected/**/*.png
+DataCollected/**/*.csv
+# But keep the .gitkeep placeholder files
+!DataCollected/**/.gitkeep
+
+# ── SQLite Databases ──────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+NetaBoardV5/backend/prisma/dev.db
+NetaBoardV5/backend/prisma/dev.db-journal
+
+# ── Prisma ────────────────────────────────────────
+# Keep schema, exclude generated client
+NetaBoardV5/backend/node_modules/.prisma/
+
+# ── Logs ──────────────────────────────────────────
+*.log
+logs/
+*.log.*
+
+# ── Temp & Cache ──────────────────────────────────
+.cache/
+.tmp/
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# ── Resolved conflict files ───────────────────────
+*.resolved
+
+# ── multer temp uploads ───────────────────────────
+NetaBoardV5/backend/uploads/

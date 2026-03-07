@@ -1,0 +1,242 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ---------------------------------------------------------
+// 1. Archetype (The Leader Profile)
+// Represents the politician's configuration and baseline stats.
+// ---------------------------------------------------------
+model Archetype {
+  id           String        @id @default(uuid())
+  archetypeKey String        @unique // e.g., 'grassroots', 'technocrat'
+  name         String
+  icon         String        // Emoji icon
+  tagline      String
+  primaryColor String        // Hex color
+
+  // Relations
+  constituency Constituency?
+  pillarScores PillarScore?
+  sansadRecord SansadRecord?
+  kpis         String?         // Flexible key-value metrics
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Constituency {
+  id          String     @id @default(uuid())
+  name        String     // e.g., 'Gorakhpur'
+  party       String     // e.g., 'BJP', 'INC', 'BRS'
+  state       String
+  type        String     // e.g., 'LS' (Lok Sabha), 'VS' (Vidhan Sabha)
+  electionDate String    // e.g., '2029-04'
+  totalBooths Int
+
+  archetypeId String     @unique
+  archetype   Archetype  @relation(fields: [archetypeId], references: [id], onDelete: Cascade)
+}
+
+model PillarScore {
+  id          String     @id @default(uuid())
+  archetypeId String     @unique
+  archetype   Archetype  @relation(fields: [archetypeId], references: [id], onDelete: Cascade)
+
+  // The 15 Pillars (0-100 scores)
+  electoralStrength       Int @default(50)
+  legislativePerformance  Int @default(50)
+  constituencyDevelopment Int @default(50)
+  publicAccessibility     Int @default(50)
+  communication           Int @default(50)
+  partyStanding           Int @default(50)
+  mediaCoverage           Int @default(50)
+  digitalInfluence        Int @default(50)
+  financialMuscle         Int @default(50)
+  allianceIntel           Int @default(50)
+  casteEquation           Int @default(50)
+  antiIncumbency          Int @default(50)
+  grassrootsNetwork       Int @default(50)
+  ideologyConsistency     Int @default(50)
+  scandalIndex            Int @default(50)
+}
+
+model SansadRecord {
+  id          String     @id @default(uuid())
+  archetypeId String     @unique
+  archetype   Archetype  @relation(fields: [archetypeId], references: [id], onDelete: Cascade)
+
+  attendancePercentage Int
+  questionsAsked       Int
+  privateBills         Int
+  billsPassed          Int
+}
+
+model Rival {
+  id          String   @id @default(uuid())
+  name        String
+  nriScore    Float
+  trend       Int      // e.g., -3 (down) or 2 (up)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// 2. Continuous Streams (Feedback & Social Media)
+// High-volume, real-time data ingestion.
+// ---------------------------------------------------------
+model Feedback {
+  id        String   @id @default(uuid())
+  text      String   
+  source    String   // e.g., 'jd' (Jan Darbar), 'sm' (Social Media)
+  sentiment Float    // e.g., 0.85 or -0.72
+  emotion   String   // e.g., 'trust', 'anger', 'joy'
+  pillarId  String   // e.g., 'cd', 'pa', 'lp'
+  urgency   String   // e.g., 'samanya', 'shighra', 'tatkal'
+  timestamp DateTime @default(now()) // Replaces '12m ago' logic
+
+  createdAt DateTime @default(now())
+}
+
+model SocialItem {
+  id        String   @id @default(uuid())
+  platform  String   // e.g., 'youtube', 'x', 'facebook'
+  author    String
+  text      String   
+  sentiment Float
+  emotion   String
+  likes     Int      @default(0)
+  reposts   Int      @default(0)
+  timestamp DateTime @default(now())
+
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------
+// 3. Alerts & IASCL (Issue Analysis & Strategic Crisis Loop)
+// State-machine driven workflows for crises.
+// ---------------------------------------------------------
+model Alert {
+  id            String   @id @default(uuid())
+  severity      String   // 'crisis', 'high', 'medium', 'low', 'info'
+  title         String
+  description   String   
+  aiSuggestedText String 
+  aiConfidence  Float    // 0-100%
+  icon          String
+  
+  // IASCL Tracking properties
+  isDispatched  Boolean  @default(false)
+  
+  iasclAction   IASCLAction? 
+
+  timestamp     DateTime @default(now())
+}
+
+model IASCLAction {
+  id                String   @id @default(uuid())
+  uid               String   @unique // Human-readable ID like 'ACT-492'
+  status            String   // 'draft', 'dispatched', 'in_progress', etc.
+  priority          String?  // 'tatkal', 'samayik', etc.
+  assigneeId        String?  // References a User/Staff member table (not defined here) 
+  
+  alertId           String   @unique
+  alert             Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  completionPct     Int      @default(0)
+
+  criteria          IASCLCriteria[]
+  transitions       IASCLTransition[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model IASCLCriteria {
+  id            String       @id @default(uuid())
+  text          String
+  isMandatory   Boolean      @default(true)
+  isMet         Boolean      @default(false)
+  
+  iasclActionId String
+  iasclAction   IASCLAction  @relation(fields: [iasclActionId], references: [id], onDelete: Cascade)
+}
+
+model IASCLTransition {
+  id            String       @id @default(uuid())
+  fromState     String?
+  toState       String
+  
+  iasclActionId String
+  iasclAction   IASCLAction  @relation(fields: [iasclActionId], references: [id], onDelete: Cascade)
+  
+  timestamp     DateTime     @default(now())
+}
+
+// ---------------------------------------------------------
+// 4. Integrations & Configuration
+// Details about connected platforms (WhatsApp, Jan Setu).
+// ---------------------------------------------------------
+model Channel {
+  id             String   @id @default(uuid())
+  channelType    String   @unique // e.g., 'whatsapp', 'facebook'
+  name           String
+  icon           String
+  status         String   // 'connected', 'pending', 'disconnected'
+  apiEndpoint    String
+  authMethod     String
+
+  // Permissions (Booleans stored as ints or actual bools)
+  canRead        Boolean  @default(true)
+  canReply       Boolean  @default(true)
+  canDelete      Boolean  @default(false)
+  canDM          Boolean  @default(false)
+  hasWebhook     Boolean  @default(false)
+
+  instances      ChannelInstance[]
+}
+
+model ChannelInstance {
+  id         String     @id @default(uuid())
+  channelId  String
+  channel    Channel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  
+  label      String     // e.g., 'Official Page', 'Constituency Helpline'
+  handle     String     // e.g., '@MP_Official', '+91 98XXX 00001'
+  status     String     // 'connected', 'pending'
+  notes      String?    
+
+  // Stats snapshot (ideally calculated, but can be cached here)
+  followers  Int      @default(0)
+  totalItems Int      @default(0)
+  pending    Int      @default(0)
+  responsePct Float     @default(0)
+}
+
+// ---------------------------------------------------------
+// 5. Ingestion & Job Queue
+// Tracks background jobs and their states.
+// ---------------------------------------------------------
+model IngestJob {
+  id          String   @id @default(uuid())
+  name        String   // e.g., "ConfirmationPage.pdf"
+  sourceType  String   // 'pdf', 'image', 'youtube', 'url_scrape', 'csv'
+  status      String   @default("queued") // queued, processing, done, failed
+  progress    Int      @default(0)
+  logs        String   @default("[]") // JSON array of log lines
+  resultPath  String?  // Path to extracted_text.txt in DataCollected
+  error       String?
+  
+  itemsProcessed Int   @default(0)
+  totalItems     Int   @default(1)
+
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+}

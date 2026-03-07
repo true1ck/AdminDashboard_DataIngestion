@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="MediaToText — Convert video and audio files to text using the Whisper Large V3 AI model. Apache 2.0 licensed.">
+    <title>MediaToText — AI Video & Audio Transcription</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <!-- Ambient Background -->
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <rect width="32" height="32" rx="8" fill="url(#logo-grad)" />
+                        <path d="M8 16L12 10L16 18L20 12L24 16" stroke="white" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <path d="M8 20L12 16L16 22L20 14L24 20" stroke="white" stroke-width="1.5" stroke-linecap="round"
+                            stroke-linejoin="round" opacity="0.5" />
+                        <defs>
+                            <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32">
+                                <stop stop-color="#6366f1" />
+                                <stop offset="1" stop-color="#8b5cf6" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1>Media<span class="accent">ToText</span></h1>
+            </div>
+            <p class="tagline">AI-powered transcription · Apache 2.0 models</p>
+        </header>
+
+        <!-- Model Info -->
+        <section class="model-info" id="model-info">
+            <div class="model-card active" id="card-whisper">
+                <div class="model-badge">Active Model</div>
+                <div class="model-icon whisper-icon">
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                        <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="1.5" opacity="0.3" />
+                        <path d="M12 20C12 20 14 14 20 14C26 14 28 20 28 20C28 20 26 26 20 26C14 26 12 20 12 20Z"
+                            stroke="currentColor" stroke-width="1.5" />
+                        <circle cx="20" cy="20" r="3" fill="currentColor" />
+                    </svg>
+                </div>
+                <h3>Whisper Large V3</h3>
+                <p class="model-provider">by OpenAI</p>
+                <p class="model-desc">High-accuracy ASR with word-level timestamps and language detection.</p>
+                <div class="model-tags">
+                    <span class="tag">Timestamps</span>
+                    <span class="tag">1.55B params</span>
+                    <span class="tag">~3GB</span>
+                </div>
+                <div class="model-license">Apache 2.0</div>
+            </div>
+        </section>
+
+        <!-- Input Mode Tabs -->
+        <section class="input-section" id="input-section">
+            <div class="input-tabs">
+                <button class="input-tab active" id="tab-upload" data-tab="upload">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15V19C21 20.1 20.1 21 19 21H5C3.9 21 3 20.1 3 19V15" />
+                        <path d="M17 8L12 3L7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>Upload File</span>
+                </button>
+                <button class="input-tab" id="tab-path" data-tab="path">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M22 19C22 19.5304 21.7893 20.0391 21.4142 20.4142C21.0391 20.7893 20.5304 21 20 21H4C3.46957 21 2.96086 20.7893 2.58579 20.4142C2.21071 20.0391 2 19.5304 2 19V5C2 4.46957 2.21071 3.96086 2.58579 3.58579C2.96086 3.21071 3.46957 3 4 3H9L11 6H20C20.5304 6 21.0391 6.21071 21.4142 6.58579C21.7893 6.96086 22 7.46957 22 8V19Z" />
+                    </svg>
+                    <span>Server Path</span>
+                </button>
+            </div>
+
+            <!-- Upload Tab Content -->
+            <div class="tab-content active" id="content-upload">
+                <div class="upload-zone" id="upload-zone">
+                    <div class="upload-content">
+                        <div class="upload-icon">
+                            <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+                                <circle cx="28" cy="28" r="26" stroke="url(#upload-grad)" stroke-width="2"
+                                    stroke-dasharray="6 4" />
+                                <path d="M28 36V20M28 20L22 26M28 20L34 26" stroke="url(#upload-grad)" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" />
+                                <defs>
+                                    <linearGradient id="upload-grad" x1="0" y1="0" x2="56" y2="56">
+                                        <stop stop-color="#6366f1" />
+                                        <stop offset="1" stop-color="#a855f7" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
+                        <h3>Drop your file here</h3>
+                        <p>or <span class="browse-link">browse</span> to upload</p>
+                        <p class="upload-formats">MP4, MKV, AVI, MOV, WebM, MP3, WAV, FLAC, OGG, M4A</p>
+                        <p class="upload-limit">Max 500MB</p>
+                    </div>
+                    <input type="file" id="file-input" accept=".mp4,.mkv,.avi,.mov,.webm,.mp3,.wav,.flac,.ogg,.m4a"
+                        hidden>
+                </div>
+
+                <!-- File Info (shown after selection) -->
+                <div class="file-info hidden" id="file-info">
+                    <div class="file-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path
+                                d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+                                stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                            <path d="M14 2V8H20" stroke="currentColor" stroke-width="1.5" />
+                        </svg>
+                    </div>
+                    <div class="file-details">
+                        <span class="file-name" id="file-name">—</span>
+                        <span class="file-size" id="file-size">—</span>
+                    </div>
+                    <button class="btn-remove" id="btn-remove" title="Remove file">✕</button>
+                </div>
+            </div>
+
+            <!-- Server Path Tab Content -->
+            <div class="tab-content" id="content-path">
+                <div class="path-input-container">
+                    <div class="path-input-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M22 19C22 19.5304 21.7893 20.0391 21.4142 20.4142C21.0391 20.7893 20.5304 21 20 21H4C3.46957 21 2.96086 20.7893 2.58579 20.4142C2.21071 20.0391 2 19.5304 2 19V5C2 4.46957 2.21071 3.96086 2.58579 3.58579C2.96086 3.21071 3.46957 3 4 3H9L11 6H20C20.5304 6 21.0391 6.21071 21.4142 6.58579C21.7893 6.96086 22 7.46957 22 8V19Z" />
+                        </svg>
+                    </div>
+                    <input type="text" id="path-input" class="path-input" placeholder="/path/to/your/media/file.mp4"
+                        spellcheck="false" autocomplete="off">
+                </div>
+                <p class="path-hint">Enter the absolute path to a media file on the server</p>
+                <p class="upload-formats">Supported: MP4, MKV, AVI, MOV, WebM, MP3, WAV, FLAC, OGG, M4A</p>
+            </div>
+        </section>
+
+        <!-- Transcribe Button -->
+        <div class="action-bar">
+            <button class="btn-transcribe" id="btn-transcribe" disabled>
+                <span class="btn-text">Transcribe</span>
+                <span class="btn-icon">→</span>
+            </button>
+        </div>
+
+        <!-- Progress -->
+        <section class="progress-section hidden" id="progress-section">
+            <div class="progress-card">
+                <div class="progress-spinner"></div>
+                <div class="progress-text">
+                    <h3 id="progress-title">Uploading...</h3>
+                    <p id="progress-desc">Preparing your file for transcription</p>
+                </div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+        </section>
+
+        <!-- Results -->
+        <section class="results-section hidden" id="results-section">
+            <div class="results-header">
+                <div class="results-meta">
+                    <h2>Transcription Result</h2>
+                    <div class="result-badges" id="result-badges"></div>
+                </div>
+                <div class="results-actions">
+                    <button class="btn-action" id="btn-copy" title="Copy to clipboard">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" />
+                            <path d="M5 15H4C2.9 15 2 14.1 2 13V4C2 2.9 2.9 2 4 2H13C14.1 2 15 2.9 15 4V5" />
+                        </svg>
+                        <span>Copy</span>
+                    </button>
+                    <button class="btn-action" id="btn-download" title="Download as text">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 15V19C21 20.1 20.1 21 19 21H5C3.9 21 3 20.1 3 19V15" />
+                            <path d="M7 10L12 15L17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        <span>Download</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Segments (Whisper) -->
+            <div class="segments-container" id="segments-container"></div>
+
+            <!-- Full Text -->
+            <div class="full-text-container">
+                <h3>Full Transcript</h3>
+                <div class="full-text" id="full-text"></div>
+            </div>
+        </section>
+
+        <!-- Error -->
+        <section class="error-section hidden" id="error-section">
+            <div class="error-card">
+                <div class="error-icon">⚠</div>
+                <h3>Transcription Failed</h3>
+                <p id="error-message">An unexpected error occurred.</p>
+                <button class="btn-retry" id="btn-retry">Try Again</button>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Powered by <strong>Whisper Large V3</strong> · Licensed under <strong>Apache 2.0</strong> · Built with
+                FastAPI + faster-whisper</p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
