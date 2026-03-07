@@ -626,13 +626,16 @@ app.post('/api/db/query', async (req, res) => {
         });
 
         // Use custom query if provided, else simple SELECT
-        const sql = query && query.trim() !== '' ? query : `SELECT * FROM "${table}" LIMIT ${finalLimit}`;
+        const sql = query && query.trim() !== '' ? query : `SELECT * FROM ${table} LIMIT ${finalLimit}`;
+        console.log(`[DB Query] Executing SQL: ${sql}`);
 
         tempDb.all(sql, [], (err, rows) => {
             tempDb.close();
             if (err) {
+                console.error(`[DB Query] Error: ${err.message}`);
                 return res.json({ ok: false, error: `Query failed: ${err.message}` });
             }
+            console.log(`[DB Query] Success: ${rows.length} rows returned`);
             res.json({ ok: true, rows: rows, count: rows.length });
         });
     } else {
