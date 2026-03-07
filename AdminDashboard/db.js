@@ -1,272 +1,206 @@
 // ═══════════════════════════════════════════════════════════════
 //  NetaBoard Admin Dashboard — SQLite Persistence Layer
+//  Uses sqlite3 (pre-compiled, no native build needed)
 // ═══════════════════════════════════════════════════════════════
-const Database = require('better-sqlite3');
+const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 const DB_PATH = path.join(__dirname, 'dashboard.db');
-const db = new Database(DB_PATH);
+const db = new sqlite3.Database(DB_PATH);
 
-// ── Enable WAL mode for better concurrent performance ──
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// ── Enable WAL mode ──
+db.run('PRAGMA journal_mode = WAL');
+db.run('PRAGMA foreign_keys = ON');
 
-// ── Create Tables ──────────────────────────────────────────────
-db.exec(`
-  CREATE TABLE IF NOT EXISTS jobs (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT    NOT NULL,
-    icon        TEXT    DEFAULT '📦',
-    source_type TEXT    NOT NULL,
-    extra_meta  TEXT    DEFAULT '',
-    status      TEXT    DEFAULT 'queued',
-    progress    INTEGER DEFAULT 0,
+// ── Run SQL helper (promisified) ──
+function run(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function (err) {
+            if (err) reject(err); else resolve({ lastID: this.lastID, changes: this.changes });
+        });
+    });
+}
+
+function get(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => { if (err) reject(err); else resolve(row); });
+    });
+}
+
+function all(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.all(sql, params, (err, rows) => { if (err) reject(err); else resolve(rows); });
+    });
+}
+
+// ── Create Tables ──
+async function initDb() {
+    await run(`CREATE TABLE IF NOT EXISTS jobs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    icon          TEXT DEFAULT '📦',
+    source_type   TEXT NOT NULL,
+    extra_meta    TEXT DEFAULT '',
+    status        TEXT DEFAULT 'queued',
+    progress      INTEGER DEFAULT 0,
     items_processed INTEGER DEFAULT 0,
-    total_items INTEGER DEFAULT 100,
-    yt_job_id   TEXT,
-    error_msg   TEXT,
-    created_at  TEXT    DEFAULT (datetime('now')),
-    started_at  TEXT,
-    done_at     TEXT
-  );
+    total_items   INTEGER DEFAULT 100,
+    yt_job_id     TEXT,
+    error_msg     TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    started_at    TEXT,
+    done_at       TEXT
+  )`);
 
-  CREATE TABLE IF NOT EXISTS yt_videos (
-    vid         TEXT    PRIMARY KEY,
-    url         TEXT    NOT NULL,
-    title       TEXT,
-    channel     TEXT,
-    duration    TEXT,
-    thumbnail   TEXT,
-    status      TEXT    DEFAULT 'staged',
-    added_at    TEXT    DEFAULT (datetime('now'))
-  );
+    await run(`CREATE TABLE IF NOT EXISTS yt_videos (
+    vid       TEXT PRIMARY KEY,
+    url       TEXT NOT NULL,
+    title     TEXT,
+    channel   TEXT,
+    duration  TEXT,
+    thumbnail TEXT,
+    status    TEXT DEFAULT 'staged',
+    added_at  TEXT DEFAULT (datetime('now'))
+  )`);
 
-  CREATE TABLE IF NOT EXISTS yt_playlists (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    url         TEXT    NOT NULL,
-    name        TEXT,
-    count       INTEGER DEFAULT 0,
-    videos_json TEXT    DEFAULT '[]',
-    status      TEXT    DEFAULT 'staged',
-    progress    INTEGER DEFAULT 0,
-    added_at    TEXT    DEFAULT (datetime('now'))
-  );
+    await run(`CREATE TABLE IF NOT EXISTS yt_playlists (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    url          TEXT NOT NULL,
+    name         TEXT,
+    count        INTEGER DEFAULT 0,
+    videos_json  TEXT DEFAULT '[]',
+    status       TEXT DEFAULT 'staged',
+    progress     INTEGER DEFAULT 0,
+    added_at     TEXT DEFAULT (datetime('now'))
+  )`);
 
-  CREATE TABLE IF NOT EXISTS settings (
-    key         TEXT    PRIMARY KEY,
-    value       TEXT,
-    updated_at  TEXT    DEFAULT (datetime('now'))
-  );
+    await run(`CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT DEFAULT (datetime('now'))
+  )`);
 
-  CREATE TABLE IF NOT EXISTS log_entries (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    ts          TEXT    DEFAULT (datetime('now','localtime')),
-    level       TEXT    DEFAULT 'info',
-    message     TEXT    NOT NULL
-  );
-`);
-
-// ══════════════════════════════════════════════
-//  JOB CRUD
-// ══════════════════════════════════════════════
-const jobStmts = {
-    create: db.prepare(`
-    INSERT INTO jobs (name, icon, source_type, extra_meta, status, progress, items_processed, total_items)
-    VALUES (@name, @icon, @source_type, @extra_meta, @status, @progress, @items_processed, @total_items)
-  `),
-    update: db.prepare(`
-    UPDATE jobs SET
-      status          = COALESCE(@status, status),
-      progress        = COALESCE(@progress, progress),
-      items_processed = COALESCE(@items_processed, items_processed),
-      extra_meta      = COALESCE(@extra_meta, extra_meta),
-      yt_job_id       = COALESCE(@yt_job_id, yt_job_id),
-      error_msg       = COALESCE(@error_msg, error_msg),
-      started_at      = COALESCE(@started_at, started_at),
-      done_at         = COALESCE(@done_at, done_at)
-    WHERE id = @id
-  `),
-    getAll: db.prepare(`SELECT * FROM jobs ORDER BY created_at DESC`),
-    getById: db.prepare(`SELECT * FROM jobs WHERE id = ?`),
-    delete: db.prepare(`DELETE FROM jobs WHERE id = ?`),
-    clearDone: db.prepare(`DELETE FROM jobs WHERE status IN ('done', 'failed')`),
-};
-
-function createJob(data) {
-    const result = jobStmts.create.run({
-        name: data.name || 'Unnamed Job',
-        icon: data.icon || '📦',
-        source_type: data.sourceType || 'unknown',
-        extra_meta: data.extraMeta || '',
-        status: 'queued',
-        progress: 0,
-        items_processed: 0,
-        total_items: data.totalItems || Math.floor(Math.random() * 800 + 50),
-    });
-    return jobStmts.getById.get(result.lastInsertRowid);
+    await run(`CREATE TABLE IF NOT EXISTS log_entries (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts       TEXT DEFAULT (datetime('now','localtime')),
+    level    TEXT DEFAULT 'info',
+    message  TEXT NOT NULL
+  )`);
 }
 
-function updateJob(id, data) {
-    jobStmts.update.run({
-        id,
-        status: data.status ?? null,
-        progress: data.progress ?? null,
-        items_processed: data.itemsProcessed ?? null,
-        extra_meta: data.extraMeta ?? null,
-        yt_job_id: data.ytJobId ?? null,
-        error_msg: data.errorMsg ?? null,
-        started_at: data.startedAt ?? null,
-        done_at: data.doneAt ?? null,
-    });
-    return jobStmts.getById.get(id);
+// Initialize on load
+initDb().catch(console.error);
+
+// ═══════════════════════════════════
+//  JOBS
+// ═══════════════════════════════════
+async function createJob(data) {
+    const totalItems = data.totalItems || Math.floor(Math.random() * 800 + 50);
+    const { lastID } = await run(
+        `INSERT INTO jobs (name, icon, source_type, extra_meta, total_items) VALUES (?,?,?,?,?)`,
+        [data.name || 'Job', data.icon || '📦', data.sourceType || 'unknown', data.extraMeta || '', totalItems]
+    );
+    return get(`SELECT * FROM jobs WHERE id = ?`, [lastID]);
 }
 
-function getJobs(filter) {
-    const all = jobStmts.getAll.all();
-    if (!filter || filter === 'all') return all;
-    if (filter === 'queued') return all.filter(j => j.status === 'queued' || j.status === 'paused');
-    if (filter === 'processing') return all.filter(j => j.status === 'processing');
-    if (filter === 'done') return all.filter(j => j.status === 'done' || j.status === 'failed');
-    return all;
+async function updateJob(id, data) {
+    const sets = [];
+    const vals = [];
+    if (data.status !== undefined) { sets.push('status = ?'); vals.push(data.status); }
+    if (data.progress !== undefined) { sets.push('progress = ?'); vals.push(data.progress); }
+    if (data.itemsProcessed !== undefined) { sets.push('items_processed = ?'); vals.push(data.itemsProcessed); }
+    if (data.extraMeta !== undefined) { sets.push('extra_meta = ?'); vals.push(data.extraMeta); }
+    if (data.ytJobId !== undefined) { sets.push('yt_job_id = ?'); vals.push(data.ytJobId); }
+    if (data.errorMsg !== undefined) { sets.push('error_msg = ?'); vals.push(data.errorMsg); }
+    if (data.startedAt !== undefined) { sets.push('started_at = ?'); vals.push(data.startedAt); }
+    if (data.doneAt !== undefined) { sets.push('done_at = ?'); vals.push(data.doneAt); }
+    if (!sets.length) return get(`SELECT * FROM jobs WHERE id = ?`, [id]);
+    vals.push(id);
+    await run(`UPDATE jobs SET ${sets.join(', ')} WHERE id = ?`, vals);
+    return get(`SELECT * FROM jobs WHERE id = ?`, [id]);
 }
 
-function deleteJob(id) {
-    jobStmts.delete.run(id);
+async function getJobs(filter) {
+    const rows = await all(`SELECT * FROM jobs ORDER BY created_at DESC`);
+    if (!filter || filter === 'all') return rows;
+    if (filter === 'queued') return rows.filter(j => j.status === 'queued' || j.status === 'paused');
+    if (filter === 'processing') return rows.filter(j => j.status === 'processing');
+    if (filter === 'done') return rows.filter(j => j.status === 'done' || j.status === 'failed');
+    return rows;
 }
 
-function clearDoneJobs() {
-    jobStmts.clearDone.run();
+async function deleteJob(id) { await run(`DELETE FROM jobs WHERE id = ?`, [id]); }
+async function clearDoneJobs() { await run(`DELETE FROM jobs WHERE status IN ('done','failed')`); }
+
+// ═══════════════════════════════════
+//  YOUTUBE
+// ═══════════════════════════════════
+async function addYtVideo(data) {
+    await run(
+        `INSERT OR REPLACE INTO yt_videos (vid, url, title, channel, duration, thumbnail, status) VALUES (?,?,?,?,?,?,?)`,
+        [data.vid, data.url, data.title || '', data.channel || '', data.duration || '', data.thumbnail || `https://img.youtube.com/vi/${data.vid}/mqdefault.jpg`, 'staged']
+    );
 }
 
-// ══════════════════════════════════════════════
-//  YOUTUBE VIDEOS & PLAYLISTS
-// ══════════════════════════════════════════════
-const ytStmts = {
-    addVideo: db.prepare(`
-    INSERT OR REPLACE INTO yt_videos (vid, url, title, channel, duration, thumbnail, status)
-    VALUES (@vid, @url, @title, @channel, @duration, @thumbnail, @status)
-  `),
-    getVideos: db.prepare(`SELECT * FROM yt_videos ORDER BY added_at DESC`),
-    updateVideo: db.prepare(`UPDATE yt_videos SET status = @status WHERE vid = @vid`),
-    deleteVideo: db.prepare(`DELETE FROM yt_videos WHERE vid = ?`),
-    clearVideos: db.prepare(`DELETE FROM yt_videos`),
+async function updateYtVideo(vid, status) { await run(`UPDATE yt_videos SET status=? WHERE vid=?`, [status, vid]); }
+async function getYtVideos() { return all(`SELECT * FROM yt_videos ORDER BY added_at DESC`); }
+async function deleteYtVideo(vid) { await run(`DELETE FROM yt_videos WHERE vid=?`, [vid]); }
+async function clearYtVideos() { await run(`DELETE FROM yt_videos`); }
 
-    addPlaylist: db.prepare(`
-    INSERT INTO yt_playlists (url, name, count, videos_json, status)
-    VALUES (@url, @name, @count, @videos_json, 'staged')
-  `),
-    getPlaylists: db.prepare(`SELECT * FROM yt_playlists ORDER BY added_at DESC`),
-    updatePlaylist: db.prepare(`UPDATE yt_playlists SET status = @status, progress = @progress WHERE id = @id`),
-    deletePlaylist: db.prepare(`DELETE FROM yt_playlists WHERE id = ?`),
-    clearPlaylists: db.prepare(`DELETE FROM yt_playlists`),
-};
-
-function addYtVideo(data) {
-    ytStmts.addVideo.run({
-        vid: data.vid,
-        url: data.url,
-        title: data.title || '',
-        channel: data.channel || '',
-        duration: data.duration || '',
-        thumbnail: data.thumbnail || `https://img.youtube.com/vi/${data.vid}/mqdefault.jpg`,
-        status: 'staged',
-    });
+async function addYtPlaylist(data) {
+    const { lastID } = await run(
+        `INSERT INTO yt_playlists (url, name, count, videos_json) VALUES (?,?,?,?)`,
+        [data.url, data.name || 'Playlist', data.count || 0, JSON.stringify(data.videos || [])]
+    );
+    return get(`SELECT * FROM yt_playlists WHERE id=?`, [lastID]);
 }
 
-function updateYtVideo(vid, status) {
-    ytStmts.updateVideo.run({ vid, status });
+async function getYtPlaylists() {
+    const rows = await all(`SELECT * FROM yt_playlists ORDER BY added_at DESC`);
+    return rows.map(p => ({ ...p, videos: JSON.parse(p.videos_json || '[]') }));
 }
 
-function getYtVideos() {
-    return ytStmts.getVideos.all();
+async function updateYtPlaylist(id, status, progress) {
+    await run(`UPDATE yt_playlists SET status=?, progress=? WHERE id=?`, [status, progress || 0, id]);
 }
+async function deleteYtPlaylist(id) { await run(`DELETE FROM yt_playlists WHERE id=?`, [id]); }
+async function clearYtPlaylists() { await run(`DELETE FROM yt_playlists`); }
 
-function deleteYtVideo(vid) {
-    ytStmts.deleteVideo.run(vid);
-}
-
-function clearYtVideos() {
-    ytStmts.clearVideos.run();
-}
-
-function addYtPlaylist(data) {
-    const result = ytStmts.addPlaylist.run({
-        url: data.url,
-        name: data.name || 'Playlist',
-        count: data.count || 0,
-        videos_json: JSON.stringify(data.videos || []),
-    });
-    return ytStmts.getPlaylists.all().find(p => p.id === result.lastInsertRowid);
-}
-
-function getYtPlaylists() {
-    return ytStmts.getPlaylists.all().map(p => ({
-        ...p,
-        videos: JSON.parse(p.videos_json || '[]')
-    }));
-}
-
-function updateYtPlaylist(id, status, progress) {
-    ytStmts.updatePlaylist.run({ id, status, progress });
-}
-
-function deleteYtPlaylist(id) {
-    ytStmts.deletePlaylist.run(id);
-}
-
-function clearYtPlaylists() {
-    ytStmts.clearPlaylists.run();
-}
-
-// ══════════════════════════════════════════════
+// ═══════════════════════════════════
 //  SETTINGS
-// ══════════════════════════════════════════════
-const settingsStmts = {
-    set: db.prepare(`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))`),
-    get: db.prepare(`SELECT value FROM settings WHERE key = ?`),
-    getAll: db.prepare(`SELECT key, value FROM settings`),
-};
-
-function saveSetting(key, value) {
-    settingsStmts.set.run(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+// ═══════════════════════════════════
+async function saveSetting(key, value) {
+    const v = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    await run(`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))`, [key, v]);
 }
 
-function getSetting(key, defaultValue = null) {
-    const row = settingsStmts.get.get(key);
+async function getSetting(key, defaultValue = null) {
+    const row = await get(`SELECT value FROM settings WHERE key=?`, [key]);
     if (!row) return defaultValue;
     try { return JSON.parse(row.value); } catch { return row.value; }
 }
 
-function getAllSettings() {
-    const rows = settingsStmts.getAll.all();
+async function getAllSettings() {
+    const rows = await all(`SELECT key, value FROM settings`);
     const result = {};
-    rows.forEach(r => {
-        try { result[r.key] = JSON.parse(r.value); } catch { result[r.key] = r.value; }
-    });
+    rows.forEach(r => { try { result[r.key] = JSON.parse(r.value); } catch { result[r.key] = r.value; } });
     return result;
 }
 
-// ══════════════════════════════════════════════
+// ═══════════════════════════════════
 //  LOGS
-// ══════════════════════════════════════════════
-const logStmts = {
-    add: db.prepare(`INSERT INTO log_entries (level, message) VALUES (?, ?)`),
-    getRecent: db.prepare(`SELECT * FROM log_entries ORDER BY id DESC LIMIT 200`),
-    cleanup: db.prepare(`DELETE FROM log_entries WHERE id NOT IN (SELECT id FROM log_entries ORDER BY id DESC LIMIT 500)`),
-};
-
-function appendLog(level, message) {
-    logStmts.add.run(level, message);
-    // Keep only last 500 entries
-    logStmts.cleanup.run();
+// ═══════════════════════════════════
+async function appendLog(level, message) {
+    await run(`INSERT INTO log_entries (level, message) VALUES (?, ?)`, [level, message]);
+    await run(`DELETE FROM log_entries WHERE id NOT IN (SELECT id FROM log_entries ORDER BY id DESC LIMIT 500)`);
 }
 
-function getRecentLogs() {
-    return logStmts.getRecent.all().reverse(); // oldest first
+async function getRecentLogs() {
+    const rows = await all(`SELECT * FROM log_entries ORDER BY id DESC LIMIT 200`);
+    return rows.reverse();
 }
 
 module.exports = {
-    db,
     // Jobs
     createJob, updateJob, getJobs, deleteJob, clearDoneJobs,
     // YouTube

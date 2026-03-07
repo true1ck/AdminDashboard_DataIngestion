@@ -40,13 +40,13 @@ app.get('/api/health', (req, res) => {
 // ══════════════════════════════════════════════
 //  FULL STATE RESTORE (on page load)
 // ══════════════════════════════════════════════
-app.get('/api/state', (req, res) => {
+app.get('/api/state', async (req, res) => {
     try {
-        const jobs = db.getJobs('all');
-        const ytVideos = db.getYtVideos();
-        const ytPlaylists = db.getYtPlaylists();
-        const settings = db.getAllSettings();
-        const logs = db.getRecentLogs();
+        const jobs = await db.getJobs('all');
+        const ytVideos = await db.getYtVideos();
+        const ytPlaylists = await db.getYtPlaylists();
+        const settings = await db.getAllSettings();
+        const logs = await db.getRecentLogs();
         res.json({ jobs, ytVideos, ytPlaylists, settings, logs });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -57,10 +57,10 @@ app.get('/api/state', (req, res) => {
 //  JOBS API
 // ══════════════════════════════════════════════
 // Create job
-app.post('/api/jobs', (req, res) => {
+app.post('/api/jobs', async (req, res) => {
     try {
-        const job = db.createJob(req.body);
-        db.appendLog('info', `Queued: [${job.source_type.toUpperCase()}] ${job.name}`);
+        const job = await db.createJob(req.body);
+        await db.appendLog('info', `Queued: [${job.source_type.toUpperCase()}] ${job.name}`);
         res.json(job);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -68,13 +68,17 @@ app.post('/api/jobs', (req, res) => {
 });
 
 // List jobs
-app.get('/api/jobs', (req, res) => {
-    const filter = req.query.filter || 'all';
-    res.json(db.getJobs(filter));
+app.get('/api/jobs', async (req, res) => {
+    try {
+        const filter = req.query.filter || 'all';
+        res.json(await db.getJobs(filter));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Update job
-app.put('/api/jobs/:id', (req, res) => {
+app.put('/api/jobs/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const body = req.body;
@@ -87,13 +91,13 @@ app.put('/api/jobs/:id', (req, res) => {
             body.doneAt = new Date().toISOString();
         }
 
-        const job = db.updateJob(id, body);
+        const job = await db.updateJob(id, body);
         if (!job) return res.status(404).json({ error: 'Job not found' });
 
         // Auto-log status changes
-        if (body.status === 'done') db.appendLog('ok', `✓ Done: ${job.name}`);
-        if (body.status === 'failed') db.appendLog('err', `Failed: ${job.name} — ${body.errorMsg || 'Unknown error'}`);
-        if (body.status === 'processing') db.appendLog('info', `Started: ${job.name}`);
+        if (body.status === 'done') await db.appendLog('ok', `✓ Done: ${job.name}`);
+        if (body.status === 'failed') await db.appendLog('err', `Failed: ${job.name} — ${body.errorMsg || 'Unknown error'}`);
+        if (body.status === 'processing') await db.appendLog('info', `Started: ${job.name}`);
 
         res.json(job);
     } catch (err) {
@@ -102,104 +106,158 @@ app.put('/api/jobs/:id', (req, res) => {
 });
 
 // Delete job
-app.delete('/api/jobs/:id', (req, res) => {
-    db.deleteJob(parseInt(req.params.id));
-    res.json({ success: true });
+app.delete('/api/jobs/:id', async (req, res) => {
+    try {
+        await db.deleteJob(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Clear done/failed
-app.delete('/api/jobs', (req, res) => {
-    if (req.query.status === 'done') {
-        db.clearDoneJobs();
-        res.json({ success: true });
-    } else {
-        res.status(400).json({ error: 'Specify ?status=done to clear completed jobs' });
+app.delete('/api/jobs', async (req, res) => {
+    try {
+        if (req.query.status === 'done') {
+            await db.clearDoneJobs();
+            res.json({ success: true });
+        } else {
+            res.status(400).json({ error: 'Specify ?status=done to clear completed jobs' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
 // ══════════════════════════════════════════════
 //  YOUTUBE VIDEOS & PLAYLISTS API
 // ══════════════════════════════════════════════
-app.post('/api/yt/videos', (req, res) => {
+app.post('/api/yt/videos', async (req, res) => {
     try {
-        db.addYtVideo(req.body);
+        await db.addYtVideo(req.body);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.put('/api/yt/videos/:vid', (req, res) => {
-    db.updateYtVideo(req.params.vid, req.body.status);
-    res.json({ success: true });
-});
-
-app.delete('/api/yt/videos/:vid', (req, res) => {
-    db.deleteYtVideo(req.params.vid);
-    res.json({ success: true });
-});
-
-app.delete('/api/yt/videos', (req, res) => {
-    db.clearYtVideos();
-    res.json({ success: true });
-});
-
-app.post('/api/yt/playlists', (req, res) => {
+app.put('/api/yt/videos/:vid', async (req, res) => {
     try {
-        const pl = db.addYtPlaylist(req.body);
+        await db.updateYtVideo(req.params.vid, req.body.status);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/yt/videos/:vid', async (req, res) => {
+    try {
+        await db.deleteYtVideo(req.params.vid);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/yt/videos', async (req, res) => {
+    try {
+        await db.clearYtVideos();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/yt/playlists', async (req, res) => {
+    try {
+        const pl = await db.addYtPlaylist(req.body);
         res.json(pl);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.put('/api/yt/playlists/:id', (req, res) => {
-    db.updateYtPlaylist(parseInt(req.params.id), req.body.status, req.body.progress || 0);
-    res.json({ success: true });
+app.put('/api/yt/playlists/:id', async (req, res) => {
+    try {
+        await db.updateYtPlaylist(parseInt(req.params.id), req.body.status, req.body.progress || 0);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-app.delete('/api/yt/playlists/:id', (req, res) => {
-    db.deleteYtPlaylist(parseInt(req.params.id));
-    res.json({ success: true });
+app.delete('/api/yt/playlists/:id', async (req, res) => {
+    try {
+        await db.deleteYtPlaylist(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-app.delete('/api/yt/playlists', (req, res) => {
-    db.clearYtPlaylists();
-    res.json({ success: true });
+app.delete('/api/yt/playlists', async (req, res) => {
+    try {
+        await db.clearYtPlaylists();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // ══════════════════════════════════════════════
 //  SETTINGS API
 // ══════════════════════════════════════════════
-app.get('/api/settings', (req, res) => {
-    res.json(db.getAllSettings());
+app.get('/api/settings', async (req, res) => {
+    try {
+        res.json(await db.getAllSettings());
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-app.post('/api/settings', (req, res) => {
-    const { key, value } = req.body;
-    if (!key) return res.status(400).json({ error: 'key required' });
-    db.saveSetting(key, value);
-    res.json({ success: true });
+app.post('/api/settings', async (req, res) => {
+    try {
+        const { key, value } = req.body;
+        if (!key) return res.status(400).json({ error: 'key required' });
+        await db.saveSetting(key, value);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Save multiple settings at once
-app.put('/api/settings', (req, res) => {
-    const settings = req.body; // { key: value, ... }
-    Object.entries(settings).forEach(([k, v]) => db.saveSetting(k, v));
-    res.json({ success: true });
+app.put('/api/settings', async (req, res) => {
+    try {
+        const settings = req.body; // { key: value, ... }
+        for (const [k, v] of Object.entries(settings)) {
+            await db.saveSetting(k, v);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // ══════════════════════════════════════════════
 //  LOGS API
 // ══════════════════════════════════════════════
-app.get('/api/logs', (req, res) => {
-    res.json(db.getRecentLogs());
+app.get('/api/logs', async (req, res) => {
+    try {
+        res.json(await db.getRecentLogs());
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-app.post('/api/logs', (req, res) => {
-    const { level, message } = req.body;
-    db.appendLog(level || 'info', message || '');
-    res.json({ success: true });
+app.post('/api/logs', async (req, res) => {
+    try {
+        const { level, message } = req.body;
+        await db.appendLog(level || 'info', message || '');
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // ══════════════════════════════════════════════
@@ -323,17 +381,21 @@ app.post('/api/proxy/ingest', async (req, res) => {
 
 // Proxy: Service health check aggregator
 app.get('/api/proxy/health', async (req, res) => {
-    const checks = await Promise.allSettled([
-        fetch(`${BACKEND_URL}/api/health`, { signal: AbortSignal.timeout(2000) }),
-        fetch(`${QWEN_URL}/api/health`, { signal: AbortSignal.timeout(2000) }),
-        fetch(`${WHISPER_URL}/api/health`, { signal: AbortSignal.timeout(2000) }),
-    ]);
-    res.json({
-        admin: 'online',
-        backend: checks[0].status === 'fulfilled' && checks[0].value.ok ? 'online' : 'offline',
-        qwen: checks[1].status === 'fulfilled' && checks[1].value.ok ? 'online' : 'offline',
-        whisper: checks[2].status === 'fulfilled' && checks[2].value.ok ? 'online' : 'offline',
-    });
+    try {
+        const checks = await Promise.allSettled([
+            fetch(`${BACKEND_URL}/api/health`, { signal: AbortSignal.timeout(2000) }),
+            fetch(`${QWEN_URL}/api/health`, { signal: AbortSignal.timeout(2000) }),
+            fetch(`${WHISPER_URL}/api/health`, { signal: AbortSignal.timeout(2000) }),
+        ]);
+        res.json({
+            admin: 'online',
+            backend: checks[0].status === 'fulfilled' && checks[0].value.ok ? 'online' : 'offline',
+            qwen: checks[1].status === 'fulfilled' && checks[1].value.ok ? 'online' : 'offline',
+            whisper: checks[2].status === 'fulfilled' && checks[2].value.ok ? 'online' : 'offline',
+        });
+    } catch (err) {
+        res.json({ admin: 'online', backend: 'offline', qwen: 'offline', whisper: 'offline' });
+    }
 });
 
 // ── Serve index.html for all routes (SPA fallback) ──
@@ -342,12 +404,14 @@ app.get('*', (req, res) => {
 });
 
 // ── Start ──
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`\n╔══════════════════════════════════════════════════╗`);
     console.log(`║  NetaBoard Admin Dashboard                       ║`);
     console.log(`║  http://localhost:${PORT}                           ║`);
     console.log(`╚══════════════════════════════════════════════════╝\n`);
-    db.appendLog('info', `Admin Dashboard server started on port ${PORT}`);
+    try {
+        await db.appendLog('info', `Admin Dashboard server started on port ${PORT}`);
+    } catch (e) { }
 });
 
 module.exports = app;

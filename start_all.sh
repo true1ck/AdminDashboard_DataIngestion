@@ -73,17 +73,25 @@ open_tab "MediaToTextWhisper :8000" \
   "cd '${BASE}/MediaToTextWhisper/backend' && source venv/bin/activate && python3 main.py"
 wait_for_url "http://localhost:8000/api/health" "MediaToTextWhisper"
 
-# 4. NetaBoardV5 Frontend (Vite)
-echo -e "\n${GREEN}[4/4]${RESET} ${BOLD}NetaBoard Frontend${RESET} → http://localhost:5180"
+# 4. AdminDashboard Server (Express)
+echo -e "\n${GREEN}[4/5]${RESET} ${BOLD}Admin Dashboard${RESET} → http://localhost:4000"
+open_tab "Admin Dashboard :4000" \
+  "cd '${BASE}/AdminDashboard' && npm install --silent && node server.js"
+wait_for_url "http://localhost:4000/api/health" "AdminDashboard"
+
+# 5. NetaBoardV5 Frontend (Vite)
+echo -e "\n${GREEN}[5/5]${RESET} ${BOLD}NetaBoard Frontend${RESET} → http://localhost:5180"
 open_tab "NetaBoard Frontend :5180" \
   "cd '${BASE}/NetaBoardV5' && npm install --silent && npm run dev"
 
 echo ""
 echo -e "${BOLD}${CYAN}All services launched!${RESET}"
 echo ""
-echo -e "  ${CYAN}●${RESET} Dashboard URL → ${YELLOW}http://localhost:5180/ingest${RESET}"
+echo -e "  ${CYAN}●${RESET} Admin Dashboard → ${YELLOW}http://localhost:4000${RESET}"
+echo -e "  ${CYAN}●${RESET} NetaBoard App   → ${YELLOW}http://localhost:5180${RESET}"
 echo ""
 
 # Give frontend a couple seconds to boot up
 sleep 3
-open "http://localhost:5180/ingest"
+open "http://localhost:4000"
+open "http://localhost:5180"

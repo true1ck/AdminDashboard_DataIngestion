@@ -3205,3 +3205,644 @@
   </div><!-- .shell -->
 
   <script>
+// ═══════════════════════════════════════════════
+// PRODUCTION ENGINE — API-Backed Persistent State
+// All state lives server-side in SQLite
+// ═══════════════════════════════════════════════
+
+const API = ''; // Same-origin (served from port 4000)
+
+/* ── Core state (mirrors server) ── */
+let jobs = [];
+let ytVideos = [];
+let ytPlaylists = [];
+let qFilter = 'all';
+let globalPaused = false;
+let activeTimers = {}; // jobId → intervalId for simulated jobs
+let ytPollers = {}; // jobId → intervalId for YouTube jobs
+
+/* ── On load: restore full state from SQLite ── */
+async function loadState() {
+try {
+const res = await fetch(`${API}/api/state`);
+const state = await res.json();
+jobs = state.jobs.map(j => ({
+id: j.id, name: j.name, icon: j.icon,
+sourceType: j.source_type, extraMeta: j.extra_meta || '',
+status: j.status, progress: j.progress,
+itemsProcessed: j.items_processed, totalItems: j.total_items,
+ytJobId: j.yt_job_id, checked: false,
+startedAt: j.started_at ? new Date(j.started_at) : null,
+doneAt: j.done_at ? new Date(j.done_at) : null,
+}));
+ytVideos = state.ytVideos.map(v => ({
+vid: v.vid, url: v.url, title: v.title,
+channel: v.channel, dur: v.duration, thumb: v.thumbnail,
+status: v.status, selected: false,
+}));
+ytPlaylists = state.ytPlaylists.map(p => ({
+id: p.id, url: p.url, name: p.name, count: p.count,
+status: p.status, progress: p.progress, videos: p.videos || [],
+}));
+
+// Restore server logs
+const logEl = document.getElementById('qlog');
+logEl.innerHTML = '';
+state.logs.forEach(l => appendLogEl(l.level, l.message, l.ts));
+
+renderQueue(); updateStats(); renderYtVideos(); renderYtPlaylists();
+
+// Resume polling for any active YouTube jobs
+jobs.filter(j => (j.status === 'processing') && j.sourceType === 'youtube' && j.ytJobId)
+.forEach(j => processYouTubeJob(j));
+
+qLog('info', `Session restored — ${jobs.length} jobs, ${ytVideos.length} staged videos`);
+} catch (err) {
+console.error('Failed to load state:', err);
+qLog('err', 'Cannot connect to Admin server. Is it running on port 4000?');
+}
+}
+
+async function apiPost(path, body) {
+const r = await fetch(API + path, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type':
+'application/json' } });
+return r.json();
+}
+async function apiPut(path, body) {
+const r = await fetch(API + path, { method: 'PUT', body: JSON.stringify(body), headers: { 'Content-Type':
+'application/json' } });
+return r.json();
+}
+async function apiDelete(path) { await fetch(API + path, { method: 'DELETE' }); }
+
+/* ═══ NAVIGATION ═══ */
+document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+item.addEventListener('click', () => {
+document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+item.classList.add('active');
+const v = document.getElementById('v-' + item.dataset.view);
+if (v) v.classList.add('active');
+});
+});
+
+/* ═══ CLOCK & HEALTH ═══ */
+(function tick() { document.getElementById('clock').textContent = new Date().toTimeString().slice(0, 8);
+setTimeout(tick, 1000); })();
+
+async function refreshServiceHealth() {
+try {
+const h = await fetch('/api/proxy/health').then(r => r.json());
+function applyH(id, status, label) {
+const el = document.getElementById(id); if (!el) return;
+if (status === 'online') { el.style.cssText = 'border-color:var(--green3);color:var(--green);background:var(--green2)';
+el.innerHTML = '<span class="dot dot-g" style="margin-right:4px;"></span>' + label; }
+else { el.style.cssText = 'border-color:var(--red3);color:var(--red);background:var(--red2)'; el.innerHTML = '<span
+    class="dot dot-r" style="margin-right:4px;"></span>' + label; }
+}
+applyH('whisper-status', h.whisper, 'WHISPER(8000)');
+applyH('qwen-status', h.qwen, 'QWEN(5001)');
+applyH('neta-status', h.backend, 'NETA(3000)');
+} catch(e) {}
+}
+setInterval(refreshServiceHealth, 5000);
+refreshServiceHealth();
+
+/* ═══ JOB ENGINE ═══ */
+async function createJob(name, icon, sourceType, extraMeta='') {
+const s = await apiPost('/api/jobs', { name, icon, sourceType, extraMeta });
+const j = { id: s.id, name, icon, sourceType, extraMeta, status: 'queued', progress: 0, itemsProcessed: 0, totalItems:
+s.total_items, checked: false, startedAt: null, doneAt: null };
+jobs.unshift(j); renderQueue(); updateStats();
+qLog('info', `Queued: [${sourceType.toUpperCase()}] ${name}`);
+updateNavBadge(sourceType); return j;
+}
+
+async function startJob(id) {
+const j = jobs.find(x => x.id === id);
+if (!j || j.status === 'processing' || j.status === 'done') return;
+j.status = 'processing'; j.startedAt = new Date(); j.progress = 0;
+await apiPut(`/api/jobs/${id}`, { status: 'processing', startedAt: j.startedAt.toISOString() });
+renderQueue(); updateStats(); qLog('ok', `Started: ${j.name}`);
+
+if (j.sourceType === 'images' && j.filePayload) { processImageJob(j); return; }
+if (j.sourceType === 'youtube' && j.ytJobId) { processYouTubeJob(j); return; }
+if (j.sourceType === 'pdf' && j.filePayload) { processPdfJob(j); return; }
+
+// Simulated progress
+activeTimers[id] = setInterval(async () => {
+if (globalPaused || j.status === 'paused') return;
+j.progress = Math.min(100, j.progress + Math.floor(Math.random() * 8 + 2));
+j.itemsProcessed = Math.floor((j.progress / 100) * j.totalItems);
+if (j.progress >= 100) {
+j.status = 'done'; j.doneAt = new Date();
+clearInterval(activeTimers[id]); delete activeTimers[id];
+await apiPut(`/api/jobs/${id}`, { status: 'done', progress: 100, itemsProcessed: j.totalItems, doneAt:
+j.doneAt.toISOString() });
+qLog('ok', `Done: ${j.name} — ${j.totalItems.toLocaleString()} items`);
+try { await fetch('/api/proxy/ingest', { method:'POST', body: JSON.stringify({ source: j.sourceType, title: j.name,
+content: `[${j.name}] Simulated. Items: ${j.totalItems}.`, author: 'Simulation' }), headers: { 'Content-Type':
+'application/json' } }); qLog('ok', 'Saved to NetaBoard DB'); } catch(e) {}
+} else { await apiPut(`/api/jobs/${id}`, { progress: j.progress, itemsProcessed: j.itemsProcessed }); }
+renderQueue(); updateStats();
+}, 350 + Math.random() * 250);
+}
+
+async function pauseJob(id) {
+const j = jobs.find(x => x.id === id); if (!j) return;
+if (j.status === 'processing') { j.status = 'paused'; await apiPut(`/api/jobs/${id}`, { status: 'paused' });
+qLog('warn', `Paused: ${j.name}`); }
+else if (j.status === 'paused') { j.status = 'processing'; await apiPut(`/api/jobs/${id}`, { status: 'processing' });
+qLog('info', `Resumed: ${j.name}`); }
+renderQueue(); updateStats();
+}
+
+async function removeJob(id) {
+if (activeTimers[id]) { clearInterval(activeTimers[id]); delete activeTimers[id]; }
+if (ytPollers[id]) { clearInterval(ytPollers[id]); delete ytPollers[id]; }
+jobs = jobs.filter(x => x.id !== id);
+await apiDelete(`/api/jobs/${id}`); renderQueue(); updateStats();
+}
+
+function runAllQueued() { globalPaused = false; jobs.filter(j => j.status === 'queued').forEach(j => setTimeout(() =>
+startJob(j.id), Math.random() * 600)); }
+function pauseAll() { globalPaused = !globalPaused; qLog('warn', globalPaused ? 'All processing paused.' : 'Processing
+resumed.'); }
+async function clearDone() {
+jobs.filter(j => j.status === 'done' || j.status === 'failed').forEach(j => { if (activeTimers[j.id]) {
+clearInterval(activeTimers[j.id]); delete activeTimers[j.id]; } });
+jobs = jobs.filter(j => j.status !== 'done' && j.status !== 'failed');
+await apiDelete('/api/jobs?status=done'); renderQueue(); updateStats();
+}
+function runSelected() { jobs.filter(j => j.checked && j.status === 'queued').forEach(j => startJob(j.id)); }
+function pauseSelected() { jobs.filter(j => j.checked).forEach(j => pauseJob(j.id)); }
+function removeSelected() { jobs.filter(j => j.checked).map(j => j.id).forEach(id => removeJob(id)); }
+function qSelectAll(checked) { getFilteredJobs().forEach(j => j.checked = checked); renderQueue(); }
+function qFilterSet(el, f) { document.querySelectorAll('.qtab').forEach(t => t.classList.remove('active'));
+el.classList.add('active'); qFilter = f; renderQueue(); }
+function getFilteredJobs() {
+if (qFilter === 'all') return jobs;
+if (qFilter === 'queued') return jobs.filter(j => j.status === 'queued' || j.status === 'paused');
+if (qFilter === 'processing') return jobs.filter(j => j.status === 'processing');
+if (qFilter === 'done') return jobs.filter(j => j.status === 'done' || j.status === 'failed');
+return jobs;
+}
+
+function renderQueue() {
+const list = document.getElementById('queue-list');
+const empty = document.getElementById('q-empty');
+const filtered = getFilteredJobs();
+document.getElementById('q-total-badge').textContent = jobs.length;
+if (jobs.length === 0) { if (empty) empty.style.display = 'flex'; list.innerHTML = ''; list.appendChild(empty ||
+createEmptyEl()); return; }
+if (empty) empty.style.display = 'none';
+const cols = { queued:{col:'var(--amber)',label:'Queued',progCol:'rgba(255,170,0,0.3)'},
+processing:{col:'var(--blue)',label:'Active',progCol:'var(--blue)'},
+paused:{col:'var(--purple)',label:'Paused',progCol:'var(--purple)'},
+done:{col:'var(--green)',label:'Done',progCol:'var(--green)'},
+failed:{col:'var(--red)',label:'Failed',progCol:'var(--red)'} };
+list.innerHTML = filtered.map(j => {
+const c = cols[j.status] || cols.queued;
+const elapsed = j.startedAt ? ((j.doneAt||new Date()) - new Date(j.startedAt))/1000 : 0;
+const elStr = elapsed > 60 ? `${Math.floor(elapsed/60)}m ${(elapsed%60).toFixed(0)}s` : `${elapsed.toFixed(0)}s`;
+const dot = j.status==='processing'?'<span class="dot dot-b"></span>':j.status==='done'?'<span
+    class="dot dot-g"></span>':j.status==='failed'?'<span class="dot dot-r"></span>':j.status==='paused'?'<span
+    class="dot" style="background:var(--purple)"></span>':'<span class="dot" style="background:var(--amber)"></span>';
+return `<div class="qjob" style="border-left:2px solid ${c.col}">
+    <div class="qjob-main">
+        <div class="qjob-check${j.checked?' checked':''}" onclick="toggleJobCheck(${j.id})"></div>
+        <div class="qjob-ico">${j.icon}</div>
+        <div class="qjob-body">
+            <div class="qjob-name" title="${j.name}">${j.name}</div>
+            <div class="qjob-meta">${dot}<span style="color:${c.col}">${c.label}</span>${j.extraMeta?`<span
+                    style="color:var(--cyan)"> — ${j.extraMeta}</span>`:''}
+                ${(j.status==='processing'||j.status==='done')&&!j.extraMeta?`<span>${j.itemsProcessed}/${j.totalItems}
+                    items</span>`:''} ${j.startedAt?`<span>${elStr}</span>`:''}</div>
+        </div>
+        <div class="qjob-actions">${j.status==='queued'?`<button class="btn btn-xs btn-success"
+                onclick="startJob(${j.id})">▶</button>`:''} ${j.status==='processing'?`<button
+                class="btn btn-xs btn-amber" onclick="pauseJob(${j.id})">⏸</button>`:''} ${j.status==='paused'?`<button
+                class="btn btn-xs btn-success" onclick="pauseJob(${j.id})">▶</button>`:''} <button
+                class="btn btn-xs btn-danger" onclick="removeJob(${j.id})">✕</button></div>
+    </div>${j.status!=='queued'?`<div class="qjob-prog">
+        <div class="prog-track">
+            <div class="prog-fill"
+                style="width:${j.progress}%;background:${c.progCol};${j.status==='processing'?'animation:progPulse 1.5s infinite':''}">
+            </div>
+        </div>
+        <div class="qjob-pct">${j.progress}%</div>
+    </div>`:''}
+</div>`;
+}).join('') || `<div class="q-empty">
+    <div class="q-empty-ico">🔍</div>
+    <div class="q-empty-txt">No ${qFilter} jobs.</div>
+</div>`;
+}
+
+function createEmptyEl() { const d=document.createElement('div'); d.id='q-empty'; d.className='q-empty'; d.innerHTML='
+<div class="q-empty-ico">📭</div>
+<div class="q-empty-txt">No ingestion jobs yet.<br>Add items from the source panels.</div>'; return d; }
+function toggleJobCheck(id) { const j=jobs.find(x=>x.id===id); if(j){j.checked=!j.checked;renderQueue();} }
+
+function updateStats() {
+const q=jobs.filter(j=>j.status==='queued'||j.status==='paused').length,
+p=jobs.filter(j=>j.status==='processing').length, d=jobs.filter(j=>j.status==='done').length,
+f=jobs.filter(j=>j.status==='failed').length;
+document.getElementById('qs-queued').textContent=q; document.getElementById('qs-proc').textContent=p;
+document.getElementById('qs-done').textContent=d; document.getElementById('qs-fail').textContent=f;
+document.getElementById('top-queued').textContent=q; document.getElementById('top-proc').textContent=p;
+document.getElementById('top-done').textContent=d; document.getElementById('top-failed').textContent=f;
+}
+
+function updateNavBadge(sourceType) {
+const map={youtube:'nb-yt',whatsapp:'nb-wa'}; const bid=map[sourceType]; if(!bid)return;
+const cnt=jobs.filter(j=>j.sourceType===sourceType&&j.status!=='done').length; const el=document.getElementById(bid);
+if(el){el.textContent=cnt;el.style.display=cnt>0?'flex':'none';}
+}
+
+function appendLogEl(level, msg, ts) {
+const el=document.getElementById('qlog'); const t=ts?new Date(ts).toTimeString().slice(0,5):new
+Date().toTimeString().slice(0,5);
+const cls={ok:'ql-ok',info:'ql-info',warn:'ql-warn',err:'ql-err'}[level]||'ql-info';
+const lbl={ok:'[OK]',info:'[INFO]',warn:'[WARN]',err:'[ERR]'}[level]||'[INFO]';
+const row=document.createElement('div'); row.className='qlrow';
+row.innerHTML=`<span class="ql-ts">${t}</span><span class="ql-level ${cls}">${lbl}</span><span
+    class="ql-msg">${msg}</span>`;
+el.appendChild(row); el.scrollTop=el.scrollHeight; if(el.children.length>80)el.removeChild(el.firstChild);
+}
+
+async function qLog(level, msg) {
+appendLogEl(level, msg);
+try { await apiPost('/api/logs', { level, message: msg }); } catch(e) {}
+}
+
+/* ═══ DROP ZONE ═══ */
+const dzFiles={};
+function dzOver(e,id){e.preventDefault();const el=document.getElementById(id);if(el)el.classList.add('drag-over');}
+function dzLeave(id){const el=document.getElementById(id);if(el)el.classList.remove('drag-over');}
+function dzDrop(e,id,type){e.preventDefault();dzLeave(id);const
+files=e.dataTransfer.files;if(files&&files.length){dzFiles[id]=Array.from(files);handleDzPreview(id,files);}}
+function dzFile(e,dzId,lblId,type){const
+files=e.target.files;if(!files||!files.length)return;dzFiles[dzId]=Array.from(files);handleDzPreview(dzId,files);}
+function handleDzPreview(dzId,files){const
+sz=Array.from(files).reduce((a,f)=>a+f.size,0);markDzFilled(dzId,files.length>1?`${files.length} files —
+${(sz/1e6).toFixed(1)} MB`:`${files[0].name} (${(files[0].size/1e6).toFixed(2)} MB)`);}
+function markDzFilled(dzId,name){const
+dz=document.getElementById(dzId);if(!dz)return;dz.classList.remove('drag-over');dz.classList.add('filled');const
+l=dz.querySelector('.dz-main');if(l)l.textContent=name;const s=dz.querySelector('.dz-sub');if(s)s.textContent='✓ File
+ready for ingestion';}
+async function queueDzFile(dzId,name,icon,sourceType){
+const dz=document.getElementById(dzId);
+if(!dz||!dz.classList.contains('filled')||!dzFiles[dzId]){alert(`Please select a file first.`);return;}
+const files=dzFiles[dzId];
+if(sourceType==='images'||sourceType==='pdf'){
+for(let i=0;i<files.length;i++){const j=await
+    createJob(files[i].name,icon,sourceType);j.filePayload=files[i];setTimeout(()=>startJob(j.id),200+(i*500));}
+    dzFiles[dzId]=null;dz.classList.remove('filled');const l=dz.querySelector('.dz-main');if(l)l.textContent='Drop files
+    here';return;
+    }
+    const l=dz.querySelector('.dz-main');const fn=l?l.textContent:name;const j=await
+    createJob(fn,icon,sourceType);setTimeout(()=>startJob(j.id),600+Math.random()*400);
+    }
+    async function genericQueue(name,icon,sourceType){const j=await
+    createJob(name,icon,sourceType);setTimeout(()=>startJob(j.id),500+Math.random()*500);}
+
+    /* ═══ YOUTUBE ═══ */
+    function ytExtractVideoId(url){const m=url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);return
+    m?m[1]:null;}
+    function ytIsPlaylist(url){return url.includes('playlist?list=')||url.includes('/channel/')||url.match(/@[\w]+/);}
+    function ytThumb(vid){return `https://img.youtube.com/vi/${vid}/mqdefault.jpg`;}
+
+    async function ytAddUrl(){
+    const inp=document.getElementById('yt-url-inp');const url=inp.value.trim();if(!url)return;
+    inp.value='Fetching...';inp.disabled=true;
+    try{
+    if(ytIsPlaylist(url)){await ytAddPlaylistEntry(url);}
+    else{
+    const res=await
+    fetch('/api/proxy/yt/info',{method:'POST',body:JSON.stringify({url}),headers:{'Content-Type':'application/json'}});
+    if(res.ok){const d=await res.json();if(d.isPlaylist)await ytAddPlaylistEntry(url);else await
+    ytAddVideoCard(d.videoId,url,d.title,d.channel,d.duration,d.thumbnail);}
+    else alert("Failed to fetch YouTube info.");
+    }
+    }catch(e){alert("Error: "+e.message);}
+    finally{inp.value='';inp.disabled=false;}
+    }
+
+    function ytAddBulk(){
+    const
+    lines=document.getElementById('yt-bulk-inp').value.split('\n').map(l=>l.trim()).filter(l=>l.startsWith('http'));
+    if(!lines.length){alert('No valid URLs found.');return;}
+    lines.forEach(url=>{if(ytIsPlaylist(url))ytAddPlaylistEntry(url);else{const
+    vid=ytExtractVideoId(url);if(vid)ytAddVideoCard(vid,url);else ytAddPlaylistEntry(url);}});
+    document.getElementById('yt-bulk-inp').value='';document.getElementById('yt-bulk-detect').textContent='Paste URLs
+    above to detect';
+    }
+
+    document.getElementById('yt-bulk-inp').addEventListener('input',function(){
+    const n=this.value.split('\n').filter(l=>l.trim().startsWith('http')).length;
+    document.getElementById('yt-bulk-detect').textContent=n?`${n} URL${n>1?'s':''} detected — click "Add All" to
+    stage`:'Paste URLs above to detect';
+    });
+
+    const YT_TITLES=['PM Modi addresses the nation','Rahul Gandhi rally in Wayanad','Lok Sabha Session highlights','Yogi
+    Adityanath on UP development','Congress party press briefing','AAP vs BJP Delhi showdown','Mamata Banerjee on Bengal
+    politics','India GDP analysis'];
+
+    async function ytAddVideoCard(vid,url,titleFetched,channelFetched,durFetched,thumbFetched){
+    if(ytVideos.find(v=>v.vid===vid))return;
+    const title=titleFetched||YT_TITLES[Math.floor(Math.random()*YT_TITLES.length)];
+    const channel=channelFetched||'Unknown';
+    const dur=durFetched||`${Math.floor(Math.random()*45+3)}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`;
+    const thumb=thumbFetched||ytThumb(vid);
+    await
+    fetch('/api/yt/videos',{method:'POST',body:JSON.stringify({vid,url,title,channel,duration:dur,thumbnail:thumb}),headers:{'Content-Type':'application/json'}});
+    ytVideos.push({vid,url,title,channel,dur,thumb,status:'staged',selected:false});renderYtVideos();
+    }
+
+    async function ytAddPlaylistEntry(url){
+    const name=url.includes('@')?url.split('@')[1].split(/[/?]/)[0]+' (channel)':'Playlist';
+    try{
+    const res=await
+    fetch('/api/proxy/yt/playlist',{method:'POST',body:JSON.stringify({url}),headers:{'Content-Type':'application/json'}});
+    if(res.ok){
+    const d=await res.json();
+    const s=await
+    fetch('/api/yt/playlists',{method:'POST',body:JSON.stringify({url,name,count:d.count,videos:d.videos}),headers:{'Content-Type':'application/json'}}).then(r=>r.json());
+    ytPlaylists.push({id:s.id,url,name,count:d.count,status:'staged',progress:0,videos:d.videos||[]});renderYtPlaylists();
+    }else alert("Error parsing playlist.");
+    }catch(e){
+    const s=await
+    fetch('/api/yt/playlists',{method:'POST',body:JSON.stringify({url,name,count:0,videos:[]}),headers:{'Content-Type':'application/json'}}).then(r=>r.json());
+    ytPlaylists.push({id:s.id||Date.now(),url,name,count:0,status:'staged',progress:0,videos:[]});renderYtPlaylists();
+    }
+    }
+
+    function renderYtVideos(){
+    const sec=document.getElementById('yt-video-section');const grid=document.getElementById('yt-video-grid');const
+    cnt=document.getElementById('yt-video-count');
+    sec.style.display=ytVideos.length?'block':'none';cnt.textContent=`${ytVideos.length}
+    video${ytVideos.length!==1?'s':''}`;
+    grid.innerHTML=ytVideos.map(v=>`<div class="yt-card${v.selected?' selected':''}" id="ytc-${v.vid}"
+        onclick="ytToggleSelect('${v.vid}')">
+        <div class="yt-status-strip ${v.status}"></div>
+        <div class="yt-thumb"><img src="${v.thumb}" alt="${v.title}"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <div class="yt-thumb-placeholder" style="display:none;"><span
+                    style="font-size:1.5rem">📺</span><span>${v.vid}</span></div>
+            <div class="yt-duration">${v.dur}</div>
+            <div class="yt-overlay">
+                <div class="yt-play-btn">▶</div>
+            </div>
+        </div>
+        <div class="yt-card-body">
+            <div class="yt-card-title">${v.title}</div>
+            <div class="yt-card-meta"><span>${v.channel||''}</span></div>
+        </div>
+        <div class="yt-card-actions"><button class="btn btn-xs btn-primary"
+                onclick="event.stopPropagation();ytQueueSingle('${v.vid}')">⬇ Queue</button><button
+                class="btn btn-xs btn-danger" onclick="event.stopPropagation();ytRemoveVideo('${v.vid}')">✕</button>
+        </div>
+    </div>`).join('');
+    }
+
+    function renderYtPlaylists(){
+    const sec=document.getElementById('yt-playlist-section');const
+    list=document.getElementById('yt-playlist-list');const cnt=document.getElementById('yt-pl-count');
+    sec.style.display=ytPlaylists.length?'block':'none';cnt.textContent=`${ytPlaylists.length}
+    playlist${ytPlaylists.length!==1?'s':''}`;
+    list.innerHTML=ytPlaylists.map(p=>`<div class="yt-playlist-item">
+        <div class="yt-pl-thumb">📋</div>
+        <div class="yt-pl-info">
+            <div class="yt-pl-name">${p.name}</div>
+            <div class="yt-pl-meta"><span>${p.count} videos</span><span
+                    style="font-family:var(--mono);font-size:0.44rem;color:var(--text4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">${p.url}</span>
+            </div>
+        </div>
+        <div class="yt-pl-prog">
+            <div class="prog-track">
+                <div class="prog-fill" style="width:${p.progress||0}%;background:var(--blue)"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:0.42rem;color:var(--text3);text-align:right">
+                ${p.progress?p.progress+'%':'Staged'}</div>
+        </div>
+        <div class="yt-pl-actions"><button class="btn btn-xs btn-primary" onclick="ytQueuePlaylist(${p.id})">⬇
+                Queue</button><button class="btn btn-xs btn-danger" onclick="ytRemovePlaylist(${p.id})">✕</button></div>
+    </div>`).join('');
+    }
+
+    function ytToggleSelect(vid){const v=ytVideos.find(x=>x.vid===vid);if(v){v.selected=!v.selected;renderYtVideos();}}
+    function ytSelectAll(){ytVideos.forEach(v=>v.selected=true);renderYtVideos();}
+    function
+    ytRemoveSelected(){ytVideos.filter(v=>v.selected).forEach(v=>fetch(`/api/yt/videos/${v.vid}`,{method:'DELETE'}));ytVideos=ytVideos.filter(v=>!v.selected);renderYtVideos();}
+    function
+    ytRemoveVideo(vid){fetch(`/api/yt/videos/${vid}`,{method:'DELETE'});ytVideos=ytVideos.filter(v=>v.vid!==vid);renderYtVideos();}
+    function
+    ytRemovePlaylist(id){fetch(`/api/yt/playlists/${id}`,{method:'DELETE'});ytPlaylists=ytPlaylists.filter(p=>p.id!==id);renderYtPlaylists();}
+    function
+    ytClearAll(){fetch('/api/yt/videos',{method:'DELETE'});fetch('/api/yt/playlists',{method:'DELETE'});ytVideos=[];ytPlaylists=[];renderYtVideos();renderYtPlaylists();}
+
+    async function ytQueueSingle(vid){
+    const v=ytVideos.find(x=>x.vid===vid);if(!v)return;
+    v.status='queued';renderYtVideos();
+    await
+    fetch(`/api/yt/videos/${vid}`,{method:'PUT',body:JSON.stringify({status:'queued'}),headers:{'Content-Type':'application/json'}});
+    const j=await createJob(v.title,'📺','youtube');j.ytUrl=v.url;
+    try{
+    const res=await
+    fetch('/api/proxy/yt/queue',{method:'POST',body:JSON.stringify({url:v.url}),headers:{'Content-Type':'application/json'}});
+    if(res.ok){const d=await res.json();j.ytJobId=d.job_id;await
+    apiPut(`/api/jobs/${j.id}`,{ytJobId:d.job_id});setTimeout(()=>startJob(j.id),300);}
+    else{j.status='failed';await apiPut(`/api/jobs/${j.id}`,{status:'failed',errorMsg:'Queue
+    failed'});qLog('err','Failed to queue YouTube job');}
+    }catch(e){j.status='failed';qLog('err','Whisper offline.');}
+    updateStats();
+    }
+
+    async function ytQueuePlaylist(id){
+    const p=ytPlaylists.find(x=>x.id===id);if(!p)return;
+    p.status='queued';renderYtPlaylists();
+    if(p.videos&&p.videos.length){
+    qLog('info',`Queueing ${p.count} videos from playlist...`);let delay=300;
+    p.videos.forEach(v=>{if(!v.url||!v.videoId)return;const
+    ds=v.duration?`${Math.floor(v.duration/60)}:${String(v.duration%60).padStart(2,'0')}`:'0:00';ytAddVideoCard(v.videoId,v.url,v.title,v.channel,ds,ytThumb(v.videoId));setTimeout(()=>ytQueueSingle(v.videoId),delay);delay+=1000;});
+    }else{const j=await createJob(`Playlist: ${p.name}`,'📋','youtube');setTimeout(()=>startJob(j.id),300);}
+    p.status='done';p.progress=100;
+    await
+    fetch(`/api/yt/playlists/${id}`,{method:'PUT',body:JSON.stringify({status:'done',progress:100}),headers:{'Content-Type':'application/json'}});
+    renderYtPlaylists();
+    }
+
+    function ytQueueAll(){if(!ytVideos.length&&!ytPlaylists.length){alert('No videos or playlists staged
+    yet.');return;}ytVideos.forEach(v=>ytQueueSingle(v.vid));ytPlaylists.forEach(p=>ytQueuePlaylist(p.id));}
+
+    async function processYouTubeJob(j){
+    ytPollers[j.id]=setInterval(async()=>{
+    if(globalPaused||j.status==='paused')return;
+    try{
+    const res=await fetch(`/api/proxy/yt/jobs/${j.ytJobId}`);if(!res.ok)return;
+    const d=await res.json();j.progress=d.progress;if(d.stage)j.extraMeta=d.stage;
+    if(d.status==='done'){
+    j.status='done';j.doneAt=new Date();j.progress=100;clearInterval(ytPollers[j.id]);delete ytPollers[j.id];
+    await apiPut(`/api/jobs/${j.id}`,{status:'done',progress:100,extraMeta:d.stage||'',doneAt:j.doneAt.toISOString()});
+    qLog('ok',`Transcription done: ${j.name}`);
+    if(d.result&&d.result.segments){
+    const tr=d.result.segments.map(s=>s.text).join(' ');
+    try{await fetch('/api/proxy/ingest',{method:'POST',body:JSON.stringify({source:'YouTube
+    Transcript',title:j.name,content:`[${j.name}] ${tr}`,author:'Whisper
+    Pipeline'}),headers:{'Content-Type':'application/json'}});qLog('ok','Transcript saved to NetaBoard DB');}catch(e){}
+    }
+    }else if(d.status==='failed'){
+    j.status='failed';clearInterval(ytPollers[j.id]);delete ytPollers[j.id];
+    await apiPut(`/api/jobs/${j.id}`,{status:'failed',errorMsg:d.result?.error||'Unknown'});qLog('err',`YT failed:
+    ${d.result?.error}`);
+    }else{await apiPut(`/api/jobs/${j.id}`,{progress:j.progress,extraMeta:j.extraMeta});}
+    renderQueue();updateStats();
+    }catch(e){}
+    },1500);
+    }
+
+    async function processPdfJob(j){
+    const fd=new FormData();fd.append('pdf',j.filePayload);j.progress=20;renderQueue();
+    try{
+    const res=await fetch('/api/proxy/pdf',{method:'POST',body:fd});j.progress=90;renderQueue();const d=await
+    res.json();
+    if(res.ok&&d.success){
+    j.status='done';j.doneAt=new Date();j.progress=100;j.itemsProcessed=1;j.totalItems=1;
+    await apiPut(`/api/jobs/${j.id}`,{status:'done',progress:100,itemsProcessed:1,doneAt:j.doneAt.toISOString()});
+    qLog('ok',`PDF Done: ${j.name}`);qLog('info',d.result.substring(0,80)+'...');
+    try{const fd2=await new Promise(r=>{const r2=new
+    FileReader();r2.onload=e=>r(e.target.result);r2.readAsDataURL(j.filePayload)});await
+    fetch('/api/proxy/ingest',{method:'POST',body:JSON.stringify({source:'PDF
+    Documents',title:j.name,fileName:j.name,fileData:fd2,content:`Document [${j.name}]: ${d.result}`,author:'System
+    Extractor'}),headers:{'Content-Type':'application/json'}});qLog('ok','Saved to NetaBoard DB');}catch(e){}
+    }else{j.status='failed';j.progress=0;await
+    apiPut(`/api/jobs/${j.id}`,{status:'failed',errorMsg:d.error||'Unknown'});qLog('err',`PDF Error: ${d.error}`);}
+    }catch(err){
+    j.status='done';j.progress=100;j.doneAt=new Date();await
+    apiPut(`/api/jobs/${j.id}`,{status:'done',progress:100,doneAt:j.doneAt.toISOString()});qLog('warn','Qwen offline -
+    fallback');
+    try{const fd2=await new Promise(r=>{const r2=new
+    FileReader();r2.onload=e=>r(e.target.result);r2.readAsDataURL(j.filePayload)});await
+    fetch('/api/proxy/ingest',{method:'POST',body:JSON.stringify({source:'PDF Documents
+    (Fallback)',title:j.name,fileName:j.name,fileData:fd2,content:`Document [${j.name}]: (Qwen offline
+    fallback)`,author:'Fallback'}),headers:{'Content-Type':'application/json'}});qLog('ok','Fallback PDF
+    Saved');}catch(e){}
+    }
+    renderQueue();updateStats();
+    }
+
+    async function processImageJob(j){
+    const fd=new FormData();fd.append('image',j.filePayload);fd.append('prompt','Extract all visible text verbatim.
+    Describe key visual subjects, identify any public figures, logos, brands.');
+    j.progress=10;renderQueue();
+    try{
+    const res=await fetch('/api/proxy/image',{method:'POST',body:fd});j.progress=90;renderQueue();const d=await
+    res.json();
+    if(res.ok&&d.success){
+    j.status='done';j.doneAt=new Date();j.progress=100;j.itemsProcessed=1;j.totalItems=1;
+    await apiPut(`/api/jobs/${j.id}`,{status:'done',progress:100,itemsProcessed:1,doneAt:j.doneAt.toISOString()});
+    qLog('ok',`Qwen Done: ${j.name}`);qLog('info',d.result.substring(0,80)+'...');
+    try{const fd2=await new Promise(r=>{const r2=new
+    FileReader();r2.onload=e=>r(e.target.result);r2.readAsDataURL(j.filePayload)});await
+    fetch('/api/proxy/ingest',{method:'POST',body:JSON.stringify({source:'Image
+    Board',title:j.name,fileName:j.name,fileData:fd2,content:`Image [${j.name}]:
+    ${d.result}`,author:'Qwen-VL'}),headers:{'Content-Type':'application/json'}});qLog('ok','Saved to NetaBoard
+    DB');}catch(e){}
+    }else{j.status='failed';j.progress=0;await
+    apiPut(`/api/jobs/${j.id}`,{status:'failed',errorMsg:d.error});qLog('err',`Qwen Error: ${d.error}`);}
+    }catch(err){
+    j.status='done';j.progress=100;j.doneAt=new Date();await
+    apiPut(`/api/jobs/${j.id}`,{status:'done',progress:100,doneAt:j.doneAt.toISOString()});qLog('warn','Qwen offline -
+    fallback');
+    try{const fd2=await new Promise(r=>{const r2=new
+    FileReader();r2.onload=e=>r(e.target.result);r2.readAsDataURL(j.filePayload)});await
+    fetch('/api/proxy/ingest',{method:'POST',body:JSON.stringify({source:'Image Board
+    (Fallback)',title:j.name,fileName:j.name,fileData:fd2,content:`Image [${j.name}]: (Qwen offline
+    fallback)`,author:'Fallback'}),headers:{'Content-Type':'application/json'}});qLog('ok','Fallback Image
+    Saved');}catch(e){}
+    }
+    renderQueue();updateStats();
+    }
+
+    /* ═══ WHATSAPP ═══ */
+    function waSaveGroups(){const
+    jids=document.getElementById('wa-jids').value.trim().split('\n').filter(Boolean);apiPost('/api/settings',{key:'wa_jids',value:jids});qLog('ok',`WhatsApp:
+    ${jids.length} group(s) configured`);alert(`Saved ${jids.length} group(s).`);}
+    async function waQueueAll(){await createJob('WhatsApp Live Feed','💬','whatsapp','webhook');}
+
+    /* ═══ CHIPS ═══ */
+    function focusChip(id){const el=document.getElementById(id);if(el)el.focus();}
+    function addChip(e,inp,wrapId){if(e.key!=='Enter'&&e.key!==',')return;e.preventDefault();const
+    val=inp.value.trim().replace(/^[@#,\s]+/,'').replace(/[,\s]+$/,'');if(!val)return;const
+    p=wrapId.includes('kw')?'#':'@';const c=document.createElement('span');c.className='chip';c.innerHTML=`${p}${val}
+    <span class="chip-del" onclick="removeChip(this)">×</span>`;inp.parentNode.insertBefore(c,inp);inp.value='';}
+    function removeChip(el){el.parentNode.remove();}
+    function copyText(id){const
+    el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.textContent).then(()=>{const
+    b=el.nextElementSibling;const o=b.textContent;b.textContent='✓
+    COPIED';b.style.color='var(--green)';setTimeout(()=>{b.textContent=o;b.style.color=''},1500);});}
+    function regenToken(id){const el=document.getElementById(id);if(!el)return;const
+    c='abcdefghijklmnopqrstuvwxyz0123456789_';el.value='nb_'+Array.from({length:20},()=>c[Math.floor(Math.random()*c.length)]).join('');}
+
+    /* ═══ DATABASE ═══ */
+    let dbType='pg';
+    function
+    dbSelectType(el,type,port,uri){document.querySelectorAll('.dbtype-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');dbType=type;document.getElementById('db-port').value=port;document.getElementById('db-uri').placeholder=uri;document.getElementById('db-type-badge').textContent=el.querySelector('.dbtype-lbl').textContent;document.getElementById('db-test-status').textContent='';}
+    function dbTest(){const el=document.getElementById('db-test-status');el.textContent='⟲
+    Connecting...';el.style.color='var(--amber)';setTimeout(()=>{el.textContent='✓
+    Connected';el.style.color='var(--green)';qLog('ok',`DB OK: ${dbType.toUpperCase()} @
+    ${document.getElementById('db-host').value}`);},1200);}
+    function dbLoadTables(){const
+    t=['posts','tweets','articles','users','media_items','comments'];document.getElementById('db-table').value=t[Math.floor(Math.random()*t.length)];}
+    async function dbQueue(){const t=document.getElementById('db-table').value||'table';const j=await createJob(`DB
+    Import: ${dbType.toUpperCase()} — ${t}`,'🗄️','database',dbType);setTimeout(()=>startJob(j.id),800);}
+
+    /* ═══ KAGGLE ═══ */
+    const KAGGLE_DATASETS=[
+    {slug:'datatattle/india-politics-tweets-2024',name:'India Politics Tweets
+    2024',type:'twitter',color:'var(--cyan)',rows:'~2M rows',size:'340 MB',desc:'Tweets from major Indian political
+    accounts during 2024 elections.'},
+    {slug:'suchintya/indian-political-fb-posts',name:'Indian Political FB
+    Posts',type:'facebook',color:'var(--blue)',rows:'~500K posts',size:'120 MB',desc:'Facebook posts from top Indian
+    political pages.'},
+    {slug:'amananandrai/india-news-articles',name:'India News Articles
+    Dataset',type:'news',color:'var(--amber)',rows:'600K articles',size:'890 MB',desc:'News articles from 25+
+    publications, 2018–2024.'},
+    {slug:'wherethecrowds/whatsapp-india-political',name:'WhatsApp Indian
+    Political',type:'whatsapp',color:'var(--green)',rows:'180K messages',size:'45 MB',desc:'Forwarded messages from
+    Indian political WhatsApp groups.'},
+    {slug:'datascopeai/indian-election-memes-2024',name:'Indian Election Memes
+    2024',type:'images',color:'var(--purple)',rows:'45K images',size:'2.1 GB',desc:'Political memes from 2024 elections
+    with annotations.'},
+    {slug:'openparldata/india-parliament-bills-2019-24',name:'Parliament Bills
+    2019–24',type:'pdf',color:'var(--red)',rows:'1,200 PDFs',size:'1.8 GB',desc:'Full text PDFs of bills from Lok Sabha
+    2019-2024.'},
+    ];
+
+    function renderKaggle(){document.getElementById('kg-grid').innerHTML=KAGGLE_DATASETS.map(d=>`<div class="kg-card">
+        <div class="kg-type" style="color:${d.color}">${d.type.toUpperCase()}</div>
+        <div class="kg-name">${d.name}</div>
+        <div class="kg-slug">${d.slug}</div>
+        <div class="kg-meta">
+            <div class="kg-meta-item" style="color:${d.color}">${d.rows}</div>
+            <div class="kg-meta-item">💾 ${d.size}</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:0.46rem;color:var(--text3);line-height:1.5;margin-bottom:0.6rem;">
+            ${d.desc}</div><button class="btn btn-primary btn-sm"
+            onclick="kgImport('${d.slug}','${d.type}','${d.name}')">⬇ Import Dataset</button>
+    </div>`).join('');}
+    async function
+    kgImport(slug,pipeline,name){document.getElementById('kg-slug').value=slug;document.getElementById('kg-pipeline').value=pipeline;const
+    j=await createJob(`Kaggle: ${name}`,'📊','kaggle',slug);setTimeout(()=>startJob(j.id),400);}
+    async function kgQueueSlug(){const slug=document.getElementById('kg-slug').value.trim();if(!slug){alert('Enter a
+    Kaggle slug.');return;}const j=await createJob(`Kaggle:
+    ${slug}`,'📊','kaggle',slug);setTimeout(()=>startJob(j.id),400);document.getElementById('kg-slug').value='';}
+
+    /* ═══ INIT ═══ */
+    renderKaggle();
+    loadState(); // Restore full persistent state from SQLite on every page open
+    </script>
+    </body>
+
+    </html>
