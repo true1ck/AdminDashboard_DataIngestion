@@ -500,7 +500,7 @@ function autoQuotePgQuery(sql, tables = []) {
     const targetList = tables.length > 0 ? tables : knownTables;
     
     targetList.forEach(tableName => {
-        const regex = new RegExp(`(?<!["'\\w])${tableName}(?!["'\\w])`, 'g');
+        const regex = new RegExp(`(?<!["'\\w])${tableName}(?!["'\\w])`, 'gi');
         modified = modified.replace(regex, `"${tableName}"`);
     });
     return modified;
