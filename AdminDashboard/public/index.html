@@ -467,7 +467,15 @@
       flex-direction: column;
       gap: 1rem;
       min-height: 0;
+      scrollbar-gutter: stable;
     }
+
+    .card-body-scroll {
+      max-height: 500px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+
 
     /* ── BUTTONS ── */
     .btn {
@@ -2677,7 +2685,8 @@
               <div class="card-title"><span class="icon">📁</span> Upload Offline Dataset</div><span
                 class="tag tag-b">Kaggle / CSV</span>
             </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:0.75rem;">
+            <div class="card-body card-body-scroll" style="display:flex;flex-direction:column;gap:0.75rem;">
+
               <div class="info-box info">ℹ No live API access? Upload a Kaggle Facebook posts dataset in CSV or JSON
                 format. Field mapping is auto-detected.</div>
               <div class="drop-zone" id="fb-dz" ondragover="dzOver(event,'fb-dz')" ondragleave="dzLeave('fb-dz')"
@@ -2866,7 +2875,8 @@
               <div class="card-title"><span class="icon">📁</span> Upload Twitter Dataset (Kaggle)</div><span
                 class="tag tag-p">Offline Mode</span>
             </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:0.75rem;">
+            <div class="card-body card-body-scroll" style="display:flex;flex-direction:column;gap:0.75rem;">
+
               <div class="info-box warn">⚠ No X API access? Upload a Kaggle Twitter dataset. Column mapping must match
                 below.</div>
               <div class="g2">
@@ -3505,7 +3515,8 @@
                   <button class="btn btn-xs btn-primary" onclick="dbRunQuery()">▶ Run Query</button>
                 </div>
               </div>
-              <div class="card-body" style="display:flex;flex-direction:column;gap:0.65rem;">
+              <div class="card-body card-body-scroll" style="display:flex;flex-direction:column;gap:0.65rem;">
+
 
                 <div
                   style="display:flex;gap:1rem;margin-bottom:0.2rem;padding:0.4rem;background:var(--bg2);border-radius:var(--radius);border:1px dashed var(--border);">
