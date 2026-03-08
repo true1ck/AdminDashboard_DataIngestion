@@ -34,6 +34,95 @@ const upload = multer({ dest: uploadsDir });
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ══════════════════════════════════════════════
+//  SERVERS MANAGEMENT API
+// ══════════════════════════════════════════════
+const net = require('net');
+const { exec } = require('child_process');
+
+const SERVERS = [
+    { id: 'backend', name: 'NetaBoard Backend', port: 3000, type: 'node', path: '../NetaBoardV5/backend', cmd: 'npm install --silent && npm run dev', desc: 'Main Express API connecting DB and React frontend' },
+    { id: 'qwen', name: 'ImageToTextQwen', port: 5001, type: 'flask', path: '../ImageToTextQwen/backend', cmd: 'source venv/bin/activate && python3 app.py', desc: 'Offline Qwen Vision OCR engine API' },
+    { id: 'whisper', name: 'MediaToTextWhisper', port: 8000, type: 'fastapi', path: '../MediaToTextWhisper/backend', cmd: 'source venv/bin/activate && python3 main.py', desc: 'FastAPI server for local Whisper audio transcription' },
+    { id: 'twitter', name: 'TwitterIngestionServer', port: 6060, type: 'flask', path: '../TwitterIngestionServer/backend', cmd: 'source venv/bin/activate && python3 app.py', desc: 'Flask Python microservice for scraping Twitter' },
+    { id: 'facebook', name: 'FacebookIngestionServer', port: 7070, type: 'flask', path: '../FacebookIngestionServer/backend', cmd: 'source venv/bin/activate && python3 app.py', desc: 'Flask endpoint wrapping Meta Graph APIs' },
+    { id: 'admin', name: 'Admin Dashboard', port: 4000, type: 'node', path: '.', cmd: 'npm install --silent && node server.js', desc: 'Central orchestration dashboard (This node)' },
+    { id: 'frontend', name: 'NetaBoard App', port: 5180, type: 'vite', path: '../NetaBoardV5', cmd: 'npm install --silent && npm run dev', desc: 'Vite React user interface application' }
+];
+
+function checkPortHost(port, host) {
+    return new Promise((resolve) => {
+        const socket = new net.Socket();
+        socket.setTimeout(800);
+        socket.on('connect', () => { socket.destroy(); resolve(true); });
+        socket.on('timeout', () => { socket.destroy(); resolve(false); });
+        socket.on('error', () => { socket.destroy(); resolve(false); });
+        socket.connect(port, host);
+    });
+}
+
+async function checkPort(port) {
+    let isUp = await checkPortHost(port, '127.0.0.1');
+    if (!isUp) {
+        isUp = await checkPortHost(port, '::1');
+    }
+    return isUp;
+}
+
+function killPort(port) {
+    return new Promise((resolve) => {
+        exec(`lsof -t -i:${port}`, (err, stdout) => {
+            if (stdout) {
+                const pid = stdout.trim().split('\\n')[0]; // Safe kill
+                exec(`kill -9 ${pid}`, () => resolve(true));
+            } else {
+                resolve(true);
+            }
+        });
+    });
+}
+
+function startServerProcess(srv) {
+    return new Promise((resolve) => {
+        const absPath = path.resolve(__dirname, srv.path);
+        const script = `osascript -e 'tell application "Terminal"' -e 'do script "printf \\"\\\\\\\\033[1m[${srv.name}]\\\\\\\\033[0m\\\\\\\\n\\" && cd \\"${absPath}\\" && ${srv.cmd}"' -e 'activate' -e 'end tell'`;
+        exec(script, () => resolve(true));
+    });
+}
+
+app.get('/api/servers', async (req, res) => {
+    const statusPromises = SERVERS.map(async (s) => {
+        const isUp = await checkPort(s.port);
+        return { ...s, status: isUp ? 'online' : 'offline' };
+    });
+    const results = await Promise.all(statusPromises);
+    res.json({ servers: results });
+});
+
+app.post('/api/servers/:id/control', async (req, res) => {
+    try {
+        const srv = SERVERS.find(s => s.id === req.params.id);
+        if (!srv) return res.status(404).json({ error: 'Server not found' });
+
+        const action = req.body.action;
+
+        if (action === 'stop' || action === 'restart') {
+            await killPort(srv.port);
+            if (action === 'stop') await new Promise(r => setTimeout(r, 500));
+        }
+
+        if (action === 'start' || action === 'restart') {
+            if (srv.id !== 'admin' || action === 'start') {
+                await startServerProcess(srv);
+            }
+        }
+
+        res.json({ success: true, server: req.params.id, action });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ══════════════════════════════════════════════
 //  HEALTH CHECK
 // ══════════════════════════════════════════════
 app.get('/api/health', (req, res) => {

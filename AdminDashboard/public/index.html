@@ -2072,6 +2072,10 @@
         <div class="nav-ico">🧠</div>
         <div class="nav-lbl">Preprocess</div>
       </div>
+      <div class="nav-item" data-view="servers" title="Node Server Management">
+        <div class="nav-ico">🖥️</div>
+        <div class="nav-lbl">Servers</div>
+      </div>
     </nav>
 
     <!-- ══════════════════════════════════════
@@ -3517,6 +3521,26 @@
         </div>
       </div>
 
+      <!-- ██ SERVERS MANAGEMENT ██ -->
+      <div class="view" id="v-servers">
+        <div class="vhdr">
+          <div class="vhdr-left">
+            <div class="vhdr-title"><span class="src-icon">🖥️</span> System Servers & Node Health</div>
+            <div class="vhdr-sub">Monitor, start, stop, and restart microservices across the entire NetaBoard ecosystem
+            </div>
+          </div>
+          <div class="vhdr-actions">
+            <button class="btn btn-primary btn-sm" onclick="loadServersHealth()">⟲ Refresh Health</button>
+          </div>
+        </div>
+        <div class="vscroll">
+          <div id="servers-grid"
+            style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1rem; width:100%;">
+            <div style="color:var(--text4);">Loading server cluster health...</div>
+          </div>
+        </div>
+      </div>
+
     </main>
 
     <!-- ══════════════════════════════════════
@@ -3626,6 +3650,11 @@
         if (item.dataset.view === 'preprocessing') {
           if (typeof loadDataCollectedFolder === 'function') {
             loadDataCollectedFolder();
+          }
+        }
+        if (item.dataset.view === 'servers') {
+          if (typeof loadServersHealth === 'function') {
+            loadServersHealth();
           }
         }
       });
@@ -5279,6 +5308,89 @@
       const j = createJob(`Kaggle: ${slug}`, '📊', 'kaggle', slug);
       setTimeout(() => startJob(j.id), 400);
       document.getElementById('kg-slug').value = '';
+    }
+
+    /* ═══════════════════════════════════════════════
+       SERVERS MANAGEMENT API
+    ═══════════════════════════════════════════════ */
+    async function loadServersHealth() {
+      const grid = document.getElementById('servers-grid');
+      if (!grid) return;
+      grid.innerHTML = '<div style="color:var(--text4);">Checking server ports...</div>';
+
+      try {
+        const res = await fetch('/api/servers');
+        const data = await res.json();
+
+        grid.innerHTML = data.servers.map(s => {
+          const isUp = s.status === 'online';
+          const badgeCol = isUp ? 'var(--green)' : 'var(--red)';
+          const badgeText = isUp ? 'ONLINE' : 'OFFLINE';
+
+          return `
+          <div class="card" style="border:1px solid ${isUp ? 'var(--border2)' : 'var(--red3)'}; position:relative; overflow:hidden;">
+            ${isUp ? `<div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--green);"></div>` : `<div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--red);"></div>`}
+            <div class="card-hdr" style="padding-bottom:0.4rem;">
+              <div class="card-title" style="font-size:0.95rem;">${s.name}</div>
+              <div style="background:${badgeCol}22; color:${badgeCol}; padding:0.15rem 0.4rem; border-radius:4px; font-family:var(--mono); font-size:0.55rem; font-weight:700;">${badgeText}</div>
+            </div>
+            <div class="card-body" style="padding-top:0.2rem;">
+              <div style="font-family:var(--mono); font-size:0.6rem; color:var(--text3); margin-bottom:0.6rem; display:flex; justify-content:space-between;">
+                <span>PORT: ${s.port}</span>
+                <span>TYPE: ${s.type.toUpperCase()}</span>
+              </div>
+              <div style="color:var(--text2); font-size:0.75rem; min-height:40px; margin-bottom:1rem; line-height:1.4;">
+                ${s.desc}
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; border-top:1px solid var(--border); margin:0 -1.25rem -1.25rem -1.25rem; padding:0.75rem 1.25rem; background:var(--bg2);">
+                ${isUp ? `
+                  <button class="btn btn-xs btn-outline" style="border-color:var(--red3); color:var(--red);" onclick="controlServer('${s.id}', 'stop')">⏹ Stop</button>
+                  <button class="btn btn-xs btn-primary" onclick="controlServer('${s.id}', 'restart')">⟲ Restart</button>
+                ` : `
+                  <button class="btn btn-xs btn-outline" disabled style="opacity:0.5; cursor:not-allowed;">⏹ Stop</button>
+                  <button class="btn btn-xs btn-primary" style="background:var(--green); color:black;" onclick="controlServer('${s.id}', 'start')">▶ Start</button>
+                `}
+              </div>
+            </div>
+          </div>
+          `;
+        }).join('');
+      } catch (err) {
+        grid.innerHTML = `<div style="color:var(--red);">Failed to connect to monitoring service: ${err.message}</div>`;
+      }
+    }
+
+    async function controlServer(id, action) {
+      if (id === 'admin' && action === 'stop') {
+        if (!confirm("Stopping the Admin Dashboard will kill the interface you are looking at. Are you sure?")) return;
+      }
+
+      const btnGroup = event.target.parentElement;
+      btnGroup.style.opacity = '0.5';
+
+      try {
+        const res = await fetch(`/api/servers/${id}/control`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action })
+        });
+
+        if (!res.ok) {
+          throw new Error("Action failed");
+        }
+
+        // Let it start/stop before refreshing UI
+        if (action === 'start' || action === 'restart') {
+          qLog('sys', `Issued ${action} command to ${id}. Waiting for port...`);
+          setTimeout(loadServersHealth, 2500);
+        } else {
+          setTimeout(loadServersHealth, 1000);
+        }
+
+      } catch (e) {
+        alert("Server control issue: " + e.message);
+        loadServersHealth();
+      }
     }
 
     /* ═══════════════════════════════════════════════
