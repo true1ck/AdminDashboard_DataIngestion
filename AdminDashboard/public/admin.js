@@ -382,6 +382,7 @@ function updateStats() {
     // Synchronize UI if progress updates occurred
     if (typeof renderYtVideos === 'function') renderYtVideos();
     if (typeof renderYtPlaylists === 'function') renderYtPlaylists();
+    if (typeof renderPdfCards === 'function') renderPdfCards();
 }
 
 function updateNavBadge(sourceType) {
@@ -908,6 +909,9 @@ async function processPdfJob(j) {
             j.itemsProcessed = 1;
             j.totalItems = 1;
 
+            j.extractedPyMuPDF = d.result_pymupdf;
+            j.extractedQwen = d.result_qwen;
+
             await apiPut(`/api/jobs/${j.id}`, {
                 status: 'done',
                 progress: 100,
@@ -1069,6 +1073,20 @@ function regenToken(id) {
 }
 
 /* ═══ DATABASE ═══ */
+function autoFillPrisma() {
+    const pgBtn = document.getElementById('db-btn-pg');
+    if (pgBtn) dbSelectType(pgBtn, 'pg', '5432', '');
+    document.getElementById('db-host').value = 'ep-bold-sun-a8jpixb6-pooler.eastus2.azure.neon.tech';
+    document.getElementById('db-port').value = '5432';
+    document.getElementById('db-name').value = 'neondb';
+    document.getElementById('db-user').value = 'neondb_owner';
+
+    const pInput = document.getElementById('db-pass');
+    if (pInput) pInput.value = 'npg_EmIV5WQi3bGr';
+
+    qLog('ok', 'Prisma Database credentials auto-filled successfully.');
+}
+
 let dbType = 'sqlite';
 let dbPrismaStudioOpen = false;
 
@@ -1334,3 +1352,122 @@ window.addEventListener('DOMContentLoaded', () => {
     renderKaggle();
     loadState(); // Restore state from SQLite on load
 });
+
+// PDF Helper Functions
+function renderPdfCards() {
+    const section = document.getElementById('pdf-job-section');
+    const container = document.getElementById('pdf-job-list');
+    const countSpan = document.getElementById('pdf-job-count');
+    if (!section || !container) return;
+
+    const pdfJobs = jobs.filter(j => j.sourceType === 'pdf');
+    if (pdfJobs.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+    section.style.display = 'block';
+
+    if (countSpan) countSpan.textContent = `${pdfJobs.length} Document Jobs`;
+
+    container.innerHTML = pdfJobs.map(j => {
+        const isDone = j.status === 'done';
+        const isFail = j.status === 'failed';
+        const isProc = j.status === 'processing';
+
+        let dot = 'dot-x';
+        let txt = 'Queued';
+        if (isDone) { dot = 'dot-g'; txt = 'Done'; }
+        else if (isFail) { dot = 'dot-r'; txt = 'Failed'; }
+        else if (isProc) { dot = 'dot-b'; txt = 'Processing'; }
+        else if (j.status === 'paused') { dot = 'dot-a'; txt = 'Paused'; }
+
+        let pg = j.progress || 0;
+
+        let resBtn = '';
+        if (isDone && (j.extractedPyMuPDF || j.extractedQwen)) {
+            resBtn = `<button class="btn btn-xs btn-outline" style="margin-left:0.5rem; border-color:var(--cyan3); color:var(--cyan); border-radius:4px; padding:0.1rem 0.4rem;" onclick="showPdfPreview(${j.id})">Preview Text 👁️</button>`;
+        }
+
+        let cancelBtn = `<button class="btn btn-xs btn-outline" style="border-radius:4px;" onclick="removeJob(${j.id})">Remove</button>`;
+
+        return `
+        <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border2); display:flex; flex-direction:column; gap:0.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div style="font-weight:600; font-size:0.85rem; color:var(--text); margin-bottom:0.2rem;">📄 ${j.name}</div>
+                    <div style="display:flex; align-items:center; gap:0.5rem; font-family:var(--mono); font-size:0.75rem; color:var(--text3);">
+                       <span class="dot ${dot}"></span> ${txt}
+                       ${isProc || isDone ? ` • ${pg}%` : ''}
+                       ${resBtn}
+                    </div>
+                </div>
+                <div>${cancelBtn}</div>
+            </div>
+            ${!isDone && !isFail ? `
+            <div class="prog-track" style="height:3px;">
+                <div class="prog-fill" style="width:${pg}%; background:var(--cyan); ${isProc ? 'animation:pulse 1.5s infinite;' : ''}"></div>
+            </div>` : ''}
+        </div>
+        `;
+    }).join('');
+}
+
+function showPdfPreview(jobId) {
+    const j = jobs.find(x => x.id === jobId);
+    if (!j) return;
+
+    const pyText = document.getElementById('modal-pymupdf-text');
+    const qwenText = document.getElementById('modal-qwen-text');
+    const btnPy = document.getElementById('btn-pymupdf-tab');
+    const btnQwen = document.getElementById('btn-qwen-tab');
+
+    if (j.extractedPyMuPDF) {
+        pyText.textContent = j.extractedPyMuPDF;
+        pyText.style.display = 'block';
+        btnPy.style.display = 'block';
+    } else {
+        pyText.style.display = 'none';
+        btnPy.style.display = 'none';
+    }
+
+    if (j.extractedQwen) {
+        qwenText.textContent = j.extractedQwen;
+        qwenText.style.display = 'none';
+        btnQwen.style.display = 'block';
+    } else {
+        qwenText.style.display = 'none';
+        btnQwen.style.display = 'none';
+    }
+
+    if (j.extractedPyMuPDF) {
+        switchPdfModalTab('pymupdf');
+    } else if (j.extractedQwen) {
+        switchPdfModalTab('qwen');
+    } else {
+        pyText.textContent = "No text extracted.";
+        pyText.style.display = 'block';
+        btnPy.style.display = 'block';
+        switchPdfModalTab('pymupdf');
+    }
+
+    document.getElementById('pdf-text-modal').style.display = 'flex';
+}
+
+function switchPdfModalTab(tab) {
+    const btnPy = document.getElementById('btn-pymupdf-tab');
+    const btnQwen = document.getElementById('btn-qwen-tab');
+    const pyText = document.getElementById('modal-pymupdf-text');
+    const qwenText = document.getElementById('modal-qwen-text');
+
+    if (tab === 'pymupdf') {
+        btnPy.className = 'btn btn-sm btn-primary';
+        btnQwen.className = 'btn btn-sm btn-outline';
+        pyText.style.display = 'block';
+        qwenText.style.display = 'none';
+    } else {
+        btnPy.className = 'btn btn-sm btn-outline';
+        btnQwen.className = 'btn btn-sm btn-primary';
+        pyText.style.display = 'none';
+        qwenText.style.display = 'block';
+    }
+}

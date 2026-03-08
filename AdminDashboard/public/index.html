@@ -64,6 +64,53 @@
       --radius: 6px;
     }
 
+    /* Light Theme Overlay */
+    [data-theme="light"] {
+      --bg: #f8f9fa;
+      --bg1: #ffffff;
+      --bg2: #f1f3f5;
+      --bg3: #e9ecef;
+      --bg4: #dee2e6;
+      --bg5: #ced4da;
+
+      --cyan: #0088cc;
+      --cyan2: rgba(0, 136, 204, 0.10);
+      --cyan3: rgba(0, 136, 204, 0.18);
+      --cyan4: rgba(0, 136, 204, 0.04);
+
+      --amber: #e67700;
+      --amber2: rgba(230, 119, 0, 0.10);
+      --amber3: rgba(230, 119, 0, 0.18);
+
+      --green: #0ca678;
+      --green2: rgba(12, 166, 120, 0.10);
+      --green3: rgba(12, 166, 120, 0.18);
+
+      --red: #e03131;
+      --red2: rgba(224, 49, 49, 0.10);
+      --red3: rgba(224, 49, 49, 0.18);
+
+      --purple: #845ef7;
+      --purple2: rgba(132, 94, 247, 0.10);
+      --purple3: rgba(132, 94, 247, 0.18);
+
+      --blue: #228be6;
+      --blue2: rgba(34, 139, 230, 0.10);
+      --blue3: rgba(34, 139, 230, 0.18);
+
+      --pink: #d6336c;
+      --pink2: rgba(214, 51, 108, 0.10);
+
+      --border: rgba(0, 0, 0, 0.08);
+      --border2: rgba(0, 0, 0, 0.14);
+      --border3: rgba(0, 0, 0, 0.22);
+
+      --text: #1a1e23;
+      --text2: rgba(26, 30, 35, 0.75);
+      --text3: rgba(26, 30, 35, 0.55);
+      --text4: rgba(26, 30, 35, 0.35);
+    }
+
     *,
     *::before,
     *::after {
@@ -96,12 +143,12 @@
     }
 
     ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.08);
+      background: var(--border3);
       border-radius: 2px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.15);
+      background: var(--text4);
     }
 
     /* ── LAYOUT ── */
@@ -1906,10 +1953,10 @@
     <!-- ══════════════ TOPBAR ══════════════ -->
     <header class="topbar">
       <div class="tb-logo">
-        <div class="logo-mark">NB</div>
+        <div class="logo-mark">AD</div>
       </div>
       <div class="tb-center">
-        <div class="tb-title">NetaBoard · <span>Data Ingestion</span></div>
+        <div class="tb-title">AdminDashBoard</div>
         <div class="tb-divider"></div>
         <div class="tb-stats">
           <div class="tb-stat">
@@ -1947,6 +1994,9 @@
         <div class="tb-divider"></div>
         <div class="live-dot"></div>
         <div class="tb-clock" id="clock">00:00:00</div>
+        <button id="theme-toggle" class="btn btn-outline btn-xs"
+          style="margin-left:8px; border-radius:15px; padding:0.2rem 0.5rem;" title="Toggle Light/Dark Mode"
+          onclick="toggleTheme()">☀️ Theme</button>
       </div>
     </header>
 
@@ -2783,6 +2833,17 @@
               </div>
             </div>
           </div>
+          <div id="pdf-job-section" style="display:none; margin-top:1.5rem;">
+            <div class="card" style="width:100%;">
+              <div class="card-hdr" style="justify-content:space-between;">
+                <div class="card-title"><span class="icon">📄</span> <span id="pdf-job-count">0 Document Jobs</span>
+                </div>
+              </div>
+              <div class="card-body p0" id="pdf-job-list">
+                <!-- PDF Jobs appear here -->
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -3112,9 +3173,13 @@
           </div>
           <div class="g2">
             <div class="card">
-              <div class="card-hdr">
-                <div class="card-title"><span class="icon">🔌</span> Connection</div><span class="tag tag-x"
-                  id="db-type-badge">PostgreSQL</span>
+              <div class="card-hdr" style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  <div class="card-title"><span class="icon">🔌</span> Connection</div>
+                  <span class="tag tag-x" id="db-type-badge">PostgreSQL</span>
+                </div>
+                <button class="btn btn-xs btn-outline" style="border-radius:4px;" onclick="autoFillPrisma()">Auto-fill
+                  Prisma DB</button>
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:0.65rem;">
                 <div class="fg" style="display:none;">
@@ -3452,6 +3517,23 @@
     /* ═══════════════════════════════════════════════
        NAVIGATION
     ═══════════════════════════════════════════════ */
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute("data-theme");
+      const targetTheme = currentTheme === "light" ? "dark" : "light";
+      document.documentElement.setAttribute('data-theme', targetTheme);
+      localStorage.setItem('nb-theme', targetTheme);
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.innerHTML = targetTheme === 'light' ? '🌙 Theme' : '☀️ Theme';
+    }
+
+    // Initialize Theme
+    const savedTheme = localStorage.getItem('nb-theme') || 'dark';
+    if (savedTheme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.innerHTML = '🌙 Theme';
+    }
+
     document.querySelectorAll('.nav-item[data-view]').forEach(item => {
       item.addEventListener('click', () => {
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
@@ -5018,6 +5100,39 @@
     const pgBtn = document.getElementById('db-btn-pg');
     if (pgBtn) dbSelectType(pgBtn, 'pg', '5432');
   </script>
+
+  <!-- PDF Text Preview Modal -->
+  <div id="pdf-text-modal" class="modal"
+    style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.85); align-items:center; justify-content:center;">
+    <div
+      style="background:var(--bg1); border:1px solid var(--border); border-radius:var(--radius); width:90%; max-width:800px; display:flex; flex-direction:column; max-height:85vh; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+      <div
+        style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--bg2);">
+        <div
+          style="font-weight:600; color:var(--text); letter-spacing:0.02em; display:flex; align-items:center; gap:0.5rem;">
+          <span style="font-size:1.1rem;">📄</span> Extracted Document Text
+        </div>
+        <button class="btn btn-xs" style="padding:0.2rem 0.5rem; border-radius:4px; border-color:transparent;"
+          onclick="document.getElementById('pdf-text-modal').style.display='none'">✕ Close</button>
+      </div>
+      <div style="padding:1rem; display:flex; flex-direction:column; flex:1; overflow:hidden;">
+        <div id="pdf-modal-tabs"
+          style="display:flex; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid var(--border2); padding-bottom:0.75rem;">
+          <button class="btn btn-sm btn-primary" id="btn-pymupdf-tab" onclick="switchPdfModalTab('pymupdf')"
+            style="border-radius:4px;">PyMuPDF Text</button>
+          <button class="btn btn-sm btn-outline" id="btn-qwen-tab" onclick="switchPdfModalTab('qwen')"
+            style="border-radius:4px;">Qwen Vision OCR</button>
+        </div>
+        <div id="modal-pymupdf-text"
+          style="flex:1; overflow-y:auto; white-space:pre-wrap; display:block; background:var(--bg); border:1px solid var(--border2); border-radius:4px; padding:1rem; font-family:var(--mono); font-size:0.75rem; color:var(--text2); line-height:1.6;">
+        </div>
+        <div id="modal-qwen-text"
+          style="flex:1; overflow-y:auto; white-space:pre-wrap; display:none; background:var(--bg); border:1px solid var(--border2); border-radius:4px; padding:1rem; font-family:var(--mono); font-size:0.75rem; color:var(--text2); line-height:1.6;">
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>
