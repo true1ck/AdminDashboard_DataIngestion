@@ -2039,6 +2039,10 @@
         <div class="tb-badge" id="neta-status"
           style="border-color:var(--border2);color:var(--text3);background:transparent;"><span class="dot dot-a"
             style="margin-right:4px;"></span>NETA(3000)</div>
+        <div class="tb-badge" id="pipeline-status"
+          style="border-color:var(--border2);color:var(--text3);background:transparent;"><span class="dot dot-a"
+            style="margin-right:4px;"></span>PIPELINE(8500)</div>
+
         <div class="tb-divider"></div>
         <div class="live-dot"></div>
         <div class="tb-clock" id="clock">00:00:00</div>
@@ -2098,6 +2102,11 @@
         <div class="nav-ico">🧠</div>
         <div class="nav-lbl">Preprocess</div>
       </div>
+      <div class="nav-item" data-view="pipeline" title="Pipeline Monitor">
+        <div class="nav-ico">🔄</div>
+        <div class="nav-lbl">Pipeline</div>
+      </div>
+
       <div class="nav-item" data-view="servers" title="Node Server Management">
         <div class="nav-ico">🖥️</div>
         <div class="nav-lbl">Servers</div>
@@ -2108,6 +2117,92 @@
      MAIN VIEWS
 ══════════════════════════════════════ -->
     <main class="main">
+
+      <!-- ██ PIPELINE MONITOR ██ -->
+      <div class="view" id="v-pipeline">
+        <div class="vhdr">
+          <div class="vhdr-left">
+            <div class="vhdr-title"><span class="src-icon">🔄</span> Pipeline Intelligence Monitor</div>
+            <div class="vhdr-sub">Real-time data collection · Entity tracking · Live stage logs · SSE streaming from port 8500</div>
+          </div>
+          <div class="vhdr-actions">
+            <span id="pl-api-badge" style="font-size:0.72rem;padding:3px 10px;border-radius:20px;border:1px solid var(--border2);color:var(--text3);">● Offline</span>
+            <button class="btn btn-primary" onclick="plStartSSE()">▶ Connect Feed</button>
+            <button class="btn" onclick="plStopSSE()">■ Stop</button>
+            <button class="btn" onclick="plClearFeed()">🗑 Clear</button>
+          </div>
+        </div>
+        <div class="vscroll">
+
+          <!-- Pipeline status cards -->
+          <div id="pl-pipeline-cards" style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
+            <div class="card" style="padding:1rem;text-align:center;opacity:0.5;flex:1;min-width:200px;" id="pl-no-pipelines">
+              <div style="font-size:2rem;">🔄</div>
+              <div style="font-size:0.8rem;color:var(--text3);margin-top:0.4rem;">No pipelines — start the pipeline API (port 8500)</div>
+            </div>
+          </div>
+
+          <!-- Trigger entity collection -->
+          <div class="card" style="margin-bottom:1rem;">
+            <div class="card-hdr">
+              <div class="card-title"><span class="icon">🔍</span> Trigger Entity Collection</div>
+              <span class="tag tag-p">Ad-hoc</span>
+            </div>
+            <div class="card-body">
+              <div style="display:flex;gap:0.6rem;align-items:flex-end;flex-wrap:wrap;">
+                <div class="fg" style="flex:2;min-width:160px;">
+                  <div class="fl">Entity / Person Name</div>
+                  <input class="fi" id="pl-entity" type="text" placeholder="e.g. Rahul Gandhi">
+                </div>
+                <div class="fg" style="max-width:130px;">
+                  <div class="fl">Results per source</div>
+                  <input class="fi" id="pl-count" type="number" value="5" min="1" max="50">
+                </div>
+                <div class="fg" style="max-width:180px;">
+                  <div class="fl">Sources (ctrl+click multi)</div>
+                  <select class="fs" id="pl-sources" multiple style="height:62px;">
+                    <option value="youtube" selected>YouTube</option>
+                    <option value="news_rss" selected>News RSS</option>
+                    <option value="twitter">Twitter/X</option>
+                    <option value="instagram">Instagram</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary" style="flex-shrink:0;align-self:flex-end;" onclick="plTriggerEntity()">⚡ Collect Now</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live feed -->
+          <div class="card">
+            <div class="card-hdr" style="flex-wrap:wrap;gap:0.5rem;">
+              <div class="card-title"><span class="icon">📡</span> Live Pipeline Feed</div>
+              <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-left:auto;align-items:center;">
+                <select class="fs" id="pl-filter-topic" style="min-width:160px;" onchange="plApplyFilters()">
+                  <option value="">All Topics</option>
+                </select>
+                <select class="fs" id="pl-filter-stage" style="min-width:130px;" onchange="plApplyFilters()">
+                  <option value="">All Stages</option>
+                  <option value="collector">Collector</option>
+                  <option value="transformer">Transformer</option>
+                  <option value="processor">Processor</option>
+                  <option value="consumer">Consumer</option>
+                </select>
+                <select class="fs" id="pl-filter-pipeline" style="min-width:150px;" onchange="plApplyFilters()">
+                  <option value="">All Pipelines</option>
+                </select>
+                <input class="fi" id="pl-filter-search" type="text" placeholder="Search text…" style="min-width:130px;" oninput="plApplyFilters()">
+              </div>
+            </div>
+            <div id="pl-feed" style="font-family:monospace;font-size:0.76rem;max-height:540px;overflow-y:auto;padding:0.7rem;background:var(--bg2);border-radius:6px;display:flex;flex-direction:column;gap:5px;"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.2rem 0;font-size:0.72rem;color:var(--text3);">
+              <span id="pl-event-count">0 events</span>
+              <span id="pl-sse-status" style="color:var(--text3);">● Disconnected</span>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /v-pipeline -->
+
 
       <!-- ██ YOUTUBE ██ -->
       <div class="view active" id="v-youtube">
@@ -3799,6 +3894,13 @@
 
     // Initialize Theme
     const savedTheme = localStorage.getItem('nb-theme') || 'dark';
+
+    const PL_API = 'http://localhost:8500';
+    let plESS = null;
+    let plEvents = [];
+    let plTopicsKnown = new Set();
+    let plPipelinesKnown = new Set();
+
     if (savedTheme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
       const btn = document.getElementById('theme-toggle');
@@ -5819,6 +5921,201 @@
       a.click();
       URL.revokeObjectURL(url);
     }
+
+    function plEventRow(ev) {
+      const colorMap = { 'collector': '#3b82f6', 'transformer': '#8b5cf6', 'processor': '#f59e0b', 'consumer': '#10b981' };
+      const color = colorMap[ev.stage] || '#6b7280';
+      const ts = new Date(ev.timestamp).toLocaleTimeString();
+      const text = ev.text || ev.message || JSON.stringify(ev.data || {});
+      return `<div style="display:flex;gap:6px;align-items:flex-start;padding:4px 6px;border-radius:4px;border-left:3px solid ${color};background:rgba(0,0,0,0.15);" data-stage="${ev.stage||''}" data-topic="${ev.topic||''}" data-pipeline="${ev.pipeline_id||''}" data-text="${(text).toLowerCase()}">
+        <span style="color:var(--text3);flex-shrink:0;width:65px;">[${ts}]</span>
+        <span style="color:${color};font-weight:600;width:75px;flex-shrink:0;">${(ev.stage||'log').toUpperCase()}</span>
+        <span style="color:var(--text2);flex:1;">${text}</span>
+      </div>`;
+    }
+
+    function plRenderFeed() {
+      const feed = document.getElementById('pl-feed');
+      if (!feed) return;
+      const stageFil  = document.getElementById('pl-filter-stage')?.value   || '';
+      const topicFil  = document.getElementById('pl-filter-topic')?.value   || '';
+      const pipeFil   = document.getElementById('pl-filter-pipeline')?.value  || '';
+      const searchFil = (document.getElementById('pl-filter-search')?.value  || '').toLowerCase();
+      const filtered  = plEvents.filter(ev =>
+        (!stageFil  || ev.stage === stageFil) &&
+        (!topicFil  || (ev.topic || '') === topicFil) &&
+        (!pipeFil   || (ev.pipeline_id || '') === pipeFil) &&
+        (!searchFil || (ev.text || ev.event_type || '').toLowerCase().includes(searchFil))
+      );
+      if (filtered.length === 0) {
+        feed.innerHTML = '<div style="color:var(--text3);text-align:center;padding:2rem;">No events match the current filters.</div>';
+      } else {
+        feed.innerHTML = filtered.slice(-200).map(plEventRow).join('');
+        feed.scrollTop = feed.scrollHeight;
+      }
+      document.getElementById('pl-event-count').textContent = `${plEvents.length} events (${filtered.length} shown)`;
+    }
+
+    function plApplyFilters() { plRenderFeed(); }
+
+    function plAddEvent(ev) {
+      plEvents.push(ev);
+      // update topic dropdown
+      if (ev.topic && !plTopicsKnown.has(ev.topic)) {
+        plTopicsKnown.add(ev.topic);
+        const opt = document.createElement('option');
+        opt.value = ev.topic; opt.textContent = ev.topic;
+        document.getElementById('pl-filter-topic').appendChild(opt);
+      }
+      // update pipeline dropdown
+      if (ev.pipeline_id && !plPipelinesKnown.has(ev.pipeline_id)) {
+        plPipelinesKnown.add(ev.pipeline_id);
+        const opt = document.createElement('option');
+        opt.value = ev.pipeline_id; opt.textContent = ev.pipeline_id;
+        document.getElementById('pl-filter-pipeline').appendChild(opt);
+      }
+      plRenderFeed();
+    }
+
+    function plStartSSE() {
+      if (plESS) plESS.close();
+      document.getElementById('pl-sse-status').textContent = '● Connecting…';
+      document.getElementById('pl-sse-status').style.color = '#f59e0b';
+      const url = `${PL_API}/events/stream`;
+      plESS = new EventSource(url);
+      plESS.onopen = () => {
+        document.getElementById('pl-sse-status').textContent = '● Live';
+        document.getElementById('pl-sse-status').style.color = '#10b981';
+      };
+      plESS.onmessage = (e) => {
+        try { plAddEvent(JSON.parse(e.data)); } catch(_) {}
+      };
+      plESS.addEventListener('event', (e) => {
+        try { plAddEvent(JSON.parse(e.data)); } catch(_) {}
+      });
+      plESS.onerror = () => {
+        document.getElementById('pl-sse-status').textContent = '● Error — retrying…';
+        document.getElementById('pl-sse-status').style.color = '#ef4444';
+      };
+    }
+
+    function plStopSSE() {
+      if (plESS) { plESS.close(); plESS = null; }
+      document.getElementById('pl-sse-status').textContent = '● Disconnected';
+      document.getElementById('pl-sse-status').style.color = 'var(--text3)';
+    }
+
+    function plClearFeed() {
+      plEvents = [];
+      document.getElementById('pl-feed').innerHTML = '';
+      document.getElementById('pl-event-count').textContent = '0 events';
+    }
+
+    async function plFetchPipelines() {
+      try {
+        const r = await fetch(`${PL_API}/pipelines`);
+        if (!r.ok) return;
+        const data = await r.json();
+        const pipes = Array.isArray(data) ? data : (data.pipelines || []);
+        const container = document.getElementById('pl-pipeline-cards');
+        const noPl = document.getElementById('pl-no-pipelines');
+        if (pipes.length === 0) { if (noPl) noPl.style.display = ''; return; }
+        if (noPl) noPl.style.display = 'none';
+        container.innerHTML = '';
+        pipes.forEach(p => {
+          const isRunning = p.status === 'running';
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.style.cssText = 'padding:0.9rem 1rem;flex:1;min-width:180px;border-left:4px solid ' + (isRunning ? '#10b981' : '#6b7280');
+          card.innerHTML = `
+            <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.3rem;">🔄 ${p.pipeline_id}</div>
+            <div style="font-size:0.72rem;color:var(--text3);margin-bottom:0.5rem;">${p.config_path || ''}</div>
+            <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+              <span style="font-size:0.7rem;padding:2px 8px;border-radius:10px;border:1px solid ${isRunning?'#10b981':'#6b7280'};color:${isRunning?'#10b981':'#9ca3af'};">${isRunning ? '● Running' : '○ Stopped'}</span>
+              ${isRunning
+                ? `<button class="btn" style="font-size:0.7rem;padding:2px 10px;" onclick="plStopPipeline('${p.pipeline_id}')">■ Stop</button>`
+                : `<button class="btn btn-primary" style="font-size:0.7rem;padding:2px 10px;" onclick="plStartPipeline('${p.pipeline_id}')">▶ Start</button>`}
+            </div>`;
+          container.appendChild(card);
+        });
+      } catch(e) { /* pipeline API offline */ }
+    }
+
+    async function plStartPipeline(id) {
+      try {
+        await fetch(`${PL_API}/pipelines/${id}/start`, { method: 'POST' });
+        setTimeout(plFetchPipelines, 800);
+      } catch(e) { alert('Could not start pipeline — is the pipeline API running on port 8500?'); }
+    }
+
+    async function plStopPipeline(id) {
+      try {
+        await fetch(`${PL_API}/pipelines/${id}/stop`, { method: 'POST' });
+        setTimeout(plFetchPipelines, 800);
+      } catch(e) {}
+    }
+
+    async function plFetchTopics() {
+      try {
+        const r = await fetch(`${PL_API}/events/topics`);
+        if (!r.ok) return;
+        const topics = await r.json();
+        const sel = document.getElementById('pl-filter-topic');
+        const existing = new Set([...sel.options].map(o => o.value));
+        (Array.isArray(topics) ? topics : (topics.topics || [])).forEach(t => {
+          if (!existing.has(t)) {
+            const opt = document.createElement('option');
+            opt.value = t; opt.textContent = t;
+            sel.appendChild(opt);
+            plTopicsKnown.add(t);
+          }
+        });
+      } catch(e) {}
+    }
+
+    async function plTriggerEntity() {
+      const entity = document.getElementById('pl-entity').value.trim();
+      if (!entity) { alert('Enter an entity name first.'); return; }
+      const count   = parseInt(document.getElementById('pl-count').value) || 5;
+      const srcSel  = document.getElementById('pl-sources');
+      const sources = [...srcSel.options].filter(o => o.selected).map(o => o.value);
+      if (sources.length === 0) { alert('Select at least one source.'); return; }
+      try {
+        const r = await fetch(`${PL_API}/entities`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entity, sources, count }),
+        });
+        if (r.ok) {
+          qLog('info', `Pipeline: triggered collection for "${entity}" from [${sources.join(', ')}]`);
+          // Auto-connect SSE if not connected
+          if (!plESS || plESS.readyState === 2) plStartSSE();
+        } else {
+          const err = await r.json().catch(() => ({}));
+          alert('Collection failed: ' + (err.detail || r.status));
+        }
+      } catch(e) {
+        alert('Cannot reach pipeline API on port 8500. Make sure it is running.');
+      }
+    }
+
+    // Poll pipelines & topics every 10s when pipeline tab is visible
+    function plPoll() {
+      const view = document.getElementById('v-pipeline');
+      if (view && view.classList.contains('active')) {
+        plFetchPipelines();
+        plFetchTopics();
+      }
+    }
+    setInterval(plPoll, 10000);
+
+    // Trigger initial load when switching to pipeline view
+    document.querySelectorAll('.nav-item[data-view="pipeline"]').forEach(item => {
+      item.addEventListener('click', () => {
+        setTimeout(() => { plFetchPipelines(); plFetchTopics(); }, 200);
+      });
+    });
+
   </script>
 
 </body>
