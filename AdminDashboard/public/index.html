@@ -4803,6 +4803,71 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
       qLog('info', 'Applied Facebook "Status" schema preset');
     }
 
+    async function detectFbColumns(file) {
+      if (!file) return;
+      const type = file.name.split('.').pop().toLowerCase();
+      if (!['csv', 'json'].includes(type)) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const content = e.target.result;
+        let headers = [];
+
+        if (type === 'csv') {
+          const lines = content.split(/\r?\n/);
+          if (lines.length > 0) {
+            headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+          }
+        } else if (type === 'json') {
+          try {
+            const data = JSON.parse(content);
+            const first = Array.isArray(data) ? data[0] : data;
+            if (first) headers = Object.keys(first);
+          } catch (err) {}
+        }
+
+        if (headers.length === 0) return;
+
+        const patterns = {
+          'fb-col-text': /post|message|content|text|body|status/i,
+          'fb-col-time': /date|time|published|created|timestamp/i,
+          'fb-col-type': /type|kind|category_type/i,
+          'fb-col-id': /id|uuid|guid|post_id|status_id/i,
+          'fb-col-reactions': /total_reaction|num_reaction|reaction_count/i,
+          'fb-col-likes': /^(?!.*dis).*like/i, // match like but not dislike
+          'fb-col-replies': /comment|reply|response/i,
+          'fb-col-shares': /share/i,
+          'fb-col-link': /link|url/i,
+          'fb-col-cat': /category|label|tag/i,
+          'fb-col-loves': /love/i,
+          'fb-col-wows': /wow/i,
+          'fb-col-hahas': /haha/i,
+          'fb-col-sads': /sad/i,
+          'fb-col-angrys': /angry/i,
+          'fb-col-special': /special/i,
+          'fb-col-linkname': /link_name|headline/i
+        };
+
+        let matches = 0;
+        for (const [id, regex] of Object.entries(patterns)) {
+          const el = document.getElementById(id);
+          if (el && !el.value) {
+            const match = headers.find(h => regex.test(h));
+            if (match) {
+              el.value = match;
+              matches++;
+            }
+          }
+        }
+        if (matches > 0) {
+          qLog('info', `✓ Auto-detected ${matches} Facebook columns from ${file.name}`);
+        }
+      };
+      
+      // Read first 10KB for CSV/JSON headers
+      reader.readAsText(file.slice(0, 10240));
+    }
+
 function queueFacebookKaggle() {
       const dzId = 'fb-dz';
       const dz = document.getElementById(dzId);
@@ -4814,31 +4879,37 @@ function queueFacebookKaggle() {
       const j = createJob(file.name, '📘', 'facebook-kaggle');
       j.filePayload = file;
 
+      const getVal = (id) => {
+        const el = document.getElementById(id);
+        if (!el) return '';
+        return el.value.trim() || el.placeholder.replace(/^e\.g\.,\s*/i, '');
+      };
+
       j.facebookMeta = {
-        col_text: document.getElementById('fb-col-text').value,
-        col_time: document.getElementById('fb-col-time').value,
-        col_type: document.getElementById('fb-col-type').value,
-        id_column: document.getElementById('fb-col-id').value,
+        col_text: getVal('fb-col-text'),
+        col_time: getVal('fb-col-time'),
+        col_type: getVal('fb-col-type'),
+        id_column: getVal('fb-col-id'),
         processing_type: document.getElementById('fb-kaggle-type').value,
         custom_prompt: document.getElementById('fb-kaggle-prompt').value,
-        col_likes: document.getElementById('fb-col-likes').value,
-        col_replies: document.getElementById('fb-col-replies').value,
-        col_shares: document.getElementById('fb-col-shares').value,
-        col_reactions: document.getElementById('fb-col-reactions').value,
-        col_link: document.getElementById('fb-col-link').value,
-        col_cat: document.getElementById('fb-col-cat').value,
+        col_likes: getVal('fb-col-likes'),
+        col_replies: getVal('fb-col-replies'),
+        col_shares: getVal('fb-col-shares'),
+        col_reactions: getVal('fb-col-reactions'),
+        col_link: getVal('fb-col-link'),
+        col_cat: getVal('fb-col-cat'),
         extract_all: document.getElementById('fb-extract-all').checked
       };
 
       // Aggregate extra fields into custom_cols for backend compatibility
       const extras = [
-        document.getElementById('fb-col-loves').value,
-        document.getElementById('fb-col-wows').value,
-        document.getElementById('fb-col-hahas').value,
-        document.getElementById('fb-col-sads').value,
-        document.getElementById('fb-col-angrys').value,
-        document.getElementById('fb-col-special').value,
-        document.getElementById('fb-col-linkname').value
+        getVal('fb-col-loves'),
+        getVal('fb-col-wows'),
+        getVal('fb-col-hahas'),
+        getVal('fb-col-sads'),
+        getVal('fb-col-angrys'),
+        getVal('fb-col-special'),
+        getVal('fb-col-linkname')
       ].filter(x => x && x.trim() !== '');
       
       let baseCustom = document.getElementById('fb-col-custom').value || '';
@@ -5176,6 +5247,7 @@ function queueFacebookKaggle() {
       if (files && files.length) {
         dzFiles[id] = Array.from(files);
         handleDzPreview(id, files);
+        if (id === 'fb-dz') detectFbColumns(files[0]);
       }
     }
     function dzFile(e, dzId, lblId, type) {
@@ -5183,6 +5255,7 @@ function queueFacebookKaggle() {
       if (!files || !files.length) return;
       dzFiles[dzId] = Array.from(files);
       handleDzPreview(dzId, files);
+      if (dzId === 'fb-dz') detectFbColumns(files[0]);
     }
     function handleDzPreview(dzId, files) {
       const totalSize = Array.from(files).reduce((a, f) => a + f.size, 0);
