@@ -2128,6 +2128,7 @@
         <div class="nav-ico">🧠</div>
         <div class="nav-lbl">Data Visualization</div>
       </div>
+
       <div class="nav-item" data-view="servers" title="Node Server Management">
         <div class="nav-ico">🖥️</div>
         <div class="nav-lbl">Servers</div>
@@ -3645,6 +3646,7 @@
         </div>
       </div>
 
+
       <!-- ██ SERVERS MANAGEMENT ██ -->
       <div class="view" id="v-servers">
         <div class="vhdr">
@@ -3938,12 +3940,20 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
     setInterval(() => {
       checkServiceHealth('whisper-status', 'http://localhost:8000/api/health');
       checkServiceHealth('qwen-status', 'http://localhost:5001/api/health');
+      checkServiceHealth('twitter-status', 'http://localhost:6060/api/health');
+      checkServiceHealth('fb-status', 'http://localhost:7070/api/health');
+      checkServiceHealth('admin-status', 'http://localhost:4000/api/health');
       checkServiceHealth('neta-status', 'http://localhost:3000/api/health');
       checkServiceHealth('pipeline-status', 'http://localhost:8500/health');
     }, 5000);
     // Check immediately
     checkServiceHealth('whisper-status', 'http://localhost:8000/api/health');
     checkServiceHealth('qwen-status', 'http://localhost:5001/api/health');
+    checkServiceHealth('twitter-status', 'http://localhost:6060/api/health');
+    checkServiceHealth('fb-status', 'http://localhost:7070/api/health');
+    checkServiceHealth('admin-status', 'http://localhost:4000/api/health');
+    checkServiceHealth('neta-status', 'http://localhost:3000/api/health');
+    checkServiceHealth('pipeline-status', 'http://localhost:8500/health');
     checkServiceHealth('neta-status', 'http://localhost:3000/api/health');
     checkServiceHealth('pipeline-status', 'http://localhost:8500/health');
 
@@ -5950,6 +5960,8 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `query_results_${Date.now()}.csv`; a.click();
     }
     function mydbReloadIframe() { const iframe = document.getElementById('mydb-prisma-iframe'); if (iframe) { iframe.src = 'about:blank'; setTimeout(() => { iframe.src = 'http://localhost:5555'; }, 100); } }
+
+
 
     // ═══════════════════════════════════════════════════════════════
     //  ADDITIONAL HEALTH CHECKS
