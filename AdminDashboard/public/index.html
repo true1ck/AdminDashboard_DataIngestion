@@ -87,21 +87,22 @@
     }
 
     ::-webkit-scrollbar {
-      width: 4px;
-      height: 4px;
+      width: 6px;
+      height: 6px;
     }
 
     ::-webkit-scrollbar-track {
-      background: transparent;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 3px;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 3px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.4);
     }
 
     /* ── LAYOUT ── */
@@ -405,6 +406,83 @@
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      min-height: 0;
+    }
+
+    /* ── PIPELINE VIEW LAYOUT ── */
+    #v-pipeline > .pl-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      padding: 1rem 1.25rem;
+      gap: 0.75rem;
+    }
+
+    #v-pipeline .pl-top-section {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    #v-pipeline .pl-feed-card {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    #v-pipeline .pl-feed-card > .card-hdr {
+      flex-shrink: 0;
+    }
+
+    #v-pipeline .pl-feed-wrapper {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0.6rem 0.75rem;
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      background: var(--bg1);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      word-break: break-word;
+      scrollbar-gutter: stable;
+    }
+
+    #v-pipeline .pl-feed-footer {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.72rem;
+      color: var(--text3);
+      border-top: 1px solid var(--border);
+    }
+
+    #v-pipeline .pl-filter-bar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    #v-pipeline .pl-filter-bar .fs,
+    #v-pipeline .pl-filter-bar .fi {
+      width: auto;
+      min-width: 130px;
+      font-size: 0.6rem;
+      padding: 0.4rem 0.65rem;
     }
 
     /* ── BUTTONS ── */
@@ -3374,75 +3452,79 @@
             <button class="btn" onclick="plClearFeed()">🗑 Clear</button>
           </div>
         </div>
-        <div class="vscroll">
 
-          <!-- Pipeline status cards -->
-          <div id="pl-pipeline-cards" style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
-            <div class="card" style="padding:1rem;text-align:center;opacity:0.5;flex:1;min-width:200px;" id="pl-no-pipelines">
-              <div style="font-size:2rem;">🔄</div>
-              <div style="font-size:0.8rem;color:var(--text3);margin-top:0.4rem;">No pipelines — start the pipeline API (port 8500)</div>
-            </div>
-          </div>
+        <div class="pl-body">
+          <!-- ── Top: pipeline cards + trigger (pinned, never scrolls) ── -->
+          <div class="pl-top-section">
 
-          <!-- Trigger entity collection -->
-          <div class="card" style="margin-bottom:1rem;">
-            <div class="card-hdr">
-              <div class="card-title"><span class="icon">🔍</span> Trigger Entity Collection</div>
-              <span class="tag tag-p">Ad-hoc</span>
+            <!-- Pipeline status cards -->
+            <div id="pl-pipeline-cards" style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+              <div class="card" style="padding:1rem;text-align:center;opacity:0.5;flex:1;min-width:200px;" id="pl-no-pipelines">
+                <div style="font-size:1.6rem;">🔄</div>
+                <div style="font-size:0.75rem;color:var(--text3);margin-top:0.3rem;">No pipelines — start the pipeline API (port 8500)</div>
+              </div>
             </div>
-            <div class="card-body">
-              <div style="display:flex;gap:0.6rem;align-items:flex-end;flex-wrap:wrap;">
-                <div class="fg" style="flex:2;min-width:160px;">
-                  <div class="fl">Entity / Person Name</div>
-                  <input class="fi" id="pl-entity" type="text" placeholder="e.g. Rahul Gandhi">
+
+            <!-- Trigger entity collection -->
+            <div class="card">
+              <div class="card-hdr">
+                <div class="card-title"><span class="icon">🔍</span> Trigger Entity Collection</div>
+                <span class="tag tag-p">Ad-hoc</span>
+              </div>
+              <div class="card-body">
+                <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+                  <div class="fg" style="flex:2;min-width:160px;">
+                    <div class="fl">Entity / Person Name</div>
+                    <input class="fi" id="pl-entity" type="text" placeholder="e.g. Rahul Gandhi">
+                  </div>
+                  <div class="fg" style="min-width:100px;max-width:130px;">
+                    <div class="fl">Results per source</div>
+                    <input class="fi" id="pl-count" type="number" value="5" min="1" max="50">
+                  </div>
+                  <div class="fg" style="min-width:150px;max-width:200px;">
+                    <div class="fl">Sources (ctrl+click multi)</div>
+                    <select class="fs" id="pl-sources" multiple style="height:62px;">
+                      <option value="youtube" selected>YouTube</option>
+                      <option value="news_rss" selected>News RSS</option>
+                      <option value="twitter">Twitter/X</option>
+                      <option value="instagram">Instagram</option>
+                    </select>
+                  </div>
+                  <button class="btn btn-primary" style="flex-shrink:0;align-self:flex-end;" onclick="plTriggerEntity()">⚡ Collect Now</button>
                 </div>
-                <div class="fg" style="max-width:130px;">
-                  <div class="fl">Results per source</div>
-                  <input class="fi" id="pl-count" type="number" value="5" min="1" max="50">
-                </div>
-                <div class="fg" style="max-width:180px;">
-                  <div class="fl">Sources (ctrl+click multi)</div>
-                  <select class="fs" id="pl-sources" multiple style="height:62px;">
-                    <option value="youtube" selected>YouTube</option>
-                    <option value="news_rss" selected>News RSS</option>
-                    <option value="twitter">Twitter/X</option>
-                    <option value="instagram">Instagram</option>
-                  </select>
-                </div>
-                <button class="btn btn-primary" style="flex-shrink:0;align-self:flex-end;" onclick="plTriggerEntity()">⚡ Collect Now</button>
               </div>
             </div>
           </div>
 
-          <!-- Live feed -->
-          <div class="card">
+          <!-- ── Live feed card (fills all remaining space) ── -->
+          <div class="pl-feed-card">
             <div class="card-hdr" style="flex-wrap:wrap;gap:0.5rem;">
               <div class="card-title"><span class="icon">📡</span> Live Pipeline Feed</div>
-              <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-left:auto;align-items:center;">
-                <select class="fs" id="pl-filter-topic" style="min-width:160px;" onchange="plApplyFilters()">
-                  <option value="">All Topics</option>
-                </select>
-                <select class="fs" id="pl-filter-stage" style="min-width:130px;" onchange="plApplyFilters()">
+              <div class="pl-filter-bar">
+                <select class="fs" id="pl-filter-stage" onchange="plApplyFilters()">
                   <option value="">All Stages</option>
                   <option value="collector">Collector</option>
                   <option value="transformer">Transformer</option>
                   <option value="processor">Processor</option>
                   <option value="consumer">Consumer</option>
                 </select>
-                <select class="fs" id="pl-filter-pipeline" style="min-width:150px;" onchange="plApplyFilters()">
+                <select class="fs" id="pl-filter-topic" onchange="plApplyFilters()">
+                  <option value="">All Topics</option>
+                </select>
+                <select class="fs" id="pl-filter-pipeline" onchange="plApplyFilters()">
                   <option value="">All Pipelines</option>
                 </select>
-                <input class="fi" id="pl-filter-search" type="text" placeholder="Search text…" style="min-width:130px;" oninput="plApplyFilters()">
+                <input class="fi" id="pl-filter-search" type="text" placeholder="Search…" oninput="plApplyFilters()">
               </div>
             </div>
-            <div id="pl-feed" style="font-family:monospace;font-size:0.76rem;max-height:540px;overflow-y:auto;padding:0.7rem;background:var(--bg2);border-radius:6px;display:flex;flex-direction:column;gap:5px;"></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.2rem 0;font-size:0.72rem;color:var(--text3);">
+            <div id="pl-feed" class="pl-feed-wrapper"></div>
+            <div class="pl-feed-footer">
               <span id="pl-event-count">0 events</span>
-              <span id="pl-sse-status" style="color:var(--text3);">● Disconnected</span>
+              <span id="pl-sse-status">● Disconnected</span>
             </div>
           </div>
-
         </div>
+
       </div><!-- /v-pipeline -->
 
     </main>
@@ -5125,6 +5207,18 @@
       processor:   '#8b5cf6',
       consumer:    '#10b981',
     };
+    const EVENT_TYPE_LABELS = {
+      raw_fetch:   'fetch',
+      normalized:  'norm',
+      dedup_drop:  'dedup',
+      drop:        'drop',
+      sentiment:   'sentiment',
+      ner:         'ner',
+      stored:      'stored',
+      audit:       'audit',
+      trace:       'trace',
+      error:       'error',
+    };
     const PLATFORM_ICONS_PL = {
       youtube: '▶', twitter: '𝕏', instagram: '📷',
       news_rss: '📰', india_news: '📰', mock: '🧪',
@@ -5134,16 +5228,34 @@
       const color = STAGE_COLORS_PL[ev.stage] || '#6b7280';
       const icon  = PLATFORM_ICONS_PL[ev.platform] || '●';
       const ts    = ev.timestamp ? new Date(ev.timestamp).toTimeString().slice(0,8) : '--:--:--';
-      const topic = ev.topic ? `<span style="color:#94a3b8;margin-left:4px;">[${ev.topic}]</span>` : '';
-      const text  = (ev.text || ev.error_message || ev.event_type || '').slice(0, 160);
-      const sentiment = ev.metadata && ev.metadata.sentiment_label
-        ? `<span style="color:${ev.metadata.sentiment_label==='positive'?'#10b981':ev.metadata.sentiment_label==='negative'?'#ef4444':'#94a3b8'};margin-left:4px;">${ev.metadata.sentiment_label}</span>`
+      const topic = ev.topic ? `<span style="color:#64748b;margin-left:6px;font-size:0.66rem;">[${ev.topic}]</span>` : '';
+      const text  = (ev.text || ev.error_message || ev.event_type || '').slice(0, 220);
+      const typeLabel = EVENT_TYPE_LABELS[ev.event_type] || ev.event_type || '';
+      const isError   = ev.event_type === 'error';
+      const isDrop    = ev.event_type === 'drop' || ev.event_type === 'dedup_drop';
+
+      const slabel = ev.sentiment_label;
+      const sentimentBadge = slabel
+        ? `<span style="margin-left:6px;padding:1px 6px;border-radius:8px;font-size:0.62rem;background:${slabel==='positive'?'#10b98118':slabel==='negative'?'#ef444418':'#94a3b818'};color:${slabel==='positive'?'#10b981':slabel==='negative'?'#ef4444':'#94a3b8'};white-space:nowrap;">${slabel}</span>`
         : '';
-      return `<div style="display:flex;gap:6px;align-items:flex-start;padding:4px 6px;border-radius:4px;border-left:3px solid ${color};background:rgba(0,0,0,0.15);" data-stage="${ev.stage||''}" data-topic="${ev.topic||''}" data-pipeline="${ev.pipeline_id||''}" data-text="${(text).toLowerCase()}">
-        <span style="color:var(--text3);min-width:56px;flex-shrink:0;">${ts}</span>
-        <span style="background:${color}22;color:${color};border:1px solid ${color}44;border-radius:10px;padding:0 7px;font-size:0.68rem;flex-shrink:0;">${ev.stage||'?'}</span>
-        <span style="flex-shrink:0;">${icon}</span>
-        <span style="flex:1;color:var(--text2);word-break:break-word;">${text}${topic}${sentiment}</span>
+
+      const entList = Array.isArray(ev.entities) && ev.entities.length
+        ? `<span style="margin-left:6px;color:#a78bfa;font-size:0.62rem;white-space:nowrap;">${ev.entities.slice(0,3).join(', ')}</span>`
+        : '';
+
+      const threatBadge = ev.is_threat
+        ? `<span style="margin-left:6px;padding:1px 6px;border-radius:8px;font-size:0.62rem;background:#ef444418;color:#ef4444;white-space:nowrap;">⚠ threat</span>`
+        : '';
+
+      const rowBg = isError ? 'rgba(239,68,68,0.06)' : isDrop ? 'rgba(107,114,128,0.06)' : 'rgba(255,255,255,0.02)';
+      const borderColor = isError ? '#ef4444' : color;
+
+      return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 10px;border-radius:5px;border-left:3px solid ${borderColor};background:${rowBg};transition:background 0.15s;" data-stage="${ev.stage||''}" data-topic="${ev.topic||''}" data-pipeline="${ev.pipeline_id||''}" data-text="${text.toLowerCase()}">
+        <span style="color:var(--text3);min-width:58px;flex-shrink:0;font-size:0.7rem;padding-top:1px;">${ts}</span>
+        <span style="background:${color}18;color:${color};border:1px solid ${color}33;border-radius:10px;padding:1px 8px;font-size:0.62rem;flex-shrink:0;white-space:nowrap;">${ev.stage||'?'}</span>
+        ${typeLabel ? `<span style="color:var(--text4);font-size:0.6rem;flex-shrink:0;padding-top:2px;white-space:nowrap;">${typeLabel}</span>` : ''}
+        <span style="flex-shrink:0;font-size:0.82rem;line-height:1;">${icon}</span>
+        <span style="flex:1;color:${isError?'#ef4444':isDrop?'var(--text3)':'var(--text2)'};word-break:break-word;line-height:1.45;">${text}${topic}${sentimentBadge}${entList}${threatBadge}</span>
       </div>`;
     }
 
@@ -5161,10 +5273,10 @@
         (!searchFil || (ev.text || ev.event_type || '').toLowerCase().includes(searchFil))
       );
       if (filtered.length === 0) {
-        feed.innerHTML = '<div style="color:var(--text3);text-align:center;padding:2rem;">No events match the current filters.</div>';
+        feed.innerHTML = '<div style="color:var(--text3);text-align:center;padding:3rem 1rem;font-size:0.8rem;">No events match the current filters.</div>';
       } else {
         feed.innerHTML = filtered.slice(-200).map(plEventRow).join('');
-        feed.scrollTop = feed.scrollHeight;
+        requestAnimationFrame(() => { feed.scrollTop = feed.scrollHeight; });
       }
       document.getElementById('pl-event-count').textContent = `${plEvents.length} events (${filtered.length} shown)`;
     }
