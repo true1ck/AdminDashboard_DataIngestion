@@ -2812,37 +2812,47 @@
               <div class="g2">
                 <div class="fg">
                   <div class="fl">Text Column</div><input class="fi" id="fb-col-text" type="text"
-                    placeholder="e.g., post_text">
+                    value="status_message" placeholder="e.g., status_message">
                 </div>
                 <div class="fg">
                   <div class="fl">Timestamp</div><input class="fi" id="fb-col-time" type="text"
-                    placeholder="e.g., date">
+                    value="status_published" placeholder="e.g., status_published">
                 </div>
                 <div class="fg">
-                  <div class="fl">Author</div><input class="fi" id="fb-col-author" type="text"
-                    placeholder="e.g., page_name">
+                  <div class="fl">Status Type</div><input class="fi" id="fb-col-type" type="text"
+                    value="status_type" placeholder="e.g., status_type">
                 </div>
                 <div class="fg">
                   <div class="fl">ID Column</div><input class="fi" id="fb-col-id" type="text"
-                    placeholder="e.g., post_id">
+                    value="status_id" placeholder="e.g., status_id">
                 </div>
               </div>
-              <div class="g2">
+              <div class="g3">
                 <div class="fg">
-                  <div class="fl">Likes Column</div><input class="fi" id="fb-col-likes" type="text"
-                    placeholder="e.g., likes">
+                  <div class="fl">Likes</div><input class="fi" id="fb-col-likes" type="text"
+                    value="num_likes" placeholder="e.g., num_likes">
                 </div>
                 <div class="fg">
-                  <div class="fl">Replies Column</div><input class="fi" id="fb-col-replies" type="text"
-                    placeholder="e.g., comments">
+                  <div class="fl">Comments</div><input class="fi" id="fb-col-replies" type="text"
+                    value="num_comments" placeholder="e.g., num_comments">
                 </div>
                 <div class="fg">
-                  <div class="fl">Shares Column</div><input class="fi" id="fb-col-shares" type="text"
-                    placeholder="e.g., shares">
+                  <div class="fl">Shares</div><input class="fi" id="fb-col-shares" type="text"
+                    value="num_shares" placeholder="e.g., num_shares">
+                </div>
+              </div>
+              <div class="g3">
+                <div class="fg">
+                  <div class="fl">Total Reactions</div><input class="fi" id="fb-col-reactions" type="text"
+                    value="num_reactions" placeholder="e.g., num_reactions">
                 </div>
                 <div class="fg">
-                  <div class="fl">Dislikes</div><input class="fi" id="fb-col-dislikes" type="text"
-                    placeholder="e.g., dislikes">
+                  <div class="fl">Status Link</div><input class="fi" id="fb-col-link" type="text"
+                    value="status_link" placeholder="e.g., status_link">
+                </div>
+                <div class="fg">
+                  <div class="fl">Category</div><input class="fi" id="fb-col-cat" type="text"
+                    value="category" placeholder="e.g., category">
                 </div>
               </div>
               <div class="fg">
@@ -2996,7 +3006,7 @@
                 </div>
                 <div style="display:flex;flex-direction:column;gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Text column</div><input class="fi" type="text" id="tw-col-text" value="text"
+                    <div class="fl">Text column</div><input class="fi" type="text" id="tw-col-text" value="tweet"
                       placeholder="text / tweet / content">
                   </div>
                   <div class="fg">
@@ -4751,14 +4761,16 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
       j.facebookMeta = {
         col_text: document.getElementById('fb-col-text').value,
         col_time: document.getElementById('fb-col-time').value,
-        col_author: document.getElementById('fb-col-author').value,
+        col_type: document.getElementById('fb-col-type').value,
         id_column: document.getElementById('fb-col-id').value,
         processing_type: document.getElementById('fb-kaggle-type').value,
         custom_prompt: document.getElementById('fb-kaggle-prompt').value,
         col_likes: document.getElementById('fb-col-likes').value,
         col_replies: document.getElementById('fb-col-replies').value,
         col_shares: document.getElementById('fb-col-shares').value,
-        col_dislikes: document.getElementById('fb-col-dislikes').value,
+        col_reactions: document.getElementById('fb-col-reactions').value,
+        col_link: document.getElementById('fb-col-link').value,
+        col_cat: document.getElementById('fb-col-cat').value,
         custom_cols: document.getElementById('fb-col-custom').value,
         extract_all: document.getElementById('fb-extract-all').checked
       };
