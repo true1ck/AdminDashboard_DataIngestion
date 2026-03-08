@@ -7,7 +7,7 @@
 echo "🛑 Stopping all NetaBoard services..."
 
 # Ports used by NetaBoard ecosystem
-PORTS=(3000 4000 5001 6060 7070 8000 5180 5181)
+PORTS=(3000 4000 5001 6060 7070 8000 5180 5181 5555)
 
 for PORT in "${PORTS[@]}"
 do
