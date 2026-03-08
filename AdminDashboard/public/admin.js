@@ -106,6 +106,10 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item => {
         item.classList.add('active');
         const v = document.getElementById('v-' + item.dataset.view);
         if (v) v.classList.add('active');
+
+        if (item.dataset.view === 'preprocessing') {
+            loadDataCollectedFolder();
+        }
     });
 });
 
@@ -382,6 +386,7 @@ function updateStats() {
     // Synchronize UI if progress updates occurred
     if (typeof renderYtVideos === 'function') renderYtVideos();
     if (typeof renderYtPlaylists === 'function') renderYtPlaylists();
+    if (typeof renderPdfCards === 'function') renderPdfCards();
 }
 
 function updateNavBadge(sourceType) {
@@ -908,6 +913,9 @@ async function processPdfJob(j) {
             j.itemsProcessed = 1;
             j.totalItems = 1;
 
+            j.extractedPyMuPDF = d.result_pymupdf;
+            j.extractedQwen = d.result_qwen;
+
             await apiPut(`/api/jobs/${j.id}`, {
                 status: 'done',
                 progress: 100,
@@ -1069,6 +1077,20 @@ function regenToken(id) {
 }
 
 /* ═══ DATABASE ═══ */
+function autoFillPrisma() {
+    const pgBtn = document.getElementById('db-btn-pg');
+    if (pgBtn) dbSelectType(pgBtn, 'pg', '5432', '');
+    document.getElementById('db-host').value = 'ep-bold-sun-a8jpixb6-pooler.eastus2.azure.neon.tech';
+    document.getElementById('db-port').value = '5432';
+    document.getElementById('db-name').value = 'neondb';
+    document.getElementById('db-user').value = 'neondb_owner';
+
+    const pInput = document.getElementById('db-pass');
+    if (pInput) pInput.value = 'npg_EmIV5WQi3bGr';
+
+    qLog('ok', 'Prisma Database credentials auto-filled successfully.');
+}
+
 let dbType = 'sqlite';
 let dbPrismaStudioOpen = false;
 
@@ -1334,3 +1356,243 @@ window.addEventListener('DOMContentLoaded', () => {
     renderKaggle();
     loadState(); // Restore state from SQLite on load
 });
+
+// PDF Helper Functions
+function renderPdfCards() {
+    let section = document.getElementById('pdf-job-section');
+    if (!section) {
+        const vPdfs = document.getElementById('v-pdfs');
+        if (vPdfs) {
+            const vscroll = vPdfs.querySelector('.vscroll');
+            if (vscroll) {
+                const markup = `
+                  <div id="pdf-job-section" style="display:none; margin-top:1.5rem;">
+                    <div class="card" style="width:100%;">
+                      <div class="card-hdr" style="justify-content:space-between;">
+                        <div class="card-title"><span class="icon">📄</span> <span id="pdf-job-count">0 Document Jobs</span></div>
+                      </div>
+                      <div class="card-body p0" id="pdf-job-list"></div>
+                    </div>
+                  </div>
+                `;
+                vscroll.insertAdjacentHTML('beforeend', markup);
+                section = document.getElementById('pdf-job-section');
+            }
+        }
+    }
+
+    if (!section) return; // if STILL nothing, give up
+
+    const container = document.getElementById('pdf-job-list');
+    const countSpan = document.getElementById('pdf-job-count');
+    if (!container) return;
+
+    const pdfJobs = jobs.filter(j => j.sourceType === 'pdf');
+    if (pdfJobs.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+    section.style.display = 'block';
+
+    if (countSpan) countSpan.textContent = `${pdfJobs.length} Document Jobs`;
+
+    container.innerHTML = pdfJobs.map(j => {
+        const isDone = j.status === 'done';
+        const isFail = j.status === 'failed';
+        const isProc = j.status === 'processing';
+
+        let dot = 'dot-x';
+        let txt = 'Queued';
+        if (isDone) { dot = 'dot-g'; txt = 'Done'; }
+        else if (isFail) { dot = 'dot-r'; txt = 'Failed'; }
+        else if (isProc) { dot = 'dot-b'; txt = 'Processing'; }
+        else if (j.status === 'paused') { dot = 'dot-a'; txt = 'Paused'; }
+
+        let pg = j.progress || 0;
+
+        let resBtn = '';
+        if (isDone && (j.extractedPyMuPDF || j.extractedQwen)) {
+            resBtn = `<button class="btn btn-xs btn-outline" style="margin-left:0.5rem; border-color:var(--cyan3); color:var(--cyan); border-radius:4px; padding:0.1rem 0.4rem;" onclick="showPdfPreview(${j.id})">Preview Text 👁️</button>`;
+        }
+
+        let cancelBtn = `<button class="btn btn-xs btn-outline" style="border-radius:4px;" onclick="removeJob(${j.id})">Remove</button>`;
+
+        return `
+        <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border2); display:flex; flex-direction:column; gap:0.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div style="font-weight:600; font-size:0.85rem; color:var(--text); margin-bottom:0.2rem;">📄 ${j.name}</div>
+                    <div style="display:flex; align-items:center; gap:0.5rem; font-family:var(--mono); font-size:0.75rem; color:var(--text3);">
+                       <span class="dot ${dot}"></span> ${txt}
+                       ${isProc || isDone ? ` • ${pg}%` : ''}
+                       ${resBtn}
+                    </div>
+                </div>
+                <div>${cancelBtn}</div>
+            </div>
+            ${!isDone && !isFail ? `
+            <div class="prog-track" style="height:3px;">
+                <div class="prog-fill" style="width:${pg}%; background:var(--cyan); ${isProc ? 'animation:pulse 1.5s infinite;' : ''}"></div>
+            </div>` : ''}
+        </div>
+        `;
+    }).join('');
+}
+
+function showPdfPreview(jobId) {
+    const j = jobs.find(x => x.id === jobId);
+    if (!j) return;
+
+    let modal = document.getElementById('pdf-text-modal');
+    if (!modal) {
+        document.body.insertAdjacentHTML('beforeend', `
+          <div id="pdf-text-modal" class="modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.85); align-items:center; justify-content:center;">
+            <div style="background:var(--bg1); border:1px solid var(--border); border-radius:var(--radius); width:90%; max-width:800px; display:flex; flex-direction:column; max-height:85vh; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+              <div style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--bg2);">
+                <div style="font-weight:600; color:var(--text); letter-spacing:0.02em; display:flex; align-items:center; gap:0.5rem;"><span style="font-size:1.1rem;">📄</span> Extracted Document Text</div>
+                <button class="btn btn-xs" style="padding:0.2rem 0.5rem; border-radius:4px; border-color:transparent;" onclick="document.getElementById('pdf-text-modal').style.display='none'">✕ Close</button>
+              </div>
+              <div style="padding:1rem; display:flex; flex-direction:column; flex:1; overflow:hidden;">
+                <div id="pdf-modal-tabs" style="display:flex; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid var(--border2); padding-bottom:0.75rem;">
+                  <button class="btn btn-sm btn-primary" id="btn-pymupdf-tab" onclick="switchPdfModalTab('pymupdf')" style="border-radius:4px;">PyMuPDF Text</button>
+                  <button class="btn btn-sm btn-outline" id="btn-qwen-tab" onclick="switchPdfModalTab('qwen')" style="border-radius:4px;">Qwen Vision OCR</button>
+                </div>
+                <div id="modal-pymupdf-text" style="flex:1; overflow-y:auto; white-space:pre-wrap; display:block; background:var(--bg); border:1px solid var(--border2); border-radius:4px; padding:1rem; font-family:var(--mono); font-size:0.75rem; color:var(--text2); line-height:1.6;"></div>
+                <div id="modal-qwen-text" style="flex:1; overflow-y:auto; white-space:pre-wrap; display:none; background:var(--bg); border:1px solid var(--border2); border-radius:4px; padding:1rem; font-family:var(--mono); font-size:0.75rem; color:var(--text2); line-height:1.6;"></div>
+              </div>
+            </div>
+          </div>
+        `);
+        modal = document.getElementById('pdf-text-modal');
+    }
+
+    const pyText = document.getElementById('modal-pymupdf-text');
+    const qwenText = document.getElementById('modal-qwen-text');
+    const btnPy = document.getElementById('btn-pymupdf-tab');
+    const btnQwen = document.getElementById('btn-qwen-tab');
+
+    if (j.extractedPyMuPDF) {
+        pyText.textContent = j.extractedPyMuPDF;
+        pyText.style.display = 'block';
+        btnPy.style.display = 'block';
+    } else {
+        pyText.style.display = 'none';
+        btnPy.style.display = 'none';
+    }
+
+    if (j.extractedQwen) {
+        qwenText.textContent = j.extractedQwen;
+        qwenText.style.display = 'none';
+        btnQwen.style.display = 'block';
+    } else {
+        qwenText.style.display = 'none';
+        btnQwen.style.display = 'none';
+    }
+
+    if (j.extractedPyMuPDF) {
+        switchPdfModalTab('pymupdf');
+    } else if (j.extractedQwen) {
+        switchPdfModalTab('qwen');
+    } else {
+        pyText.textContent = "No text extracted.";
+        pyText.style.display = 'block';
+        btnPy.style.display = 'block';
+        switchPdfModalTab('pymupdf');
+    }
+
+    document.getElementById('pdf-text-modal').style.display = 'flex';
+}
+
+function switchPdfModalTab(tab) {
+    const btnPy = document.getElementById('btn-pymupdf-tab');
+    const btnQwen = document.getElementById('btn-qwen-tab');
+    const pyText = document.getElementById('modal-pymupdf-text');
+    const qwenText = document.getElementById('modal-qwen-text');
+
+    if (tab === 'pymupdf') {
+        btnPy.className = 'btn btn-sm btn-primary';
+        btnQwen.className = 'btn btn-sm btn-outline';
+        pyText.style.display = 'block';
+        qwenText.style.display = 'none';
+    } else {
+        btnPy.className = 'btn btn-sm btn-outline';
+        btnQwen.className = 'btn btn-sm btn-primary';
+        pyText.style.display = 'none';
+        qwenText.style.display = 'block';
+    }
+}
+
+// DataCollected Preprocessing Helper Functions
+async function loadDataCollectedFolder() {
+    const treeEl = document.getElementById('data-col-tree');
+    if (!treeEl) return;
+
+    treeEl.innerHTML = '<div style="color:var(--text4); padding:0.5rem;">Loading data...</div>';
+
+    try {
+        const res = await fetch('/api/fs/datacollected');
+        const data = await res.json();
+
+        if (!data.files || data.files.length === 0) {
+            treeEl.innerHTML = '<div style="color:var(--text4); padding:0.5rem;">No files found in DataCollected foldler.</div>';
+            return;
+        }
+
+        // Group by folder
+        const grouped = {};
+        data.files.forEach(f => {
+            const parts = f.path.split('/');
+            const folderName = parts.length > 1 ? parts[0] : 'root';
+            if (!grouped[folderName]) grouped[folderName] = [];
+            grouped[folderName].push(f);
+        });
+
+        // Render
+        let html = '';
+        for (const [folder, files] of Object.entries(grouped)) {
+            html += `<div style="margin-bottom:0.75rem;">
+                <div style="font-weight:600; color:var(--text); margin-bottom:0.2rem; cursor:pointer;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none';">📁 ${folder}</div>
+                <div style="padding-left:1rem;">
+                    ${files.map(f => {
+                const kb = (f.size / 1024).toFixed(1);
+                return `<div style="padding:0.2rem 0; cursor:pointer; color:var(--text2);" 
+                                  onmouseover="this.style.color='var(--cyan)'" 
+                                  onmouseout="this.style.color='var(--text2)'"
+                                  onclick="openDataCollectedFile('${f.path}')" title="${f.name}">
+                                📄 ${f.name} <span style="font-size:0.6rem; color:var(--text4); margin-left:4px;">(${kb} KB)</span>
+                              </div>`;
+            }).join('')}
+                </div>
+            </div>`;
+        }
+        treeEl.innerHTML = html;
+
+    } catch (e) {
+        treeEl.innerHTML = `<div style="color:var(--red); padding:0.5rem;">Error loading data: ${e.message}</div>`;
+    }
+}
+
+async function openDataCollectedFile(path) {
+    const hdr = document.getElementById('data-col-hdr');
+    const preview = document.getElementById('data-col-preview');
+    if (!hdr || !preview) return;
+
+    hdr.textContent = `Loading: ${path}...`;
+    preview.value = 'Loading contents...';
+
+    try {
+        const res = await fetch(`/api/fs/datacollected/file?path=${encodeURIComponent(path)}`);
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to load file');
+        }
+
+        const content = await res.text();
+        hdr.innerHTML = `Viewing: <strong>${path}</strong>`;
+        preview.value = content;
+
+    } catch (e) {
+        hdr.textContent = `Error: ${path}`;
+        preview.value = `Error loading file: ${e.message}`;
+    }
+}
