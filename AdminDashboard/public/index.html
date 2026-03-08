@@ -2006,6 +2006,332 @@
         opacity: 0.5;
       }
     }
+
+    /* ══════════════════════════════════════════
+       PREPROVING — NRI PIPELINE TAB
+    ══════════════════════════════════════════ */
+    .nri-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .nri-stat-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.85rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      transition: border-color 0.2s;
+    }
+
+    .nri-stat-card:hover {
+      border-color: var(--border2);
+    }
+
+    .nri-stat-label {
+      font-family: var(--mono);
+      font-size: 0.42rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text4);
+    }
+
+    .nri-stat-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .nri-stat-sub {
+      font-family: var(--mono);
+      font-size: 0.46rem;
+      color: var(--text4);
+    }
+
+    .nri-stat-card.accent-green {
+      border-left: 3px solid var(--green);
+    }
+
+    .nri-stat-card.accent-blue {
+      border-left: 3px solid var(--blue);
+    }
+
+    .nri-stat-card.accent-amber {
+      border-left: 3px solid var(--amber);
+    }
+
+    .nri-stat-card.accent-red {
+      border-left: 3px solid var(--red);
+    }
+
+    .nri-stat-card.accent-cyan {
+      border-left: 3px solid var(--cyan);
+    }
+
+    .nri-stat-card.accent-purple {
+      border-left: 3px solid #a78bfa;
+    }
+
+    /* File Table */
+    .nri-file-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 0.52rem;
+    }
+
+    .nri-file-table th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.43rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text4);
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border2);
+      white-space: nowrap;
+    }
+
+    .nri-file-table td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text2);
+      vertical-align: middle;
+    }
+
+    .nri-file-table tr:hover td {
+      background: rgba(0, 217, 255, 0.03);
+    }
+
+    .nri-file-table tr.selected td {
+      background: rgba(0, 217, 255, 0.06);
+    }
+
+    .nri-state-badge {
+      display: inline-block;
+      padding: 0.18rem 0.5rem;
+      border-radius: 3px;
+      font-size: 0.42rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .nri-state-pending {
+      background: rgba(100, 100, 100, 0.15);
+      color: var(--text4);
+    }
+
+    .nri-state-queued {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--amber);
+    }
+
+    .nri-state-processing {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--blue);
+      animation: progPulse 1.5s infinite;
+    }
+
+    .nri-state-done {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--green);
+    }
+
+    .nri-state-failed {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--red);
+    }
+
+    /* Pillar score bar */
+    .pillar-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .pillar-bar-name {
+      font-family: var(--mono);
+      font-size: 0.44rem;
+      color: var(--text3);
+      width: 140px;
+      flex-shrink: 0;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .pillar-bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--bg4);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .pillar-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .pillar-bar-skipped {
+      opacity: 0.3;
+    }
+
+    .pillar-bar-value {
+      font-family: var(--mono);
+      font-size: 0.46rem;
+      color: var(--text3);
+      width: 38px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .pillar-rel-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Score heatmap grid */
+    .nri-heatmap {
+      display: grid;
+      grid-template-columns: 140px repeat(15, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      font-family: var(--mono);
+      font-size: 0.38rem;
+    }
+
+    .nri-hm-cell {
+      background: var(--bg3);
+      padding: 0.3rem 0.2rem;
+      text-align: center;
+      transition: background 0.2s;
+    }
+
+    .nri-hm-hdr {
+      background: var(--bg4);
+      padding: 0.35rem 0.2rem;
+      font-size: 0.35rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text4);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      height: 60px;
+    }
+
+    .nri-hm-file {
+      background: var(--bg4);
+      padding: 0.3rem 0.5rem;
+      text-align: left;
+      color: var(--text3);
+      font-size: 0.42rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Queue table styles */
+    .nri-queue-row td:first-child {
+      padding-left: 1rem;
+    }
+
+    .nri-priority-badge {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 18px;
+      font-size: 0.46rem;
+      font-weight: 700;
+    }
+
+    .nri-p-high {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--red);
+    }
+
+    .nri-p-normal {
+      background: rgba(59, 130, 246, 0.2);
+      color: var(--blue);
+    }
+
+    .nri-p-low {
+      background: rgba(100, 100, 100, 0.15);
+      color: var(--text4);
+    }
+
+    /* Score detail panel */
+    .nri-score-detail {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+
+    .nri-score-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+    }
+
+    .nri-score-pill {
+      background: var(--bg4);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.65rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .nri-score-pill:hover {
+      border-color: var(--border2);
+      background: var(--bg3);
+    }
+
+    .nri-score-pill.relevant {
+      border-color: rgba(0, 217, 255, 0.3);
+    }
+
+    .nri-score-pill.skipped {
+      opacity: 0.45;
+    }
+
+    .nri-sp-pillar {
+      font-family: var(--mono);
+      font-size: 0.42rem;
+      letter-spacing: 0.08em;
+      color: var(--text4);
+      text-transform: uppercase;
+    }
+
+    .nri-sp-score {
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .nri-sp-rel {
+      font-family: var(--mono);
+      font-size: 0.4rem;
+      color: var(--text4);
+    }
   </style>
 </head>
 
@@ -2127,6 +2453,12 @@
       <div class="nav-item" data-view="preprocessing" title="Data Visualization">
         <div class="nav-ico">🧠</div>
         <div class="nav-lbl">Data Visualization</div>
+      </div>
+
+      <div class="nav-item" data-view="preproving" title="NRI Pre-Processing & Scoring">
+        <div class="nav-ico">🎯</div>
+        <div class="nav-lbl">PreProving</div>
+        <div class="nav-badge" id="nb-nri" style="display:none">0</div>
       </div>
 
       <div class="nav-item" data-view="servers" title="Node Server Management">
@@ -3646,6 +3978,269 @@
         </div>
       </div>
 
+
+      <!-- ██ PREPROVING — NRI SCORING PIPELINE ██ -->
+      <div class="view" id="v-preproving">
+        <div class="vhdr">
+          <div class="vhdr-left">
+            <div class="vhdr-title"><span class="src-icon">🎯</span> PreProving — NRI Scoring Pipeline</div>
+            <div class="vhdr-sub">File-wise processing, queue management, score visualisation · All scores persisted in
+              SQLite</div>
+          </div>
+          <div class="vhdr-actions">
+            <button class="btn btn-outline btn-sm" id="btn-nri-scan" onclick="nriScanFiles(this)">🔍 Scan
+              DataCollected</button>
+            <button class="btn btn-outline btn-sm" onclick="nriLoadAll()">⟲ Refresh</button>
+            <button class="btn btn-primary btn-sm" id="btn-nri-queue-all" onclick="nriQueueAll(this)">▶ Queue All
+              Pending</button>
+          </div>
+        </div>
+        <div class="vscroll">
+
+          <!-- ─── Stats Row ─── -->
+          <div class="nri-stat-grid">
+            <div class="nri-stat-card accent-cyan">
+              <div class="nri-stat-label">Total Files</div>
+              <div class="nri-stat-value" id="nri-total">0</div>
+              <div class="nri-stat-sub">discovered</div>
+            </div>
+            <div class="nri-stat-card accent-amber">
+              <div class="nri-stat-label">Queued</div>
+              <div class="nri-stat-value" id="nri-queued">0</div>
+              <div class="nri-stat-sub">waiting to score</div>
+            </div>
+            <div class="nri-stat-card accent-blue">
+              <div class="nri-stat-label">Processing</div>
+              <div class="nri-stat-value" id="nri-processing">0</div>
+              <div class="nri-stat-sub">scoring now</div>
+            </div>
+            <div class="nri-stat-card accent-green">
+              <div class="nri-stat-label">Done</div>
+              <div class="nri-stat-value" id="nri-done">0</div>
+              <div class="nri-stat-sub">scored successfully</div>
+            </div>
+            <div class="nri-stat-card accent-red">
+              <div class="nri-stat-label">Failed</div>
+              <div class="nri-stat-value" id="nri-failed">0</div>
+              <div class="nri-stat-sub">errors</div>
+            </div>
+            <div class="nri-stat-card accent-purple">
+              <div class="nri-stat-label">Total Scores</div>
+              <div class="nri-stat-value" id="nri-scores-cnt">0</div>
+              <div class="nri-stat-sub">pillar hits stored</div>
+            </div>
+            <div class="nri-stat-card accent-green">
+              <div class="nri-stat-label">Avg Score</div>
+              <div class="nri-stat-value" id="nri-avg-score">—</div>
+              <div class="nri-stat-sub">across relevant pillars</div>
+            </div>
+            <div class="nri-stat-card accent-blue">
+              <div class="nri-stat-label">Pending</div>
+              <div class="nri-stat-value" id="nri-pending">0</div>
+              <div class="nri-stat-sub">not yet queued</div>
+            </div>
+          </div>
+
+          <!-- ─── Main layout: Files + Detail ─── -->
+          <div style="display:grid;grid-template-columns:1fr 360px;gap:1rem;">
+
+            <!-- Left: Files + Queue -->
+            <div style="display:flex;flex-direction:column;gap:1rem;min-height:0;">
+
+              <!-- Queue Panel -->
+              <div class="card">
+                <div class="card-hdr">
+                  <div class="card-title"><span class="icon">🗂</span> Processing Queue
+                    <span class="tag tag-a" id="nri-queue-count" style="margin-left:0.5rem;">0 items</span>
+                  </div>
+                  <div style="display:flex;gap:0.4rem;align-items:center;">
+                    <button class="btn btn-xs btn-outline" onclick="nriLoadQueue()">⟲</button>
+                    <button class="btn btn-xs btn-danger" onclick="nriClearQueue()"
+                      title="Clear completed queue items">✕ Clear Done</button>
+                  </div>
+                </div>
+                <div class="card-body p0" style="max-height:240px;overflow-y:auto;">
+                  <table class="nri-file-table" id="nri-queue-table">
+                    <thead>
+                      <tr>
+                        <th style="width:22px;"></th>
+                        <th>Filename</th>
+                        <th>Folder</th>
+                        <th>Platform</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Queued</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="nri-queue-body">
+                      <tr>
+                        <td colspan="8" style="text-align:center;color:var(--text4);padding:1rem;">Click Refresh to load
+                          queue</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- File Registry Panel -->
+              <div class="card" style="flex:1;">
+                <div class="card-hdr">
+                  <div class="card-title"><span class="icon">📁</span> File Registry
+                    <span class="tag tag-b" id="nri-files-count" style="margin-left:0.5rem;">0 files</span>
+                  </div>
+                  <div style="display:flex;gap:0.4rem;align-items:center;">
+                    <select class="fs" id="nri-filter-state" onchange="nriFilterFiles(this.value)"
+                      style="height:28px;font-family:var(--mono);font-size:0.52rem;">
+                      <option value="all">All States</option>
+                      <option value="pending">Pending</option>
+                      <option value="queued">Queued</option>
+                      <option value="processing">Processing</option>
+                      <option value="done">Done</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                    <input class="fi" id="nri-file-search" style="height:28px;font-size:0.52rem;max-width:150px;"
+                      placeholder="Search filename…" oninput="nriSearchFiles(this.value)">
+                    <button class="btn btn-xs btn-outline" onclick="nriSelectAll()">☑ All</button>
+                    <button class="btn btn-xs btn-primary" onclick="nriQueueSelected()">▶ Queue Selected</button>
+                  </div>
+                </div>
+                <div class="card-body p0" style="overflow-y:auto;max-height:400px;">
+                  <table class="nri-file-table" id="nri-files-table">
+                    <thead>
+                      <tr>
+                        <th style="width:30px;"><input type="checkbox" id="nri-chk-all"
+                            onchange="nriCheckAll(this.checked)"></th>
+                        <th>Filename</th>
+                        <th>Folder / Platform</th>
+                        <th>Size</th>
+                        <th>Pillars Scored</th>
+                        <th>Avg Score</th>
+                        <th>State</th>
+                        <th>Discovered</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="nri-files-body">
+                      <tr>
+                        <td colspan="9" style="text-align:center;color:var(--text4);padding:1.5rem;">Scan DataCollected
+                          folder to discover files</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div><!-- /Left -->
+
+            <!-- Right: Score Detail Panel -->
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+              <div class="card" style="flex:1;">
+                <div class="card-hdr">
+                  <div class="card-title"><span class="icon">📊</span> Score Detail</div>
+                </div>
+                <div class="card-body" id="nri-score-panel" style="overflow-y:auto;max-height:calc(100vh-280px);">
+                  <div
+                    style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:2rem 1rem;">
+                    Click a file row to view its pillar scores
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sidebar info box: dedup notice -->
+              <div class="card" style="border-color:rgba(0,217,255,0.2);">
+                <div class="card-body">
+                  <div style="font-size:0.58rem;font-weight:600;color:var(--cyan);margin-bottom:0.5rem;">🛡️ Dedup
+                    Protection</div>
+                  <div style="font-family:var(--mono);font-size:0.48rem;color:var(--text4);line-height:1.6;">
+                    Each file is fingerprinted by its full path.<br>
+                    Scanning will <strong style="color:var(--text3);">never re-register</strong> the same file.<br>
+                    Queue will <strong style="color:var(--text3);">skip already-done</strong> files.
+                  </div>
+                  <div style="margin-top:0.75rem;display:flex;gap:0.4rem;flex-wrap:wrap;">
+                    <span class="nri-state-badge nri-state-pending">pending</span>
+                    <span class="nri-state-badge nri-state-queued">queued</span>
+                    <span class="nri-state-badge nri-state-processing">scoring</span>
+                    <span class="nri-state-badge nri-state-done">done</span>
+                    <span class="nri-state-badge nri-state-failed">failed</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Manual Score Entry -->
+              <div class="card">
+                <div class="card-hdr">
+                  <div class="card-title"><span class="icon">✏️</span> Manual Score Entry</div>
+                </div>
+                <div class="card-body" style="display:flex;flex-direction:column;gap:0.55rem;">
+                  <div class="info-box info" style="font-size:0.48rem;">Enter scores manually or POST from your Python
+                    scoring pipeline</div>
+                  <div class="fg">
+                    <div class="fl">File ID</div>
+                    <input class="fi" id="ms-file-id" type="number" placeholder="File ID from registry">
+                  </div>
+                  <div class="fg">
+                    <div class="fl">Pillar</div>
+                    <select class="fs" id="ms-pillar">
+                      <option value="electoral_strength">Electoral Strength</option>
+                      <option value="legislative_performance">Legislative Performance</option>
+                      <option value="constituency_development">Constituency Development</option>
+                      <option value="public_accessibility">Public Accessibility</option>
+                      <option value="communication">Communication</option>
+                      <option value="party_standing">Party Standing</option>
+                      <option value="media_coverage">Media Coverage</option>
+                      <option value="digital_influence">Digital Influence</option>
+                      <option value="financial_muscle">Financial Muscle</option>
+                      <option value="alliance_intel">Alliance Intel</option>
+                      <option value="caste_equation">Caste Equation</option>
+                      <option value="anti_incumbency">Anti-Incumbency</option>
+                      <option value="grassroots_network">Grassroots Network</option>
+                      <option value="ideology_consistency">Ideology Consistency</option>
+                      <option value="scandal_index">Scandal Index</option>
+                    </select>
+                  </div>
+                  <div class="g2" style="gap:0.5rem;">
+                    <div class="fg">
+                      <div class="fl">Relevance (0–1)</div>
+                      <input class="fi" id="ms-relevance" type="number" step="0.01" min="0" max="1"
+                        placeholder="0.0–1.0">
+                    </div>
+                    <div class="fg">
+                      <div class="fl">Score (0–100)</div>
+                      <input class="fi" id="ms-score" type="number" min="0" max="100" placeholder="0–100">
+                    </div>
+                  </div>
+                  <div class="fg">
+                    <div class="fl">Evidence (optional)</div>
+                    <input class="fi" id="ms-evidence" type="text" placeholder="Supporting quote or reason">
+                  </div>
+                  <button class="btn btn-primary btn-sm" onclick="nriSubmitManualScore()">✓ Save Score to DB</button>
+                </div>
+              </div>
+            </div><!-- /Right -->
+
+          </div><!-- /grid -->
+
+          <!-- Score Heatmap (full width) -->
+          <div class="card" style="margin-top:1rem;">
+            <div class="card-hdr">
+              <div class="card-title"><span class="icon">🔥</span> File × Pillar Relevance Heatmap</div>
+              <div style="display:flex;gap:0.4rem;">
+                <button class="btn btn-xs btn-outline" onclick="nriLoadHeatmap()">⟲ Load Heatmap</button>
+              </div>
+            </div>
+            <div class="card-body p0" style="overflow:auto;max-height:350px;">
+              <div id="nri-heatmap-container">
+                <div
+                  style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:1.5rem;">
+                  Click "Load Heatmap" to render File × Pillar relevance matrix
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /vscroll -->
+      </div><!-- /v-preproving -->
 
       <!-- ██ SERVERS MANAGEMENT ██ -->
       <div class="view" id="v-servers">

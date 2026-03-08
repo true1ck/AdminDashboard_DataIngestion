@@ -95,6 +95,58 @@ async function initDb() {
     mapping_json  TEXT,
     created_at    TEXT DEFAULT (datetime('now'))
   )`);
+
+    // ── NRI Pre-Processing Pipeline Tables ──
+    await run(`CREATE TABLE IF NOT EXISTS nri_files (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    filepath          TEXT NOT NULL UNIQUE,
+    filename          TEXT NOT NULL,
+    folder            TEXT NOT NULL,
+    platform          TEXT DEFAULT 'unknown',
+    file_size_bytes   INTEGER DEFAULT 0,
+    fingerprint       TEXT NOT NULL UNIQUE,
+    processing_state  TEXT DEFAULT 'pending',
+    relevance_scored  INTEGER DEFAULT 0,
+    pillar_scored     INTEGER DEFAULT 0,
+    pillars_relevant  INTEGER DEFAULT 0,
+    pillars_scored    INTEGER DEFAULT 0,
+    avg_relevance     REAL DEFAULT 0,
+    avg_score         REAL DEFAULT 0,
+    error_msg         TEXT,
+    discovered_at     TEXT DEFAULT (datetime('now')),
+    queued_at         TEXT,
+    started_at        TEXT,
+    completed_at      TEXT
+  )`);
+
+    await run(`CREATE TABLE IF NOT EXISTS nri_file_scores (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id         INTEGER NOT NULL,
+    filepath        TEXT NOT NULL,
+    pillar          TEXT NOT NULL,
+    relevance_score REAL DEFAULT 0,
+    is_relevant     INTEGER DEFAULT 0,
+    raw_score       REAL,
+    effective_score REAL,
+    confidence      REAL,
+    evidence        TEXT,
+    scored_at       TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (file_id) REFERENCES nri_files(id),
+    UNIQUE(file_id, pillar)
+  )`);
+
+    await run(`CREATE TABLE IF NOT EXISTS nri_queue (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id         INTEGER NOT NULL UNIQUE,
+    filepath        TEXT NOT NULL,
+    priority        INTEGER DEFAULT 5,
+    status          TEXT DEFAULT 'queued',
+    enqueued_at     TEXT DEFAULT (datetime('now')),
+    started_at      TEXT,
+    completed_at    TEXT,
+    error_msg       TEXT,
+    FOREIGN KEY (file_id) REFERENCES nri_files(id)
+  )`);
 }
 
 // Initialize on load
@@ -229,6 +281,131 @@ async function deleteSavedQuery(id) {
     await run(`DELETE FROM saved_queries WHERE id = ?`, [id]);
 }
 
+// ═══════════════════════════════════
+//  NRI PRE-PROCESSING PIPELINE
+// ═══════════════════════════════════
+
+// Compute a simple fingerprint from filepath (deterministic dedup)
+function fpHash(filepath) {
+    let hash = 0;
+    for (let i = 0; i < filepath.length; i++) {
+        const c = filepath.charCodeAt(i);
+        hash = ((hash << 5) - hash) + c;
+        hash |= 0;
+    }
+    return Math.abs(hash).toString(16).padStart(16, '0');
+}
+
+async function nriDiscoverFile(data) {
+    const fp = fpHash(data.filepath);
+    // Upsert — skip if fingerprint already exists
+    const existing = await get(`SELECT id, processing_state FROM nri_files WHERE fingerprint = ?`, [fp]);
+    if (existing) return { existing: true, file: existing };
+    const { lastID } = await run(
+        `INSERT INTO nri_files (filepath, filename, folder, platform, file_size_bytes, fingerprint)
+         VALUES (?,?,?,?,?,?)`,
+        [data.filepath, data.filename, data.folder || '', data.platform || 'unknown', data.fileSizeBytes || 0, fp]
+    );
+    return { existing: false, file: await get(`SELECT * FROM nri_files WHERE id=?`, [lastID]) };
+}
+
+async function nriGetFiles(filter = 'all') {
+    let sql = `SELECT f.*, 
+        (SELECT COUNT(*) FROM nri_queue q WHERE q.file_id = f.id AND q.status = 'queued') as in_queue
+        FROM nri_files f ORDER BY f.discovered_at DESC`;
+    const rows = await all(sql);
+    if (filter === 'all') return rows;
+    return rows.filter(r => r.processing_state === filter);
+}
+
+async function nriUpdateFile(id, data) {
+    const sets = [];
+    const vals = [];
+    ['processing_state', 'relevance_scored', 'pillar_scored', 'pillars_relevant', 'pillars_scored',
+        'avg_relevance', 'avg_score', 'error_msg', 'queued_at', 'started_at', 'completed_at'].forEach(k => {
+            const dk = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+            if (data[dk] !== undefined) { sets.push(`${k} = ?`); vals.push(data[dk]); }
+            if (data[k] !== undefined) { sets.push(`${k} = ?`); vals.push(data[k]); }
+        });
+    if (!sets.length) return get(`SELECT * FROM nri_files WHERE id=?`, [id]);
+    vals.push(id);
+    await run(`UPDATE nri_files SET ${[...new Set(sets)].join(', ')} WHERE id=?`, vals);
+    return get(`SELECT * FROM nri_files WHERE id=?`, [id]);
+}
+
+async function nriSaveScore(data) {
+    await run(
+        `INSERT OR REPLACE INTO nri_file_scores 
+         (file_id, filepath, pillar, relevance_score, is_relevant, raw_score, effective_score, confidence, evidence)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
+        [data.fileId, data.filepath, data.pillar, data.relevanceScore || 0,
+        data.isRelevant ? 1 : 0, data.rawScore ?? null, data.effectiveScore ?? null,
+        data.confidence ?? null, data.evidence || null]
+    );
+}
+
+async function nriGetScores(fileId) {
+    return all(`SELECT * FROM nri_file_scores WHERE file_id = ? ORDER BY pillar`, [fileId]);
+}
+
+async function nriGetAllScores(limit = 500) {
+    return all(
+        `SELECT s.*, f.filename, f.folder, f.platform, f.processing_state 
+         FROM nri_file_scores s JOIN nri_files f ON s.file_id = f.id 
+         ORDER BY s.scored_at DESC LIMIT ?`, [limit]);
+}
+
+async function nriEnqueue(fileId, filepath, priority = 5) {
+    // Prevent duplicate queue entries
+    const existing = await get(`SELECT * FROM nri_queue WHERE file_id=?`, [fileId]);
+    if (existing) return existing;
+    await run(
+        `INSERT INTO nri_queue (file_id, filepath, priority) VALUES (?,?,?)`,
+        [fileId, filepath, priority]
+    );
+    await run(`UPDATE nri_files SET queued_at=datetime('now'), processing_state='queued' WHERE id=?`, [fileId]);
+    return get(`SELECT * FROM nri_queue WHERE file_id=?`, [fileId]);
+}
+
+async function nriGetQueue(status = 'all') {
+    let sql = `SELECT q.*, f.filename, f.folder, f.platform, f.file_size_bytes, f.processing_state
+               FROM nri_queue q JOIN nri_files f ON q.file_id = f.id ORDER BY q.priority DESC, q.enqueued_at ASC`;
+    const rows = await all(sql);
+    if (status === 'all') return rows;
+    return rows.filter(r => r.status === status);
+}
+
+async function nriUpdateQueue(id, data) {
+    const sets = [];
+    const vals = [];
+    if (data.status !== undefined) { sets.push('status = ?'); vals.push(data.status); }
+    if (data.startedAt !== undefined) { sets.push('started_at = ?'); vals.push(data.startedAt); }
+    if (data.completedAt !== undefined) { sets.push('completed_at = ?'); vals.push(data.completedAt); }
+    if (data.errorMsg !== undefined) { sets.push('error_msg = ?'); vals.push(data.errorMsg); }
+    if (!sets.length) return;
+    vals.push(id);
+    await run(`UPDATE nri_queue SET ${sets.join(', ')} WHERE id=?`, vals);
+}
+
+async function nriRemoveFromQueue(fileId) {
+    await run(`DELETE FROM nri_queue WHERE file_id=?`, [fileId]);
+}
+
+async function nriGetStats() {
+    const total = await get(`SELECT COUNT(*) as cnt FROM nri_files`);
+    const pending = await get(`SELECT COUNT(*) as cnt FROM nri_files WHERE processing_state='pending'`);
+    const queued = await get(`SELECT COUNT(*) as cnt FROM nri_files WHERE processing_state='queued'`);
+    const processing = await get(`SELECT COUNT(*) as cnt FROM nri_files WHERE processing_state='processing'`);
+    const done = await get(`SELECT COUNT(*) as cnt FROM nri_files WHERE processing_state='done'`);
+    const failed = await get(`SELECT COUNT(*) as cnt FROM nri_files WHERE processing_state='failed'`);
+    const scores = await get(`SELECT COUNT(*) as cnt, AVG(effective_score) as avg_score FROM nri_file_scores WHERE is_relevant=1`);
+    return {
+        total: total.cnt, pending: pending.cnt, queued: queued.cnt,
+        processing: processing.cnt, done: done.cnt, failed: failed.cnt,
+        totalScores: scores.cnt, avgScore: scores.avg_score ? Math.round(scores.avg_score * 10) / 10 : 0
+    };
+}
+
 module.exports = {
     // Jobs
     createJob, updateJob, getJobs, deleteJob, clearDoneJobs,
@@ -241,4 +418,9 @@ module.exports = {
     appendLog, getRecentLogs,
     // Saved Queries
     createSavedQuery, getSavedQueries, deleteSavedQuery,
+    // NRI Pre-Processing Pipeline
+    nriDiscoverFile, nriGetFiles, nriUpdateFile,
+    nriSaveScore, nriGetScores, nriGetAllScores,
+    nriEnqueue, nriGetQueue, nriUpdateQueue, nriRemoveFromQueue, nriGetStats,
+    fpHash,
 };

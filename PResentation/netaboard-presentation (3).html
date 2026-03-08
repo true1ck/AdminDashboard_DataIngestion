@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetaBoard — Media Intelligence Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0a0a0f;
+    --paper: #f0ede6;
+    --amber: #e8a020;
+    --amber-dim: #c4861a;
+    --red: #c8341a;
+    --teal: #1a7a6e;
+    --steel: #1e2d3d;
+    --mist: rgba(240,237,230,0.06);
+    --line: rgba(240,237,230,0.12);
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-snap-type: y mandatory; }
+  body { background: var(--ink); color: var(--paper); font-family: 'Syne', sans-serif; overflow-x: hidden; cursor: none; }
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.35;
+  }
+  .cursor { position: fixed; top: 0; left: 0; z-index: 9999; pointer-events: none; mix-blend-mode: difference; }
+  .cursor-dot { width: 8px; height: 8px; background: var(--amber); border-radius: 50%; transform: translate(-50%, -50%); transition: transform 0.1s; }
+  .cursor-ring { position: fixed; top: 0; left: 0; width: 36px; height: 36px; border: 1px solid var(--amber); border-radius: 50%; transform: translate(-50%, -50%); transition: transform 0.18s ease, width 0.3s, height 0.3s; pointer-events: none; z-index: 9998; }
+  .progress-bar { position: fixed; top: 0; left: 0; z-index: 200; height: 2px; background: var(--amber); width: 0%; transition: width 0.1s; }
+  section { min-height: 100vh; scroll-snap-align: start; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.2rem 3rem; border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(20px); background: rgba(10,10,15,0.7);
+  }
+  .nav-logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 0.15em; color: var(--amber); }
+  .nav-logo span { color: var(--paper); }
+  .nav-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  .nav-links a { font-family: 'DM Mono', monospace; font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(240,237,230,0.5); text-decoration: none; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--amber); }
+
+  /* HERO */
+  #hero { padding: 0 3rem; background: radial-gradient(ellipse 60% 50% at 80% 60%, rgba(232,160,32,0.08) 0%, transparent 60%), radial-gradient(ellipse 40% 40% at 20% 30%, rgba(26,122,110,0.07) 0%, transparent 60%), var(--ink); }
+  .hero-eyebrow { font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber); margin-bottom: 1.4rem; opacity: 0; animation: fadeUp 0.8s 0.3s forwards; }
+  .hero-eyebrow::before { content: '▸ '; color: var(--teal); }
+  .hero-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(5rem, 13vw, 13rem); line-height: 0.92; letter-spacing: 0.02em; color: var(--paper); opacity: 0; animation: fadeUp 0.9s 0.5s forwards; }
+  .hero-title .accent { color: var(--amber); display: block; }
+  .hero-title .italic { font-family: 'Instrument Serif', serif; font-style: italic; color: var(--teal); font-size: 0.7em; }
+  .hero-sub { margin-top: 2rem; max-width: 520px; font-size: 1rem; line-height: 1.7; color: rgba(240,237,230,0.55); opacity: 0; animation: fadeUp 0.9s 0.75s forwards; }
+  .hero-cta { margin-top: 2.8rem; display: flex; gap: 1rem; align-items: center; opacity: 0; animation: fadeUp 0.9s 1s forwards; }
+  .btn-primary { padding: 0.85rem 2.2rem; background: var(--amber); color: var(--ink); font-family: 'DM Mono', monospace; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; border: none; cursor: none; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); transition: background 0.2s, transform 0.15s; }
+  .btn-primary:hover { background: #f0b030; transform: translateY(-2px); }
+  .btn-ghost { padding: 0.85rem 2rem; border: 1px solid var(--line); color: rgba(240,237,230,0.6); font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; background: transparent; cursor: none; transition: border-color 0.2s, color 0.2s; }
+  .btn-ghost:hover { border-color: var(--amber); color: var(--amber); }
+  .hero-badge { position: absolute; right: 6rem; bottom: 6rem; width: 130px; height: 130px; border: 1px solid var(--line); border-radius: 50%; display: flex; align-items: center; justify-content: center; text-align: center; animation: spin 20s linear infinite; opacity: 0.5; }
+  .hero-badge-inner { font-family: 'DM Mono', monospace; font-size: 0.55rem; letter-spacing: 0.15em; text-transform: uppercase; line-height: 1.8; color: var(--amber); }
+  .hero-scroll-hint { position: absolute; bottom: 2.5rem; left: 3rem; font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(240,237,230,0.3); display: flex; align-items: center; gap: 0.8rem; opacity: 0; animation: fadeUp 1s 1.5s forwards; }
+  .scroll-line { width: 40px; height: 1px; background: rgba(240,237,230,0.2); position: relative; overflow: hidden; }
+  .scroll-line::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: var(--amber); animation: lineSlide 2s ease-in-out infinite; }
+  .stat-row { display: flex; gap: 3rem; margin-top: 2.5rem; padding-top: 2.5rem; border-top: 1px solid var(--line); }
+  .stat { display: flex; flex-direction: column; }
+  .stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--paper); line-height: 1; }
+  .stat-num span { color: var(--amber); }
+  .stat-label { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(240,237,230,0.4); margin-top: 0.2rem; }
+
+  /* SHARED SECTION PARTS */
+  .section-num { font-family: 'DM Mono', monospace; font-size: 0.62rem; letter-spacing: 0.2em; color: var(--amber); text-transform: uppercase; margin-bottom: 0.6rem; }
+  .section-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(2.5rem, 5vw, 5rem); line-height: 1; letter-spacing: 0.04em; }
+  .section-title em { font-family: 'Instrument Serif', serif; font-style: italic; color: var(--teal); }
+  .h-line { width: 40px; height: 1px; background: var(--amber); margin: 1rem 0; }
+
+  /* TICKER */
+  .ticker-wrapper { overflow: hidden; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0.7rem 0; position: relative; }
+  .ticker-track { display: flex; gap: 4rem; animation: tickerMove 35s linear infinite; white-space: nowrap; }
+  .ticker-item { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(240,237,230,0.35); flex-shrink: 0; }
+  .ticker-item .dot { color: var(--amber); margin-right: 0.5rem; }
+
+  /* SOURCES */
+  .sources-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 3.5rem; border: 1px solid var(--line); }
+  .source-card { padding: 2.2rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); position: relative; transition: background 0.3s; overflow: hidden; }
+  .source-card:hover { background: var(--mist); }
+  .source-card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 0; background: var(--amber); transition: height 0.3s; }
+  .source-card:hover::before { height: 100%; }
+  .source-icon { font-size: 1.8rem; margin-bottom: 1rem; display: block; }
+  .source-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.08em; color: var(--paper); margin-bottom: 0.5rem; }
+  .source-desc { font-family: 'DM Mono', monospace; font-size: 0.68rem; line-height: 1.7; color: rgba(240,237,230,0.45); }
+  .source-tag { position: absolute; top: 1.5rem; right: 1.5rem; font-family: 'DM Mono', monospace; font-size: 0.55rem; letter-spacing: 0.15em; padding: 0.2rem 0.5rem; border: 1px solid var(--line); color: var(--teal); text-transform: uppercase; }
+
+  /* PIPELINE */
+  .pipeline-step { display: grid; grid-template-columns: 80px 1fr; border-top: 1px solid var(--line); padding: 1.8rem 0; position: relative; transition: padding-left 0.3s; }
+  .pipeline-step:hover { padding-left: 1rem; }
+  .pipeline-step:hover .step-num { color: var(--amber); }
+  .step-num { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: rgba(240,237,230,0.1); line-height: 1; transition: color 0.3s; padding-top: 0.2rem; }
+  .step-content { padding: 0.3rem 0 0 1rem; }
+  .step-title { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--paper); }
+  .step-desc { font-family: 'DM Mono', monospace; font-size: 0.68rem; line-height: 1.7; color: rgba(240,237,230,0.45); }
+  .step-tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
+  .step-tag { font-family: 'DM Mono', monospace; font-size: 0.58rem; letter-spacing: 0.1em; padding: 0.2rem 0.6rem; background: rgba(232,160,32,0.1); color: var(--amber); border: 1px solid rgba(232,160,32,0.25); }
+
+  /* FEATURES */
+  .features-layout { margin-top: 3.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .feature-block { padding: 2.5rem; border: 1px solid var(--line); position: relative; overflow: hidden; transition: transform 0.3s, border-color 0.3s; }
+  .feature-block:hover { transform: translateY(-4px); border-color: rgba(232,160,32,0.3); }
+  .feature-block.big { grid-column: span 2; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
+  .feature-block::after { content: ''; position: absolute; bottom: 0; right: 0; width: 60px; height: 60px; background: linear-gradient(135deg, transparent 50%, rgba(232,160,32,0.06) 50%); }
+  .feature-icon-large { font-size: 2.5rem; margin-bottom: 1.2rem; display: block; }
+  .feature-block-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.06em; margin-bottom: 0.8rem; color: var(--paper); }
+  .feature-block-desc { font-family: 'DM Mono', monospace; font-size: 0.68rem; line-height: 1.8; color: rgba(240,237,230,0.5); }
+  .feature-list { list-style: none; margin-top: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .feature-list li { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: rgba(240,237,230,0.55); padding-left: 1rem; position: relative; }
+  .feature-list li::before { content: '→'; position: absolute; left: 0; color: var(--teal); }
+
+  /* TECH GRID */
+  .tech-grid { margin-top: 3.5rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; border: 1px solid var(--line); }
+  .tech-item { padding: 1.8rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: center; transition: background 0.3s; }
+  .tech-item:hover { background: var(--mist); }
+  .tech-layer { font-family: 'DM Mono', monospace; font-size: 0.55rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal); margin-bottom: 0.5rem; }
+  .tech-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 0.08em; color: var(--paper); margin-bottom: 0.3rem; }
+  .tech-why { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: rgba(240,237,230,0.35); line-height: 1.6; }
+
+  /* SERVER MAP */
+  .server-grid { margin-top: 3rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+  .server-card { border: 1px solid var(--line); padding: 1.8rem; position: relative; transition: border-color 0.3s, background 0.3s; }
+  .server-card:hover { border-color: rgba(232,160,32,0.4); background: var(--mist); }
+  .server-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1rem; }
+  .server-num { font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem; color: rgba(232,160,32,0.2); line-height: 1; }
+  .server-badge { font-family: 'DM Mono', monospace; font-size: 0.5rem; letter-spacing: 0.15em; padding: 0.2rem 0.5rem; text-transform: uppercase; }
+  .badge-gpu { border: 1px solid rgba(232,69,42,0.4); color: #e8452a; background: rgba(232,69,42,0.06); }
+  .badge-cpu { border: 1px solid rgba(74,158,255,0.4); color: #4a9eff; background: rgba(74,158,255,0.06); }
+  .badge-storage { border: 1px solid rgba(30,201,176,0.4); color: #1ec9b0; background: rgba(30,201,176,0.06); }
+  .server-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 0.06em; color: var(--paper); margin-bottom: 0.3rem; }
+  .server-role { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: var(--amber); margin-bottom: 1rem; letter-spacing: 0.08em; }
+  .server-specs { border-top: 1px solid var(--line); padding-top: 0.8rem; }
+  .spec-row { display: flex; justify-content: space-between; padding: 0.25rem 0; }
+  .spec-key { font-family: 'DM Mono', monospace; font-size: 0.56rem; color: rgba(240,237,230,0.35); text-transform: uppercase; letter-spacing: 0.1em; }
+  .spec-val { font-family: 'DM Mono', monospace; font-size: 0.56rem; color: rgba(240,237,230,0.7); }
+  .server-services { margin-top: 0.8rem; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .svc-tag { font-family: 'DM Mono', monospace; font-size: 0.5rem; padding: 0.15rem 0.4rem; background: rgba(232,160,32,0.08); border: 1px solid rgba(232,160,32,0.2); color: rgba(232,160,32,0.7); }
+
+  /* KAFKA SECTION */
+  .kafka-flow { margin-top: 3rem; }
+  .kafka-bus { border: 1px solid rgba(232,160,32,0.4); background: rgba(232,160,32,0.04); padding: 1.5rem 2rem; position: relative; margin: 1.5rem 0; }
+  .kafka-bus-label { font-family: 'DM Mono', monospace; font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber); margin-bottom: 1rem; }
+  .kafka-topics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; }
+  .kafka-topic { border: 1px solid rgba(232,160,32,0.2); padding: 0.7rem; text-align: center; background: rgba(232,160,32,0.03); transition: background 0.2s; }
+  .kafka-topic:hover { background: rgba(232,160,32,0.1); }
+  .topic-name { font-family: 'DM Mono', monospace; font-size: 0.58rem; color: var(--amber); font-weight: 500; margin-bottom: 0.2rem; }
+  .topic-desc { font-family: 'DM Mono', monospace; font-size: 0.48rem; color: rgba(240,237,230,0.35); line-height: 1.5; }
+  .kafka-producers-consumers { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem; }
+  .pc-block { border: 1px solid var(--line); padding: 1.5rem; }
+  .pc-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 0.08em; margin-bottom: 1rem; }
+  .pc-title.prod { color: var(--teal); }
+  .pc-title.cons { color: rgba(160,100,240,0.9); }
+  .pc-item { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: rgba(240,237,230,0.5); padding: 0.3rem 0; padding-left: 1rem; position: relative; line-height: 1.5; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .pc-item::before { content: '⟶'; position: absolute; left: 0; font-size: 0.5rem; top: 0.35rem; }
+  .pc-item.prod::before { color: var(--teal); }
+  .pc-item.cons::before { color: rgba(160,100,240,0.7); }
+
+  /* COMMUNICATION */
+  .comm-grid { margin-top: 3rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem; }
+  .comm-card { border: 1px solid var(--line); padding: 2rem; position: relative; overflow: hidden; transition: border-color 0.3s; }
+  .comm-card:hover { border-color: rgba(232,160,32,0.3); }
+  .comm-card::before { content: ''; position: absolute; top: 0; right: 0; width: 80px; height: 80px; background: radial-gradient(circle at top right, rgba(232,160,32,0.06), transparent 70%); }
+  .comm-protocol { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 0.08em; color: var(--amber); margin-bottom: 0.3rem; }
+  .comm-use { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: var(--teal); margin-bottom: 0.8rem; letter-spacing: 0.08em; }
+  .comm-desc { font-family: 'DM Mono', monospace; font-size: 0.65rem; line-height: 1.7; color: rgba(240,237,230,0.45); }
+  .comm-pairs { margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.3rem; }
+  .comm-pair { font-family: 'DM Mono', monospace; font-size: 0.57rem; color: rgba(240,237,230,0.4); padding: 0.2rem 0; border-left: 2px solid rgba(232,160,32,0.25); padding-left: 0.6rem; }
+
+  /* PHASES */
+  .phases-timeline { margin-top: 3.5rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid var(--line); padding-top: 2rem; }
+  .phase { padding: 0 2rem 2rem 0; position: relative; }
+  .phase::before { content: ''; position: absolute; top: -2rem; left: 0; width: 8px; height: 8px; background: var(--amber); border-radius: 50%; transform: translateY(-50%); }
+  .phase-num { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.2em; color: var(--amber); text-transform: uppercase; margin-bottom: 0.5rem; }
+  .phase-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.06em; margin-bottom: 1rem; }
+  .phase-items { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }
+  .phase-items li { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: rgba(240,237,230,0.5); line-height: 1.6; padding-left: 0.8rem; position: relative; }
+  .phase-items li::before { content: '·'; position: absolute; left: 0; color: var(--teal); }
+  .phase-duration { display: inline-block; margin-top: 1rem; font-family: 'DM Mono', monospace; font-size: 0.58rem; letter-spacing: 0.12em; padding: 0.2rem 0.6rem; border: 1px solid rgba(232,160,32,0.3); color: var(--amber); }
+
+  /* CTA */
+  #cta { min-height: 50vh; display: flex; align-items: center; justify-content: center; padding: 4rem 3rem; text-align: center; background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(232,160,32,0.06) 0%, transparent 70%), var(--ink); border-top: 1px solid var(--line); scroll-snap-align: start; }
+  .cta-inner { max-width: 700px; }
+  .cta-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber); margin-bottom: 1.5rem; }
+  .cta-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 7vw, 7rem); line-height: 0.95; margin-bottom: 1.5rem; }
+  .cta-title em { font-family: 'Instrument Serif', serif; font-style: italic; color: var(--amber); }
+  .cta-sub { font-family: 'DM Mono', monospace; font-size: 0.72rem; line-height: 1.8; color: rgba(240,237,230,0.45); margin-bottom: 2.5rem; }
+  .cta-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+  /* RESILIENCE + GAPS */
+  .gaps-grid { margin-top: 3rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+  .gap-card { border: 1px solid var(--line); padding: 1.8rem; position: relative; overflow: hidden; transition: border-color 0.3s, transform 0.3s; }
+  .gap-card:hover { border-color: rgba(232,160,32,0.35); transform: translateY(-3px); }
+  .gap-card.critical { border-color: rgba(200,52,26,0.3); }
+  .gap-card.critical:hover { border-color: rgba(200,52,26,0.6); }
+  .gap-card.optimise { border-color: rgba(26,122,110,0.3); }
+  .gap-card.optimise:hover { border-color: rgba(26,122,110,0.6); }
+  .gap-priority { font-family: 'DM Mono', monospace; font-size: 0.5rem; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.6rem; padding: 0.15rem 0.5rem; display: inline-block; border: 1px solid; }
+  .pri-critical { color: var(--red); border-color: rgba(200,52,26,0.4); background: rgba(200,52,26,0.06); }
+  .pri-high { color: var(--amber); border-color: rgba(232,160,32,0.35); background: rgba(232,160,32,0.05); }
+  .pri-optimise { color: var(--teal); border-color: rgba(26,122,110,0.35); background: rgba(26,122,110,0.05); }
+  .gap-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 0.06em; color: var(--paper); margin: 0.5rem 0 0.6rem; }
+  .gap-desc { font-family: 'DM Mono', monospace; font-size: 0.64rem; line-height: 1.75; color: rgba(240,237,230,0.45); }
+  .gap-fix { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--line); font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--amber); }
+  .gap-fix::before { content: '→ Fix: '; color: var(--teal); }
+  /* OBSERVABILITY */
+  .obs-grid { margin-top: 3rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem; }
+  .obs-card { border: 1px solid var(--line); padding: 2rem; transition: border-color 0.3s; }
+  .obs-card:hover { border-color: rgba(26,122,110,0.4); }
+  .obs-icon { font-size: 2rem; margin-bottom: 0.8rem; display: block; }
+  .obs-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.06em; color: var(--paper); margin-bottom: 0.4rem; }
+  .obs-tool { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--amber); margin-bottom: 0.8rem; letter-spacing: 0.1em; }
+  .obs-desc { font-family: 'DM Mono', monospace; font-size: 0.64rem; line-height: 1.75; color: rgba(240,237,230,0.45); }
+  .obs-list { list-style: none; margin-top: 0.8rem; }
+  .obs-list li { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: rgba(240,237,230,0.5); padding: 0.25rem 0 0.25rem 1rem; position: relative; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .obs-list li::before { content: '◈'; position: absolute; left: 0; color: var(--teal); font-size: 0.4rem; top: 0.35rem; }
+
+  /* ─── FEATURES ─── */
+  .arch-diagram { margin-top: 3.5rem; font-family: 'DM Mono', monospace; font-size: 0.7rem; line-height: 1.8; color: rgba(240,237,230,0.5); border: 1px solid var(--line); padding: 2rem; position: relative; overflow: hidden; background: rgba(240,237,230,0.02); }
+  .arch-diagram::before { content: 'ARCHITECTURE OVERVIEW'; position: absolute; top: 1rem; right: 1.5rem; font-size: 0.55rem; letter-spacing: 0.2em; color: var(--teal); }
+  .arch-highlight { color: var(--amber); }
+  .arch-dim { color: rgba(240,237,230,0.25); }
+  .arch-teal { color: var(--teal); }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes lineSlide { 0% { left: -100%; } 50% { left: 0%; } 100% { left: 100%; } }
+  @keyframes tickerMove { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursorDot"><div class="cursor-dot"></div></div>
+<div class="cursor-ring" id="cursorRing"></div>
+<div class="progress-bar" id="progressBar"></div>
+
+<nav>
+  <div class="nav-logo">Neta<span>Board</span></div>
+  <div class="nav-links">
+    <a href="#sources">Sources</a>
+    <a href="#pipeline">Pipeline</a>
+    <a href="#kafka">Kafka</a>
+    <a href="#servers">Servers</a>
+    <a href="#comms">Comms</a>
+    <a href="#resilience">Resilience</a>
+    <a href="#observability">Observability</a>
+    <a href="#features">Features</a>
+    <a href="#tech">Stack</a>
+    <a href="#phases">Roadmap</a>
+  </div>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section id="hero">
+  <div style="padding-top:5rem;">
+    <p class="hero-eyebrow">Fully In-House · Media Intelligence Platform · Architecture Proposal</p>
+    <h1 class="hero-title">
+      <span>Media</span>
+      <span class="italic">Intelligence</span>
+      <span class="accent">Reimagined.</span>
+    </h1>
+    <p class="hero-sub">A fully self-hosted backend — Kafka message bus, in-house LLMs, microservices across dedicated servers — powering real-time ingestion, AI analysis, and cross-platform search.</p>
+    <div class="hero-cta">
+      <button class="btn-primary" onclick="document.getElementById('sources').scrollIntoView()">Explore Architecture</button>
+      <button class="btn-ghost" onclick="document.getElementById('servers').scrollIntoView()">Server Topology</button>
+    </div>
+    <div class="stat-row" style="opacity:0;animation:fadeUp 0.9s 1.2s forwards;">
+      <div class="stat"><span class="stat-num">9<span>+</span></span><span class="stat-label">Input Sources</span></div>
+      <div class="stat"><span class="stat-num">8</span><span class="stat-label">Dedicated Servers</span></div>
+      <div class="stat"><span class="stat-num">6<span>+</span></span><span class="stat-label">In-House LLMs</span></div>
+      <div class="stat"><span class="stat-num">12<span>+</span></span><span class="stat-label">Kafka Topics</span></div>
+    </div>
+  </div>
+  <div class="hero-badge"><div class="hero-badge-inner">FULLY<br>IN<br>HOUSE<br>AI</div></div>
+  <div class="hero-scroll-hint"><div class="scroll-line"></div>Scroll to explore</div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker-wrapper">
+  <div class="ticker-track">
+    <span class="ticker-item"><span class="dot">◆</span>Kafka Event Bus</span>
+    <span class="ticker-item"><span class="dot">◆</span>In-House ASR</span>
+    <span class="ticker-item"><span class="dot">◆</span>8 Dedicated Servers</span>
+    <span class="ticker-item"><span class="dot">◆</span>Semantic Vector Search</span>
+    <span class="ticker-item"><span class="dot">◆</span>In-House LLM Routing</span>
+    <span class="ticker-item"><span class="dot">◆</span>gRPC Inter-Service</span>
+    <span class="ticker-item"><span class="dot">◆</span>Entity Extraction</span>
+    <span class="ticker-item"><span class="dot">◆</span>Real-time WebSocket</span>
+    <span class="ticker-item"><span class="dot">◆</span>PDF + OCR Pipeline</span>
+    <span class="ticker-item"><span class="dot">◆</span>Automated Reports</span>
+    <span class="ticker-item"><span class="dot">◆</span>Kafka Event Bus</span>
+    <span class="ticker-item"><span class="dot">◆</span>In-House ASR</span>
+    <span class="ticker-item"><span class="dot">◆</span>8 Dedicated Servers</span>
+    <span class="ticker-item"><span class="dot">◆</span>Semantic Vector Search</span>
+    <span class="ticker-item"><span class="dot">◆</span>In-House LLM Routing</span>
+    <span class="ticker-item"><span class="dot">◆</span>gRPC Inter-Service</span>
+    <span class="ticker-item"><span class="dot">◆</span>Entity Extraction</span>
+    <span class="ticker-item"><span class="dot">◆</span>Real-time WebSocket</span>
+    <span class="ticker-item"><span class="dot">◆</span>PDF + OCR Pipeline</span>
+    <span class="ticker-item"><span class="dot">◆</span>Automated Reports</span>
+  </div>
+</div>
+
+<!-- ─── SOURCES ─── -->
+<section id="sources">
+  <div style="padding:6rem 3rem;">
+    <div class="reveal">
+      <p class="section-num">01 — Data Sources</p>
+      <h2 class="section-title">Every Signal,<br><em>One Platform</em></h2>
+      <div class="h-line"></div>
+    </div>
+    <div class="sources-grid reveal">
+      <div class="source-card"><span class="source-icon">📺</span><div class="source-tag">Video</div><div class="source-name">YouTube News</div><div class="source-desc">Auto-fetch channel videos → In-house ASR model → structured text with timestamps and speaker diarization.</div></div>
+      <div class="source-card"><span class="source-icon">💬</span><div class="source-tag">Messaging</div><div class="source-name">WhatsApp</div><div class="source-desc">WhatsApp Business API webhooks for group/channel messages, media, voice notes → in-house transcription.</div></div>
+      <div class="source-card"><span class="source-icon">📘</span><div class="source-tag">Social</div><div class="source-name">Facebook</div><div class="source-desc">Pages, posts, comments, shares via Meta Graph API with engagement metrics. Events published to Kafka.</div></div>
+      <div class="source-card"><span class="source-icon">𝕏</span><div class="source-tag">Social</div><div class="source-name">Twitter / X</div><div class="source-desc">Tweets, mentions, threads, hashtag monitoring via X API v2 streaming → Kafka ingestion topic.</div></div>
+      <div class="source-card"><span class="source-icon">📄</span><div class="source-tag">Documents</div><div class="source-name">PDFs & Reports</div><div class="source-desc">Upload PDFs, extract text and tables. Scanned docs processed by in-house Vision model for OCR.</div></div>
+      <div class="source-card"><span class="source-icon">📰</span><div class="source-tag">Print Media</div><div class="source-name">Newspapers</div><div class="source-desc">URL scraping + RSS for digital news. Print clipping photos processed via Tesseract + in-house Vision.</div></div>
+      <div class="source-card" style="grid-column:span 3;">
+        <span class="source-icon">🖼️</span><div class="source-tag">Vision</div>
+        <div class="source-name">Images — Infographics, Screenshots, Charts, Clippings</div>
+        <div class="source-desc">In-house Vision model fine-tuned on newspaper clippings and media images. Extracts text, describes context, classifies content type, all published to Kafka for downstream processing.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PIPELINE ─── -->
+<section id="pipeline">
+  <div style="padding:6rem 3rem;display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:start;">
+    <div>
+      <div class="reveal">
+        <p class="section-num">02 — Processing Pipeline</p>
+        <h2 class="section-title">Raw Signal<br>to <em>Pure Intel</em></h2>
+        <div class="h-line"></div>
+        <p style="font-family:'DM Mono',monospace;font-size:0.72rem;line-height:1.9;color:rgba(240,237,230,0.45);margin-top:1rem;max-width:380px;">Every piece of content passes through a multi-stage in-house AI pipeline. Each stage is an independent microservice, communicating over Kafka. No raw noise — only structured, searchable intelligence.</p>
+      </div>
+      <div class="arch-diagram reveal" style="margin-top:2rem;font-size:0.65rem;">
+<span class="arch-highlight">INGEST</span> ──kafka──▶ <span class="arch-teal">PREPROCESS</span> ──kafka──▶ <span class="arch-highlight">AI ENRICH</span> ──kafka──▶ <span class="arch-teal">INDEX</span>
+
+<span class="arch-dim">│                   │                  │                 │</span>
+<span class="arch-dim">▼                   ▼                  ▼                 ▼</span>
+
+<span class="arch-highlight">Connector</span>       <span class="arch-teal">Clean/Detect</span>      <span class="arch-highlight">In-House</span>        <span class="arch-teal">Qdrant</span>
+<span class="arch-highlight">Workers</span>         <span class="arch-teal">OCR/ASR/</span>          <span class="arch-highlight">LLM Router</span>      <span class="arch-teal">Vector DB</span>
+<span class="arch-dim">[Server 1]</span>      <span class="arch-teal">Translate</span>         <span class="arch-highlight">Summarize</span>       <span class="arch-dim">+</span>
+                <span class="arch-dim">[Server 2]</span>        <span class="arch-highlight">NER/Sentiment</span>   <span class="arch-teal">Elasticsearch</span>
+                                  <span class="arch-dim">[Server 5+6]</span>    <span class="arch-dim">[Server 3+4]</span>
+      </div>
+    </div>
+    <div class="pipeline-flow reveal">
+      <div class="pipeline-step">
+        <div class="step-num">01</div>
+        <div class="step-content">
+          <div class="step-title">Ingestion & Normalization</div>
+          <div class="step-desc">Connector workers fetch from all sources. Audio/video transcribed by in-house ASR. Images → in-house Vision model. All raw content published to Kafka topic <em>raw.content</em>.</div>
+          <div class="step-tags"><span class="step-tag">In-House ASR</span><span class="step-tag">Tesseract</span><span class="step-tag">In-House Vision</span><span class="step-tag">Kafka: raw.content</span></div>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-num">02</div>
+        <div class="step-content">
+          <div class="step-title">Language, Cleaning & Dedup</div>
+          <div class="step-desc">Pre-processing service consumes <em>raw.content</em>, strips noise, detects language, optionally translates, runs MinHash deduplication. Publishes to <em>clean.content</em>.</div>
+          <div class="step-tags"><span class="step-tag">langdetect</span><span class="step-tag">MinHash</span><span class="step-tag">Kafka: clean.content</span></div>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-num">03</div>
+        <div class="step-content">
+          <div class="step-title">AI Enrichment — In-House LLM Router</div>
+          <div class="step-desc">Enrichment service consumes <em>clean.content</em>, routes each item to the right in-house model: summarizer, NER extractor, sentiment classifier, topic tagger. Results published to <em>enriched.content</em>.</div>
+          <div class="step-tags"><span class="step-tag">In-House Router</span><span class="step-tag">Fine-tuned Models</span><span class="step-tag">Kafka: enriched.content</span></div>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-num">04</div>
+        <div class="step-content">
+          <div class="step-title">Embedding & Vector Indexing</div>
+          <div class="step-desc">Embedding service consumes <em>enriched.content</em>, generates vectors via in-house embedding model, writes to Qdrant. Simultaneously indexes to Elasticsearch for full-text search.</div>
+          <div class="step-tags"><span class="step-tag">In-House Embeddings</span><span class="step-tag">Qdrant</span><span class="step-tag">Elasticsearch</span></div>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-num">05</div>
+        <div class="step-content">
+          <div class="step-title">Storage, Alerts & Dashboard Push</div>
+          <div class="step-desc">Final enriched document stored in PostgreSQL. Alert rules evaluated in real-time from <em>enriched.content</em>. Dashboard updated via WebSocket push from <em>alerts.triggered</em>.</div>
+          <div class="step-tags"><span class="step-tag">PostgreSQL</span><span class="step-tag">Redis</span><span class="step-tag">WebSocket</span><span class="step-tag">Kafka: alerts.triggered</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── KAFKA ─── -->
+<section id="kafka">
+  <div style="padding:6rem 3rem;">
+    <div class="reveal">
+      <p class="section-num">03 — Message Bus</p>
+      <h2 class="section-title">Kafka: The<br><em>Central Nervous System</em></h2>
+      <div class="h-line"></div>
+      <p style="font-family:'DM Mono',monospace;font-size:0.72rem;line-height:1.9;color:rgba(240,237,230,0.45);margin-top:1rem;max-width:680px;">Apache Kafka acts as the backbone between all services. Every microservice only talks to Kafka — never directly to another service. This means any service can be scaled, restarted, or upgraded independently without affecting others. Kafka also provides full replay capability — if the AI model is updated, all historical content can be reprocessed.</p>
+    </div>
+
+    <div class="kafka-flow reveal">
+      <div class="kafka-bus">
+        <div class="kafka-bus-label">◈ Apache Kafka — Event Streaming Bus (3-broker cluster on Server 2) ◈</div>
+        <div class="kafka-topics">
+          <div class="kafka-topic"><div class="topic-name">raw.content</div><div class="topic-desc">All freshly ingested content from every source connector</div></div>
+          <div class="kafka-topic"><div class="topic-name">clean.content</div><div class="topic-desc">Deduplicated, language-detected, translated content</div></div>
+          <div class="kafka-topic"><div class="topic-name">enriched.content</div><div class="topic-desc">Summarized, NER-tagged, sentiment-scored items</div></div>
+          <div class="kafka-topic"><div class="topic-name">embed.requests</div><div class="topic-desc">Items queued for embedding model processing</div></div>
+          <div class="kafka-topic"><div class="topic-name">index.ready</div><div class="topic-desc">Items ready to be written to Qdrant + Elasticsearch</div></div>
+          <div class="kafka-topic"><div class="topic-name">alerts.triggered</div><div class="topic-desc">Fired alert events for notification delivery</div></div>
+          <div class="kafka-topic"><div class="topic-name">reports.queue</div><div class="topic-desc">Scheduled and on-demand report generation jobs</div></div>
+          <div class="kafka-topic"><div class="topic-name">model.feedback</div><div class="topic-desc">Human corrections fed back for model fine-tuning</div></div>
+        </div>
+      </div>
+
+      <div class="kafka-producers-consumers">
+        <div class="pc-block">
+          <div class="pc-title prod">Kafka Producers (Publishers)</div>
+          <div class="pc-item prod">YouTube Connector → raw.content</div>
+          <div class="pc-item prod">WhatsApp Webhook → raw.content</div>
+          <div class="pc-item prod">Facebook/X Connectors → raw.content</div>
+          <div class="pc-item prod">PDF / Image Upload Handler → raw.content</div>
+          <div class="pc-item prod">Pre-processing Service → clean.content</div>
+          <div class="pc-item prod">Enrichment Service → enriched.content</div>
+          <div class="pc-item prod">Embedding Service → index.ready</div>
+          <div class="pc-item prod">Alert Engine → alerts.triggered</div>
+          <div class="pc-item prod">Dashboard Analyst (corrections) → model.feedback</div>
+        </div>
+        <div class="pc-block">
+          <div class="pc-title cons">Kafka Consumers (Subscribers)</div>
+          <div class="pc-item cons">Pre-processing Service ← raw.content</div>
+          <div class="pc-item cons">Enrichment/LLM Router ← clean.content</div>
+          <div class="pc-item cons">Embedding Service ← enriched.content</div>
+          <div class="pc-item cons">Alert Engine ← enriched.content</div>
+          <div class="pc-item cons">Qdrant Writer ← index.ready</div>
+          <div class="pc-item cons">Elasticsearch Writer ← index.ready</div>
+          <div class="pc-item cons">Notification Service ← alerts.triggered</div>
+          <div class="pc-item cons">WebSocket Push Server ← alerts.triggered</div>
+          <div class="pc-item cons">Fine-tuning Pipeline ← model.feedback</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── SERVER TOPOLOGY ─── -->
+<section id="servers">
+  <div style="padding:6rem 3rem;">
+    <div class="reveal">
+      <p class="section-num">04 — Server Topology</p>
+      <h2 class="section-title">8 Servers,<br><em>Every Role Defined</em></h2>
+      <div class="h-line"></div>
+      <p style="font-family:'DM Mono',monospace;font-size:0.72rem;line-height:1.9;color:rgba(240,237,230,0.45);margin-top:1rem;max-width:680px;">Each server has a dedicated role. Separation prevents resource contention — GPU-heavy AI inference never competes with database I/O. All servers sit on a private VLAN, communicating over gRPC and Kafka. Only the API Gateway server is exposed externally.</p>
+    </div>
+    <div class="server-grid reveal">
+
+      <div class="server-card">
+        <div class="server-card-header"><div class="server-num">01</div><div class="server-badge badge-cpu">CPU</div></div>
+        <div class="server-name">API Gateway + FastAPI</div>
+        <div class="server-role">Public-facing entry point</div>
+        <div class="server-specs">
+          <div class="spec-row"><span class="spec-key">CPU</span><span class="spec-val">16 vCPU</span></div>
+          <div class="spec-row"><span class="spec-key">RAM</span><span class="spec-val">32 GB</span></div>
+          <div class="spec-row"><span class="spec-key">Network</span><span class="spec-val">Public + Private VLAN</span></div>
+        </div>
+        <div class="server-services">
+          <span class="svc-tag">FastAPI</span><span class="svc-tag">Nginx</span><span class="svc-tag">JWT Auth</span><span class="svc-tag">WebSocket</span><span class="svc-tag">Rate Limiter</span><span class="svc-tag">Redis Session</span>
+        </div>
+      </div>
+
+      <div class="server-card">
+        <div class="server-card-header"><div class="server-num">02</div><div class="server-badge badge-cpu">CPU</div></div>
+        <div class="server-name">Kafka + Zookeeper Cluster</div>
+        <div class="server-role">Event streaming backbone</div>
+        <div class="server-specs">
+          <div class="spec-row"><span class="spec-key">CPU</span><span class="spec-val">16 vCPU</span></div>
+          <div class="spec-row"><span class="spec-key">RAM</span><span class="spec-val">64 GB</span></div>
+          <div class="spec-row"><span class="spec-key">Disk</span><span class="spec-val">2 TB NVMe (log retention)</span></div>
+        </div>
+        <div class="server-services">
+          <span class="svc-tag">Kafka Broker ×3</span><span class="svc-tag">Zookeeper</span><span class="svc-tag">Kafka UI</span><span class="svc-tag">Schema Registry</span>
+        </div>
+      </div>
+
+      <div class="server-card">
+        <div class="server-card-header"><div class="server-num">03</div><div class="server-badge badge-storage">Storage</div></div>
+        <div class="server-name">Databases — PostgreSQL + Qdrant</div>
+        <div class="server-role">Relational metadata + vector store</div>
+        <div class="server-specs">
+          <div class="spec-row"><span class="spec-key">CPU</span><span class="spec-val">16 vCPU</span></div>
+          <div class="spec-row"><span class="spec-key">RAM</span><span class="spec-val">128 GB</span></div>
+          <div class="spec-row"><span class="spec-key">Disk</span><span class="spec-val">4 TB NVMe</span></div>
+        </div>
+        <div class="server-services">
+          <span class="svc-tag">PostgreSQL 16</span><span class="svc-tag">Qdrant</span><span class="svc-tag">pgBouncer</span><span class="svc-tag">Redis</span>
+        </div>
+      </div>
+
+      <div class="server-card">
+        <div class="server-card-header"><div class="server-num">04</div><div class="server-badge badge-storage">Storage</div></div>
+        <div class="server-name">Elasticsearch + MinIO</div>
+        <div class="server-role">Full-text search + file storage</div>
+        <div class="server-specs">
+          <div class="spec-row"><span class="spec-key">CPU</span><span class="spec-val">16 vCPU</span></div>
+          <div class="spec-row"><span class="spec-key">RAM</span><span class="spec-val">64 GB</span></div>
+          <div class="spec-row"><span class="spec-key">Disk</span><span class="spec-val">8 TB HDD + 1 TB NVMe</span></div>
+        </div>
+        <div class="server-services">
+          <span class="svc-tag">Elasticsearch</span><span class="svc-tag">Kibana</span><span class="svc-tag">MinIO</span><span class="svc-tag">Logstash</span>
+        </div>
+      </div>
+
+      <div class="server-card">
+        <div class="server-card-header"><div class="server-num">05</div><div class="server-badge badge-gpu">GPU</div></div>
+        <div class="server-name">LLM Inference Server A</div>
+        <div class="server-role">Summarization + NER + Classification</div>
+        <div class="server-specs">
+          <div class="spec-row"><span class="spec-key">GPU</span><span class="spec-val">2× A100 80GB</span></div>
+          <div class="spec-row"><span class="spec-key">CPU</span><span class="spec-val">32 vCPU</span></div>
+          <div class="spec-row"><span class="spec-key">RAM</span><span class="spec-val">256 GB</span></div>
+        </div>
+        <div class="server-services">
+          <span class="svc-tag">vLLM</span><span class="svc-tag">Summarizer Model</span><span class="svc-tag">NER Model</span><span class="svc-tag">Classifier Model</span>
+        </div>
+      </div>
+
+      <div class="server-card">
+        <div class="server-card-header"><div class="server-num">06</div><div class="server-badge badge-gpu">GPU</div></div>
+        <div class="server-name">LLM Inference Server B</div>
+        <div class="server-role">ASR + Vision OCR + Embeddings</div>
+        <div class="server-specs">
+          <div class="spec-row"><span class="spec-key">GPU</span><span class="spec-val">2× A100 80GB</span></div>
+          <div class="spec-row"><span class="spec-key">CPU</span><span class="spec-val">32 vCPU</span></div>
+          <div class="spec-row"><span class="spec-key">RAM</span><span class="spec-val">256 GB</span></div>
+        </div>
+        <div class="server-services">
+          <span class="svc-tag">In-House ASR</span><span class="svc-tag">Vision Model</span><span class="svc-tag">Embedding Model</span><span class="svc-tag">Ollama</span>
+        </div>
+      </div>
+
+      <div class="server-card">
+        <div class="server-card-header"><div class="server-num">07</div><div class="server-badge badge-cpu">CPU</div></div>
+        <div class="server-name">Worker + Connector Services</div>
+        <div class="server-role">Ingestion connectors + Celery workers</div>
+        <div class="server-specs">
+          <div class="spec-row"><span class="spec-key">CPU</span><span class="spec-val">32 vCPU</span></div>
+          <div class="spec-row"><span class="spec-key">RAM</span><span class="spec-val">64 GB</span></div>
+          <div class="spec-row"><span class="spec-key">Network</span><span class="spec-val">High throughput NIC</span></div>
+        </div>
+        <div class="server-services">
+          <span class="svc-tag">YT Connector</span><span class="svc-tag">WA Webhook</span><span class="svc-tag">FB/X Connector</span><span class="svc-tag">Celery Workers</span><span class="svc-tag">Pre-processor</span>
+        </div>
+      </div>
+
+      <div class="server-card">
+        <div class="server-card-header"><div class="server-num">08</div><div class="server-badge badge-gpu">GPU</div></div>
+        <div class="server-name">Model Training + Fine-Tuning</div>
+        <div class="server-role">Offline fine-tuning & prompt eval</div>
+        <div class="server-specs">
+          <div class="spec-row"><span class="spec-key">GPU</span><span class="spec-val">4× H100 80GB</span></div>
+          <div class="spec-row"><span class="spec-key">CPU</span><span class="spec-val">64 vCPU</span></div>
+          <div class="spec-row"><span class="spec-key">RAM</span><span class="spec-val">512 GB</span></div>
+        </div>
+        <div class="server-services">
+          <span class="svc-tag">PyTorch / HF</span><span class="svc-tag">LoRA Fine-tuning</span><span class="svc-tag">MLflow</span><span class="svc-tag">Prompt Registry</span><span class="svc-tag">W&amp;B</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── COMMUNICATIONS ─── -->
+<section id="comms">
+  <div style="padding:6rem 3rem;">
+    <div class="reveal">
+      <p class="section-num">05 — Inter-Service Communication</p>
+      <h2 class="section-title">How Services<br><em>Talk to Each Other</em></h2>
+      <div class="h-line"></div>
+      <p style="font-family:'DM Mono',monospace;font-size:0.72rem;line-height:1.9;color:rgba(240,237,230,0.45);margin-top:1rem;max-width:680px;">Different communication patterns are used depending on latency requirements, payload size, and whether the call is synchronous or event-driven. No service is exposed on a public port — all communication flows through the private VLAN or Kafka.</p>
+    </div>
+    <div class="comm-grid reveal">
+      <div class="comm-card">
+        <div class="comm-protocol">Kafka (Async Events)</div>
+        <div class="comm-use">Primary inter-service bus for all data flow</div>
+        <div class="comm-desc">All content movement between pipeline stages. Decoupled — producer doesn't wait for consumer. Enables replay, backpressure handling, and horizontal scaling of any stage independently.</div>
+        <div class="comm-pairs">
+          <div class="comm-pair">Connector → Pre-processor (raw.content topic)</div>
+          <div class="comm-pair">Pre-processor → Enrichment (clean.content topic)</div>
+          <div class="comm-pair">Enrichment → Embedding (enriched.content topic)</div>
+          <div class="comm-pair">Alert Engine → Notification Service (alerts.triggered)</div>
+          <div class="comm-pair">Dashboard corrections → Fine-tuning (model.feedback)</div>
+        </div>
+      </div>
+      <div class="comm-card">
+        <div class="comm-protocol">gRPC (Sync Calls)</div>
+        <div class="comm-use">Low-latency synchronous service calls</div>
+        <div class="comm-desc">Used where a service needs an immediate response — e.g. the API server calling the LLM inference server for a real-time search query expansion, or the embedding server during live search. Protobuf serialization keeps payloads small and fast.</div>
+        <div class="comm-pairs">
+          <div class="comm-pair">API Server → LLM Server A (query expansion, real-time summarize)</div>
+          <div class="comm-pair">API Server → LLM Server B (on-demand embedding for search)</div>
+          <div class="comm-pair">API Server → Qdrant (vector search queries)</div>
+          <div class="comm-pair">API Server → Elasticsearch (full-text search queries)</div>
+        </div>
+      </div>
+      <div class="comm-card">
+        <div class="comm-protocol">REST / HTTP (Internal)</div>
+        <div class="comm-use">Admin, health checks, management APIs</div>
+        <div class="comm-desc">Used for internal management endpoints, health checks, Kafka UI, MLflow, Kibana, and other monitoring tools. Also used by Celery workers to call the connector APIs to trigger new fetches. All over private VLAN only.</div>
+        <div class="comm-pairs">
+          <div class="comm-pair">Celery Workers → Social API connectors (trigger fetch)</div>
+          <div class="comm-pair">Monitoring → all services /health endpoints</div>
+          <div class="comm-pair">MLflow → Training Server (metrics, model registry)</div>
+          <div class="comm-pair">Kafka UI / Kibana → internal management</div>
+        </div>
+      </div>
+      <div class="comm-card">
+        <div class="comm-protocol">WebSocket (Push)</div>
+        <div class="comm-use">Real-time frontend dashboard updates</div>
+        <div class="comm-desc">API Server maintains persistent WebSocket connections with each open dashboard session. When alerts.triggered fires on Kafka, the API server pushes the event to all relevant dashboard clients immediately — no polling required.</div>
+        <div class="comm-pairs">
+          <div class="comm-pair">API Server → Frontend (alert fired events)</div>
+          <div class="comm-pair">API Server → Frontend (live volume counters)</div>
+          <div class="comm-pair">API Server → Frontend (new content notifications)</div>
+          <div class="comm-pair">Kafka consumer → WebSocket relay → Browser</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── RESILIENCE & GAPS ─── -->
+<section id="resilience">
+  <div style="padding:6rem 3rem;">
+    <div class="reveal">
+      <p class="section-num">06 — What Was Missing & How We Fix It</p>
+      <h2 class="section-title">Gaps, Risks &<br><em>Optimisations</em></h2>
+      <div class="h-line"></div>
+      <p style="font-family:'DM Mono',monospace;font-size:0.72rem;line-height:1.9;color:rgba(240,237,230,0.45);margin-top:1rem;max-width:700px;">A careful review of the initial architecture revealed 9 critical gaps that would cause failures in production. Every one is addressed below with a concrete fix and the tool/pattern used.</p>
+    </div>
+    <div class="gaps-grid reveal">
+
+      <div class="gap-card critical">
+        <span class="gap-priority pri-critical">Critical</span>
+        <div class="gap-title">Single Point of Failure — API Server</div>
+        <div class="gap-desc">SRV-01 as a single gateway means one crash takes the entire platform down. No failover, no health checks, no load distribution.</div>
+        <div class="gap-fix">HAProxy in front of 2× FastAPI instances + Keepalived VIP for automatic failover. Nginx handles SSL termination.</div>
+      </div>
+
+      <div class="gap-card critical">
+        <span class="gap-priority pri-critical">Critical</span>
+        <div class="gap-title">No Secrets Management</div>
+        <div class="gap-desc">WhatsApp API keys, Facebook tokens, JWT secrets, DB passwords — all would be in env files or config. One leaked file exposes everything.</div>
+        <div class="gap-fix">HashiCorp Vault on SRV-01. All services fetch secrets at runtime via Vault agent sidecar. Secrets rotate automatically, never stored on disk.</div>
+      </div>
+
+      <div class="gap-card critical">
+        <span class="gap-priority pri-critical">Critical</span>
+        <div class="gap-title">No Dead Letter Queue on Kafka</div>
+        <div class="gap-desc">If enrichment fails (malformed data, model timeout, OOM on GPU), messages are lost or cause infinite retry storms that block the pipeline.</div>
+        <div class="gap-fix">DLQ topic per pipeline stage (e.g. enrichment.dlq). Failed messages route there after 3 retries. Separate DLQ consumer alerts ops and retries after cooldown.</div>
+      </div>
+
+      <div class="gap-card">
+        <span class="gap-priority pri-high">High</span>
+        <div class="gap-title">No Circuit Breaker</div>
+        <div class="gap-desc">If GPU server goes down, services continue hammering it with gRPC calls, causing cascading failures across the enrichment pipeline.</div>
+        <div class="gap-fix">Tenacity (Python) circuit breaker on all gRPC calls to LLM servers. Falls back to a lightweight rule-based summariser when GPU is unavailable. Opens circuit after 5 consecutive failures.</div>
+      </div>
+
+      <div class="gap-card">
+        <span class="gap-priority pri-high">High</span>
+        <div class="gap-title">No Service Discovery</div>
+        <div class="gap-desc">With 8 servers and ~15 services, hardcoded IPs in configs will break every time a server restarts or IPs change. No health-aware routing.</div>
+        <div class="gap-fix">Consul service mesh on private VLAN. Every service registers itself. gRPC clients resolve via Consul DNS (e.g. llm-server-a.service.consul:50051). Health checks built in.</div>
+      </div>
+
+      <div class="gap-card">
+        <span class="gap-priority pri-high">High</span>
+        <div class="gap-title">No Backup / DR Strategy</div>
+        <div class="gap-desc">PostgreSQL, Qdrant collections, Elasticsearch indices, MinIO objects — no backup plan means a disk failure = permanent data loss.</div>
+        <div class="gap-fix">Daily pg_dump to MinIO (encrypted). Qdrant snapshot API → MinIO weekly. Elasticsearch ILM snapshots to MinIO. Off-site replication via rclone to a cold backup server nightly.</div>
+      </div>
+
+      <div class="gap-card optimise">
+        <span class="gap-priority pri-optimise">Optimise</span>
+        <div class="gap-title">Bloom Filter at Source</div>
+        <div class="gap-desc">Currently deduplication runs inside the pre-processing service — meaning every item is ingested, parsed, and processed before duplicates are caught. Wastes GPU time.</div>
+        <div class="gap-fix">Redis Bloom Filter at the connector level. Each connector checks a content hash before publishing to Kafka. 99.9% of duplicates filtered before they ever enter the pipeline.</div>
+      </div>
+
+      <div class="gap-card optimise">
+        <span class="gap-priority pri-optimise">Optimise</span>
+        <div class="gap-title">Data Validation Gate</div>
+        <div class="gap-desc">Social media data is deeply inconsistent — null fields, encoding issues, truncated text. Without validation, corrupt records poison downstream models and indices.</div>
+        <div class="gap-fix">Pydantic v2 schema validation on every Kafka message deserialization. Invalid records routed to validation.errors topic for manual review. Schema enforced via Kafka Schema Registry (Avro).</div>
+      </div>
+
+      <div class="gap-card optimise">
+        <span class="gap-priority pri-optimise">Optimise</span>
+        <div class="gap-title">Model Canary Deployment</div>
+        <div class="gap-desc">When a new fine-tuned model version is pushed from SRV-08 to SRV-05/06, it replaces the old one instantly — no A/B testing, no safe rollout, no rollback mechanism.</div>
+        <div class="gap-fix">MLflow Model Registry with Staging → Production promotion workflow. Canary: route 10% of traffic to new model version via feature flag in the LLM router. Rollback in &lt;60s if quality drops.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── OBSERVABILITY ─── -->
+<section id="observability">
+  <div style="padding:6rem 3rem;">
+    <div class="reveal">
+      <p class="section-num">07 — Observability Stack</p>
+      <h2 class="section-title">See Everything,<br><em>Fix Anything</em></h2>
+      <div class="h-line"></div>
+      <p style="font-family:'DM Mono',monospace;font-size:0.72rem;line-height:1.9;color:rgba(240,237,230,0.45);margin-top:1rem;max-width:700px;">Without observability, a production system is a black box. This stack gives full visibility into every service, every Kafka topic, every GPU inference call, and every model performance metric — all in one place.</p>
+    </div>
+    <div class="obs-grid reveal">
+      <div class="obs-card">
+        <span class="obs-icon">📈</span>
+        <div class="obs-title">Prometheus + Grafana</div>
+        <div class="obs-tool">Metrics & Dashboards — SRV-01 (monitoring namespace)</div>
+        <div class="obs-desc">Every service exposes a /metrics endpoint. Prometheus scrapes all 8 servers every 15s. Grafana dashboards show: Kafka consumer lag, GPU utilisation, model inference latency (p50/p95/p99), pipeline throughput (items/sec), API response times, Qdrant query latency, Elasticsearch indexing rate.</div>
+        <ul class="obs-list">
+          <li>Kafka consumer lag alerts (lag &gt; 10k messages → PagerDuty)</li>
+          <li>GPU memory utilisation per model (OOM prevention)</li>
+          <li>Model inference latency SLA tracking (p99 &lt; 2s)</li>
+          <li>Pipeline throughput: items/sec per stage</li>
+          <li>API error rate + 5xx spike alerting</li>
+        </ul>
+      </div>
+      <div class="obs-card">
+        <span class="obs-icon">🔭</span>
+        <div class="obs-title">Jaeger Distributed Tracing</div>
+        <div class="obs-tool">Request tracing across all services — OpenTelemetry instrumented</div>
+        <div class="obs-desc">Every request gets a trace ID at the API gateway. As it flows through Kafka → pre-processor → enrichment → LLM → index, the trace is carried via message headers. In Jaeger you can see the exact path, timing, and which service was the bottleneck for any given article from ingest to indexed.</div>
+        <ul class="obs-list">
+          <li>End-to-end latency per article (ingest → indexed)</li>
+          <li>Per-span timing: LLM call, OCR, Kafka publish</li>
+          <li>Slow trace alerting (&gt;30s end-to-end)</li>
+          <li>Error traces auto-captured for debugging</li>
+        </ul>
+      </div>
+      <div class="obs-card">
+        <span class="obs-icon">📋</span>
+        <div class="obs-title">Structured Logging — ELK Stack</div>
+        <div class="obs-tool">Elasticsearch + Logstash + Kibana — SRV-04</div>
+        <div class="obs-desc">All services emit structured JSON logs (no unstructured text). Logstash on SRV-04 ingests from all servers, enriches with service name/hostname/trace ID, and indexes into Elasticsearch. Kibana provides log search, error dashboards, and anomaly detection. Log retention: 30 days hot, 1 year cold (MinIO).</div>
+        <ul class="obs-list">
+          <li>Centralized log search across all 8 servers</li>
+          <li>Error rate dashboards per service</li>
+          <li>Correlation of logs with Jaeger trace IDs</li>
+          <li>Model inference error logging with input samples</li>
+        </ul>
+      </div>
+      <div class="obs-card">
+        <span class="obs-icon">🧬</span>
+        <div class="obs-title">Model Quality Monitoring</div>
+        <div class="obs-tool">Custom dashboard — MLflow + W&B — SRV-08</div>
+        <div class="obs-desc">Beyond infrastructure metrics, model quality must be tracked in production. A random sample (5%) of all enriched articles is routed to a quality evaluation job that scores the in-house model outputs against a held-out gold dataset. Drift detection fires when quality drops below threshold, triggering a fine-tuning run automatically.</div>
+        <ul class="obs-list">
+          <li>NER F1 score tracking over time per entity type</li>
+          <li>Summarization ROUGE score monitoring</li>
+          <li>Sentiment classifier accuracy drift alerts</li>
+          <li>Auto-trigger fine-tuning on quality degradation</li>
+          <li>Embedding space drift detection (cosine similarity)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FEATURES ─── -->
+<section id="features">
+  <div style="padding:6rem 3rem;">
+    <div class="reveal">
+      <p class="section-num">08 — Core Features</p>
+      <h2 class="section-title">Built for<br><em>Media Teams</em></h2>
+      <div class="h-line"></div>
+    </div>
+    <div class="features-layout reveal">
+      <div class="feature-block">
+        <span class="feature-icon-large">🔍</span>
+        <div class="feature-block-title">Hybrid Search</div>
+        <div class="feature-block-desc">Combines semantic vector search (Qdrant, via in-house embeddings) with BM25 full-text search (Elasticsearch). Results merged via RRF (Reciprocal Rank Fusion).</div>
+        <ul class="feature-list">
+          <li>Semantic search via in-house embedding model</li>
+          <li>Full-text BM25 via Elasticsearch</li>
+          <li>RRF result fusion for best ranking</li>
+          <li>Entity-specific person/org lookup</li>
+          <li>Date range & source filtering</li>
+        </ul>
+      </div>
+      <div class="feature-block">
+        <span class="feature-icon-large">📊</span>
+        <div class="feature-block-title">Analytics Engine</div>
+        <div class="feature-block-desc">Real-time dashboards for mention volume, sentiment trends, source breakdown, share of voice, and trending topic detection — all served from pre-aggregated Elasticsearch indices.</div>
+        <ul class="feature-list">
+          <li>Mention volume timeline charts</li>
+          <li>Sentiment trend over time</li>
+          <li>Trending topic detection</li>
+          <li>Geo-map of coverage origin</li>
+          <li>Reach & engagement estimator</li>
+        </ul>
+      </div>
+      <div class="feature-block">
+        <span class="feature-icon-large">🔔</span>
+        <div class="feature-block-title">Smart Alerts</div>
+        <div class="feature-block-desc">Alert Engine consumes <em>enriched.content</em> from Kafka in real-time. When rules match, events are published to <em>alerts.triggered</em> and pushed to dashboard + notification service.</div>
+        <ul class="feature-list">
+          <li>Keyword threshold alerts</li>
+          <li>Sentiment spike detection</li>
+          <li>Volume anomaly detection</li>
+          <li>Delivered via WebSocket + WhatsApp/Email</li>
+        </ul>
+      </div>
+      <div class="feature-block">
+        <span class="feature-icon-large">📋</span>
+        <div class="feature-block-title">Report Generator</div>
+        <div class="feature-block-desc">Report jobs queued via Kafka <em>reports.queue</em> topic, picked up by the report worker which calls the in-house long-context model for narrative writing + chart generation.</div>
+        <ul class="feature-list">
+          <li>Branded PDF with charts</li>
+          <li>In-house LLM narrative sections</li>
+          <li>CSV / Excel data export</li>
+          <li>Scheduled auto-delivery</li>
+        </ul>
+      </div>
+      <div class="feature-block big">
+        <div>
+          <span class="feature-icon-large">🧠</span>
+          <div class="feature-block-title">In-House LLM Intelligence Router</div>
+          <div class="feature-block-desc">All models run fully in-house on GPU Servers 05 and 06. No external API calls — full data privacy. A task-aware router dispatches each enrichment job to the right model via gRPC. Models are fine-tuned on domain data and managed via a prompt registry on Server 08.</div>
+        </div>
+        <div>
+          <ul class="feature-list">
+            <li>Transcription → In-house ASR (Server 06, fine-tuned on news audio)</li>
+            <li>Summarization → In-house fast model (Server 05, prompt-engineered)</li>
+            <li>Deep analysis → In-house large model (Server 05, domain fine-tuned)</li>
+            <li>OCR + Vision → In-house Vision model (Server 06, clipping fine-tuned)</li>
+            <li>Classification → In-house fine-tuned classifier (Server 05)</li>
+            <li>Embeddings → In-house embedding model (Server 06, domain-specific)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── TECH STACK ─── -->
+<section id="tech">
+  <div style="padding:6rem 3rem;">
+    <div class="reveal">
+      <p class="section-num">09 — Technology Stack</p>
+      <h2 class="section-title">Production-Grade<br><em>Stack</em></h2>
+      <div class="h-line"></div>
+    </div>
+    <div class="tech-grid reveal">
+      <div class="tech-item"><div class="tech-layer">API Layer</div><div class="tech-name">FastAPI</div><div class="tech-why">Async Python, WebSocket, auto-docs — SRV-01 (×2 with HAProxy)</div></div>
+      <div class="tech-item"><div class="tech-layer">Message Bus</div><div class="tech-name">Apache Kafka</div><div class="tech-why">3-broker cluster + DLQ topics + Schema Registry — SRV-02</div></div>
+      <div class="tech-item"><div class="tech-layer">Task Queue</div><div class="tech-name">Celery + Redis</div><div class="tech-why">Scheduled scrapers & background workers — SRV-07</div></div>
+      <div class="tech-item"><div class="tech-layer">Relational DB</div><div class="tech-name">PostgreSQL</div><div class="tech-why">Users, metadata, workflow, audit + pgBouncer — SRV-03</div></div>
+      <div class="tech-item"><div class="tech-layer">Vector DB</div><div class="tech-name">Qdrant</div><div class="tech-why">Self-hosted semantic search + snapshot backups — SRV-03</div></div>
+      <div class="tech-item"><div class="tech-layer">Search Index</div><div class="tech-name">Elasticsearch</div><div class="tech-why">Full-text BM25, ILM snapshots to MinIO — SRV-04</div></div>
+      <div class="tech-item"><div class="tech-layer">File Storage</div><div class="tech-name">MinIO</div><div class="tech-why">S3-compatible: files, backups, log archive — SRV-04</div></div>
+      <div class="tech-item"><div class="tech-layer">Inter-Service RPC</div><div class="tech-name">gRPC + Protobuf</div><div class="tech-why">Sync low-latency calls + Consul DNS resolution</div></div>
+      <div class="tech-item"><div class="tech-layer">Service Discovery</div><div class="tech-name">Consul</div><div class="tech-why">Service registry + health checks + DNS for all 8 servers</div></div>
+      <div class="tech-item"><div class="tech-layer">Secrets</div><div class="tech-name">HashiCorp Vault</div><div class="tech-why">All API keys, DB passwords, JWT secrets — runtime injection</div></div>
+      <div class="tech-item"><div class="tech-layer">Resilience</div><div class="tech-name">Tenacity + DLQ</div><div class="tech-why">Circuit breaker on gRPC calls + Kafka Dead Letter Queues</div></div>
+      <div class="tech-item"><div class="tech-layer">Dedup (Source)</div><div class="tech-name">Redis Bloom Filter</div><div class="tech-why">Content hash check at connector — blocks duplicates pre-Kafka</div></div>
+      <div class="tech-item"><div class="tech-layer">Metrics</div><div class="tech-name">Prometheus + Grafana</div><div class="tech-why">All services scraped — GPU, Kafka lag, model latency dashboards</div></div>
+      <div class="tech-item"><div class="tech-layer">Tracing</div><div class="tech-name">Jaeger + OpenTelemetry</div><div class="tech-why">Distributed trace per article: ingest → indexed</div></div>
+      <div class="tech-item"><div class="tech-layer">LLM Inference</div><div class="tech-name">vLLM + Ollama</div><div class="tech-why">Self-hosted GPU inference + canary model deployment — SRV-05+06</div></div>
+      <div class="tech-item"><div class="tech-layer">Model Training</div><div class="tech-name">PyTorch + HuggingFace</div><div class="tech-why">LoRA/QLoRA fine-tuning + RLHF pipeline — SRV-08</div></div>
+      <div class="tech-item"><div class="tech-layer">Model Registry</div><div class="tech-name">MLflow + W&B</div><div class="tech-why">Staging → Production promotion + quality drift alerts</div></div>
+      <div class="tech-item"><div class="tech-layer">Data Validation</div><div class="tech-name">Pydantic v2 + Avro</div><div class="tech-why">Schema validation at every Kafka message boundary</div></div>
+      <div class="tech-item"><div class="tech-layer">Load Balancer</div><div class="tech-name">HAProxy + Nginx</div><div class="tech-why">Active/passive failover for API gateway + SSL termination</div></div>
+      <div class="tech-item"><div class="tech-layer">Deploy</div><div class="tech-name">Docker + K8s</div><div class="tech-why">Containerized across all 8 servers — Helm charts per service</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PHASES ─── -->
+<section id="phases">
+  <div style="padding:6rem 3rem;">
+    <div class="reveal">
+      <p class="section-num">10 — Roadmap</p>
+      <h2 class="section-title">Four Phases to<br><em>Full Intelligence</em></h2>
+      <div class="h-line"></div>
+    </div>
+    <div class="phases-timeline reveal">
+      <div class="phase">
+        <div class="phase-num">Phase 01</div>
+        <div class="phase-title">Core Infrastructure</div>
+        <ul class="phase-items">
+          <li>Kafka + DLQ + Schema Registry (SRV-02)</li>
+          <li>PostgreSQL + Qdrant (SRV-03)</li>
+          <li>Elasticsearch + MinIO (SRV-04)</li>
+          <li>FastAPI + HAProxy failover (SRV-01)</li>
+          <li>Vault secrets + Consul discovery</li>
+          <li>Redis Bloom Filter at connectors</li>
+          <li>Pydantic schema validation layer</li>
+          <li>YouTube + PDF connectors live</li>
+        </ul>
+        <span class="phase-duration">Weeks 1–5</span>
+      </div>
+      <div class="phase">
+        <div class="phase-num">Phase 02</div>
+        <div class="phase-title">Social + Observability</div>
+        <ul class="phase-items">
+          <li>Twitter/X + Facebook + WhatsApp</li>
+          <li>Full Kafka pipeline + DLQ live</li>
+          <li>Circuit breakers (Tenacity)</li>
+          <li>Prometheus + Grafana dashboards</li>
+          <li>Jaeger distributed tracing</li>
+          <li>ELK structured logging</li>
+          <li>Alert engine + WebSocket push</li>
+        </ul>
+        <span class="phase-duration">Weeks 6–12</span>
+      </div>
+      <div class="phase">
+        <div class="phase-num">Phase 03</div>
+        <div class="phase-title">In-House AI Layer</div>
+        <ul class="phase-items">
+          <li>GPU Servers 05+06 provisioned</li>
+          <li>vLLM + Ollama inference setup</li>
+          <li>LoRA fine-tuning on Server 08</li>
+          <li>Prompt registry + versioning</li>
+          <li>Embedding model deployment</li>
+          <li>model.feedback Kafka loop</li>
+        </ul>
+        <span class="phase-duration">Weeks 11–16</span>
+      </div>
+      <div class="phase">
+        <div class="phase-num">Phase 04</div>
+        <div class="phase-title">Hardening & Scale</div>
+        <ul class="phase-items">
+          <li>Kubernetes across all 8 servers</li>
+          <li>Backup + DR strategy live</li>
+          <li>Model canary deployment</li>
+          <li>Model quality drift monitoring</li>
+          <li>Multi-tenant + RBAC</li>
+          <li>Load testing + performance tuning</li>
+          <li>API documentation + SDK</li>
+        </ul>
+        <span class="phase-duration">Weeks 19–24</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="cta">
+  <div class="cta-inner reveal">
+    <div class="cta-label">◆ Ready to Build</div>
+    <h2 class="cta-title">Let's Turn<br>NetaBoard<br><em>Live.</em></h2>
+    <p class="cta-sub">8 servers. Kafka backbone. Fully in-house LLMs. Vault secrets. Consul discovery. Prometheus observability. 9 gaps identified and fixed. The architecture is complete — let's build Phase 1.</p>
+    <div class="cta-buttons">
+      <button class="btn-primary">Generate Project Scaffold</button>
+      <button class="btn-ghost">View Database Schema</button>
+    </div>
+    <div style="margin-top:3rem;padding-top:2rem;border-top:1px solid var(--line);font-family:'DM Mono',monospace;font-size:0.6rem;letter-spacing:0.15em;color:rgba(240,237,230,0.25);text-transform:uppercase;">
+      NetaBoard · Fully In-House Media Intelligence · Architecture v2 · 2025
+    </div>
+  </div>
+</section>
+
+<script>
+  const dot = document.getElementById('cursorDot');
+  const ring = document.getElementById('cursorRing');
+  let mx=0,my=0,rx=0,ry=0;
+  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx+'px';dot.style.top=my+'px';});
+  (function animRing(){rx+=(mx-rx)*0.12;ry+=(my-ry)*0.12;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(animRing);})();
+  document.querySelectorAll('button,a,.source-card,.feature-block,.tech-item,.server-card,.comm-card,.kafka-topic').forEach(el=>{
+    el.addEventListener('mouseenter',()=>{ring.style.width='60px';ring.style.height='60px';ring.style.borderColor='rgba(232,160,32,0.6)';});
+    el.addEventListener('mouseleave',()=>{ring.style.width='36px';ring.style.height='36px';ring.style.borderColor='var(--amber)';});
+  });
+  window.addEventListener('scroll',()=>{
+    const h=document.documentElement.scrollHeight-window.innerHeight;
+    document.getElementById('progressBar').style.width=(window.scrollY/h*100)+'%';
+  });
+  const obs=new IntersectionObserver((entries)=>{entries.forEach((e,i)=>{if(e.isIntersecting)setTimeout(()=>e.target.classList.add('visible'),i*80);});},{threshold:0.1});
+  document.querySelectorAll('.reveal').forEach(r=>obs.observe(r));
+</script>
+</body>
+</html>

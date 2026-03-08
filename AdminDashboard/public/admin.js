@@ -1740,6 +1740,504 @@ document.addEventListener('DOMContentLoaded', () => {
                 mydbCheckStatus();
                 mydbLoadTables();
             }
+            if (item.dataset.view === 'preproving') {
+                nriLoadAll();
+            }
         });
     });
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  PREPROVING — NRI FILE SCORING PIPELINE
+// ═══════════════════════════════════════════════════════════════
+
+const NRI_PILLARS = [
+    'electoral_strength', 'legislative_performance', 'constituency_development',
+    'public_accessibility', 'communication', 'party_standing', 'media_coverage',
+    'digital_influence', 'financial_muscle', 'alliance_intel',
+    'caste_equation', 'anti_incumbency', 'grassroots_network',
+    'ideology_consistency', 'scandal_index'
+];
+
+const PILLAR_LABELS = {
+    electoral_strength: 'Electoral Strength',
+    legislative_performance: 'Legislative Perf.',
+    constituency_development: 'Constituency Dev.',
+    public_accessibility: 'Public Access.',
+    communication: 'Communication',
+    party_standing: 'Party Standing',
+    media_coverage: 'Media Coverage',
+    digital_influence: 'Digital Influence',
+    financial_muscle: 'Financial Muscle',
+    alliance_intel: 'Alliance Intel',
+    caste_equation: 'Caste Equation',
+    anti_incumbency: 'Anti-Incumbency',
+    grassroots_network: 'Grassroots Network',
+    ideology_consistency: 'Ideology Consist.',
+    scandal_index: 'Scandal Index'
+};
+
+let nriFiles = [];
+let nriDisplayFiles = [];
+let nriQueue = [];
+let selectedNriFileId = null;
+
+function scoreColor(score) {
+    if (score === null || score === undefined) return '#555';
+    if (score >= 70) return 'var(--green)';
+    if (score >= 40) return 'var(--amber)';
+    return 'var(--red)';
+}
+
+function heatColor(val) {
+    // val = 0.0–1.0 relevance
+    if (val === null || val === undefined) return 'var(--bg4)';
+    const v = parseFloat(val);
+    if (v >= 0.7) return 'rgba(34,197,94,0.5)';
+    if (v >= 0.3) return 'rgba(245,158,11,0.4)';
+    return 'rgba(100,100,120,0.15)';
+}
+
+function formatBytes(b) {
+    if (!b) return '—';
+    if (b < 1024) return b + ' B';
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    return (b / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function fmtDate(d) {
+    if (!d) return '—';
+    try { return new Date(d).toLocaleDateString() + ' ' + new Date(d).toTimeString().slice(0, 5); }
+    catch { return d; }
+}
+
+async function nriLoadStats() {
+    try {
+        const s = await fetch('/api/nri/stats').then(r => r.json());
+        const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        setEl('nri-total', s.total || 0);
+        setEl('nri-queued', s.queued || 0);
+        setEl('nri-processing', s.processing || 0);
+        setEl('nri-done', s.done || 0);
+        setEl('nri-failed', s.failed || 0);
+        setEl('nri-pending', s.pending || 0);
+        setEl('nri-scores-cnt', s.totalScores || 0);
+        setEl('nri-avg-score', s.avgScore != null ? s.avgScore : '—');
+
+        const badge = document.getElementById('nb-nri');
+        if (badge) {
+            const active = (s.queued || 0) + (s.processing || 0);
+            badge.textContent = active;
+            badge.style.display = active > 0 ? 'flex' : 'none';
+        }
+    } catch (e) { console.warn('[NRI] Stats fetch failed:', e.message); }
+}
+
+async function nriLoadFiles() {
+    try {
+        nriFiles = await fetch('/api/nri/files').then(r => r.json());
+        nriDisplayFiles = [...nriFiles];
+        renderNriFiles();
+        const cnt = document.getElementById('nri-files-count');
+        if (cnt) cnt.textContent = `${nriFiles.length} files`;
+    } catch (e) { console.warn('[NRI] Files fetch failed:', e.message); }
+}
+
+async function nriLoadQueue() {
+    try {
+        nriQueue = await fetch('/api/nri/queue').then(r => r.json());
+        renderNriQueue();
+        const cnt = document.getElementById('nri-queue-count');
+        if (cnt) cnt.textContent = `${nriQueue.length} items`;
+    } catch (e) { console.warn('[NRI] Queue fetch failed:', e.message); }
+}
+
+async function nriLoadAll() {
+    await Promise.all([nriLoadStats(), nriLoadFiles(), nriLoadQueue()]);
+}
+
+async function nriScanFiles(btn) {
+    if (!btn) btn = document.querySelector('[onclick*="nriScanFiles"]');
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.textContent = '⟳ Scanning…'; btn.disabled = true; }
+    try {
+        const result = await fetch('/api/nri/files/scan', { method: 'POST' }).then(r => r.json());
+        qLog('ok', `[NRI] Scan complete — ${result.discovered} files found: ${result.new} new, ${result.existing} already registered`);
+        await nriLoadAll();
+    } catch (e) {
+        qLog('err', '[NRI] Scan failed: ' + e.message);
+    } finally {
+        if (btn) { btn.textContent = origText || '🔍 Scan DataCollected'; btn.disabled = false; }
+    }
+}
+
+async function nriQueueAll(btn) {
+    if (!btn) btn = document.querySelector('[onclick*="nriQueueAll"]');
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.textContent = '⟳ Queuing…'; btn.disabled = true; }
+    // Reload files first in case scan was just done but nriFiles is stale
+    await nriLoadFiles();
+    const pending = nriFiles.filter(f => f.processing_state === 'pending');
+    if (!pending.length) {
+        if (btn) { btn.textContent = origText || '▶ Queue All Pending'; btn.disabled = false; }
+        alert('No pending files to queue. All files are already queued or done.');
+        return;
+    }
+    const fileIds = pending.map(f => f.id);
+    try {
+        const r = await fetch('/api/nri/queue/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileIds })
+        }).then(r => r.json());
+        qLog('ok', `[NRI] Queued ${r.queued} files for scoring`);
+        await nriLoadAll();
+    } catch (e) {
+        qLog('err', '[NRI] Batch queue failed: ' + e.message);
+    } finally {
+        if (btn) { btn.textContent = origText || '▶ Queue All Pending'; btn.disabled = false; }
+    }
+}
+
+async function nriQueueSelected() {
+    const checked = document.querySelectorAll('.nri-file-chk:checked');
+    if (!checked.length) { alert('Select files first.'); return; }
+    const fileIds = Array.from(checked).map(c => parseInt(c.dataset.fid));
+    const toQueue = fileIds.filter(fid => {
+        const f = nriFiles.find(x => x.id === fid);
+        return f && f.processing_state !== 'done';
+    });
+    if (!toQueue.length) { alert('All selected files are already done or unavailable.'); return; }
+    try {
+        const r = await fetch('/api/nri/queue/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileIds: toQueue })
+        }).then(r => r.json());
+        qLog('ok', `[NRI] Queued ${r.queued} selected files`);
+        await nriLoadAll();
+    } catch (e) {
+        qLog('err', '[NRI] Queue error: ' + e.message);
+    }
+}
+
+async function nriRemoveFromQueue(fileId) {
+    await fetch(`/api/nri/queue/${fileId}`, { method: 'DELETE' });
+    await nriLoadAll();
+}
+
+async function nriClearQueue() {
+    const done = nriQueue.filter(q => q.status === 'done' || q.status === 'failed' || q.status === 'cancelled');
+    for (const q of done) {
+        await fetch(`/api/nri/queue/${q.file_id}`, { method: 'DELETE' });
+    }
+    await nriLoadAll();
+    qLog('info', '[NRI] Cleared completed queue items');
+}
+
+function nriSelectAll() {
+    document.querySelectorAll('.nri-file-chk').forEach(c => c.checked = true);
+    document.getElementById('nri-chk-all').checked = true;
+}
+
+function nriCheckAll(checked) {
+    document.querySelectorAll('.nri-file-chk').forEach(c => c.checked = checked);
+}
+
+function nriFilterFiles(state) {
+    if (state === 'all') nriDisplayFiles = [...nriFiles];
+    else nriDisplayFiles = nriFiles.filter(f => f.processing_state === state);
+    const search = document.getElementById('nri-file-search')?.value || '';
+    if (search) nriDisplayFiles = nriDisplayFiles.filter(f => f.filename.toLowerCase().includes(search.toLowerCase()));
+    renderNriFiles();
+}
+
+function nriSearchFiles(query) {
+    const state = document.getElementById('nri-filter-state')?.value || 'all';
+    nriDisplayFiles = state === 'all' ? [...nriFiles] : nriFiles.filter(f => f.processing_state === state);
+    if (query) nriDisplayFiles = nriDisplayFiles.filter(f =>
+        f.filename.toLowerCase().includes(query.toLowerCase()) ||
+        f.folder.toLowerCase().includes(query.toLowerCase())
+    );
+    renderNriFiles();
+}
+
+function renderNriFiles() {
+    const tbody = document.getElementById('nri-files-body');
+    if (!tbody) return;
+    if (!nriDisplayFiles.length) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text4);padding:1.5rem;">No files match the filter</td></tr>';
+        return;
+    }
+    tbody.innerHTML = nriDisplayFiles.map(f => `
+        <tr class="${f.id === selectedNriFileId ? 'selected' : ''}" onclick="nriSelectFile(${f.id})" style="cursor:pointer;">
+          <td onclick="event.stopPropagation()"><input type="checkbox" class="nri-file-chk" data-fid="${f.id}"></td>
+          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.filename}">
+            <span style="color:var(--text);">${f.filename}</span>
+          </td>
+          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text4);">
+            ${f.folder || '—'} <span class="tag tag-b" style="margin-left:4px;">${f.platform}</span>
+          </td>
+          <td style="color:var(--text4);">${formatBytes(f.file_size_bytes)}</td>
+          <td style="text-align:center;">
+            ${f.pillars_scored > 0
+            ? `<span style="color:var(--green);font-weight:600;">${f.pillars_scored}</span>/<span style="color:var(--text4)">15</span>`
+            : '<span style="color:var(--text4);">—</span>'}
+          </td>
+          <td style="text-align:center;">
+            ${f.avg_score > 0
+            ? `<span style="font-weight:600;color:${scoreColor(f.avg_score)}">${parseFloat(f.avg_score).toFixed(1)}</span>`
+            : '<span style="color:var(--text4);">—</span>'}
+          </td>
+          <td><span class="nri-state-badge nri-state-${f.processing_state}">${f.processing_state}</span></td>
+          <td style="color:var(--text4);font-size:0.46rem;">${fmtDate(f.discovered_at)}</td>
+          <td onclick="event.stopPropagation()">
+            ${f.processing_state === 'pending' || f.processing_state === 'failed'
+            ? `<button class="btn btn-xs btn-primary" onclick="nriQueueOne(${f.id}, '${f.filepath}')">▶</button>`
+            : f.in_queue
+                ? `<button class="btn btn-xs btn-danger" onclick="nriRemoveFromQueue(${f.id})">✕</button>`
+                : ''}
+          </td>
+        </tr>`
+    ).join('');
+}
+
+async function nriQueueOne(fileId, filepath) {
+    const f = nriFiles.find(x => x.id === fileId);
+    if (!f) return;
+    if (f.processing_state === 'done') {
+        if (!confirm('This file is already done. Re-queue anyway?')) return;
+    }
+    await fetch('/api/nri/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId, filepath, priority: 5 })
+    });
+    qLog('info', `[NRI] Queued ${f.filename}`);
+    await nriLoadAll();
+}
+
+function renderNriQueue() {
+    const tbody = document.getElementById('nri-queue-body');
+    if (!tbody) return;
+    if (!nriQueue.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text4);padding:1rem;">Queue is empty</td></tr>';
+        return;
+    }
+    tbody.innerHTML = nriQueue.map(q => {
+        const priClass = q.priority >= 8 ? 'nri-p-high' : q.priority >= 4 ? 'nri-p-normal' : 'nri-p-low';
+        return `<tr class="nri-queue-row">
+          <td><span class="nri-priority-badge ${priClass}">${q.priority}</span></td>
+          <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.filename}">${q.filename}</td>
+          <td style="color:var(--text4);font-size:0.46rem;">${q.folder || '—'}</td>
+          <td><span class="tag tag-b">${q.platform || 'unknown'}</span></td>
+          <td><span class="nri-priority-badge ${priClass}">${q.priority}</span></td>
+          <td><span class="nri-state-badge nri-state-${q.status}">${q.status}</span></td>
+          <td style="color:var(--text4);font-size:0.45rem;">${fmtDate(q.enqueued_at)}</td>
+          <td><button class="btn btn-xs btn-danger" onclick="nriRemoveFromQueue(${q.file_id})">✕</button></td>
+        </tr>`;
+    }).join('');
+}
+
+async function nriSelectFile(fileId) {
+    selectedNriFileId = fileId;
+    // Re-render to show selection
+    renderNriFiles();
+    // Load scores for this file
+    await nriShowScoreDetail(fileId);
+}
+
+async function nriShowScoreDetail(fileId) {
+    const panel = document.getElementById('nri-score-panel');
+    if (!panel) return;
+
+    const file = nriFiles.find(f => f.id === fileId);
+    panel.innerHTML = `<div style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:1rem;">Loading scores...</div>`;
+
+    try {
+        const scores = await fetch(`/api/nri/scores?fileId=${fileId}`).then(r => r.json());
+
+        if (!scores.length) {
+            panel.innerHTML = `
+              <div style="font-size:0.62rem;font-weight:600;color:var(--text);margin-bottom:0.5rem;">${file?.filename || 'File #' + fileId}</div>
+              <div class="nri-state-badge nri-state-${file?.processing_state || 'pending'}" style="margin-bottom:0.75rem;">${file?.processing_state || 'pending'}</div>
+              <div style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;margin-top:1rem;text-align:center;">
+                No scores yet. Queue this file and run the scoring pipeline.
+              </div>`;
+            return;
+        }
+
+        // Build score map
+        const scoreMap = {};
+        scores.forEach(s => { scoreMap[s.pillar] = s; });
+
+        let html = `
+          <div style="font-size:0.62rem;font-weight:600;color:var(--text);margin-bottom:0.35rem;">${file?.filename || 'File #' + fileId}</div>
+          <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem;">
+            <span class="nri-state-badge nri-state-${file?.processing_state || 'pending'}">${file?.processing_state || '?'}</span>
+            <span class="tag tag-b">${file?.platform || 'unknown'}</span>
+            <span style="color:var(--text4);font-family:var(--mono);font-size:0.44rem;">${scores.length} pillars scored</span>
+          </div>
+          <div style="margin-bottom:0.75rem;">`;
+
+        NRI_PILLARS.forEach(p => {
+            const s = scoreMap[p];
+            const label = PILLAR_LABELS[p] || p;
+            if (!s) {
+                html += `<div class="pillar-bar-row">
+                  <div class="pillar-rel-dot" style="background:var(--border2)"></div>
+                  <div class="pillar-bar-name" style="opacity:0.4">${label}</div>
+                  <div class="pillar-bar-track">
+                    <div class="pillar-bar-fill pillar-bar-skipped" style="width:0%;background:var(--border2)"></div>
+                  </div>
+                  <div class="pillar-bar-value" style="opacity:0.4">N/A</div>
+                </div>`;
+            } else if (!s.is_relevant) {
+                html += `<div class="pillar-bar-row">
+                  <div class="pillar-rel-dot" style="background:var(--border2)"></div>
+                  <div class="pillar-bar-name" style="opacity:0.4">${label}</div>
+                  <div class="pillar-bar-track"><div class="pillar-bar-fill pillar-bar-skipped" style="width:${(s.relevance_score * 100).toFixed(0)}%;background:rgba(100,100,120,0.3)"></div></div>
+                  <div class="pillar-bar-value" style="opacity:0.4">Skip</div>
+                </div>`;
+            } else {
+                const sc = s.effective_score ?? s.raw_score ?? 0;
+                const col = scoreColor(sc);
+                html += `<div class="pillar-bar-row" title="Relevance: ${(s.relevance_score * 100).toFixed(0)}% | Confidence: ${((s.confidence || 0) * 100).toFixed(0)}%">
+                  <div class="pillar-rel-dot" style="background:${col}"></div>
+                  <div class="pillar-bar-name">${label}</div>
+                  <div class="pillar-bar-track">
+                    <div class="pillar-bar-fill" style="width:${sc}%;background:${col}"></div>
+                  </div>
+                  <div class="pillar-bar-value" style="color:${col};font-weight:600">${sc.toFixed(0)}</div>
+                </div>`;
+            }
+        });
+
+        html += `</div>`;
+
+        // Evidence section
+        const withEvidence = scores.filter(s => s.evidence && s.is_relevant);
+        if (withEvidence.length) {
+            html += `<div style="font-family:var(--mono);font-size:0.44rem;color:var(--text4);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.4rem;">Evidence</div>`;
+            withEvidence.slice(0, 3).forEach(s => {
+                html += `<div style="background:var(--bg4);border-radius:4px;padding:0.35rem 0.5rem;margin-bottom:0.3rem;">
+                  <div style="color:var(--cyan);font-family:var(--mono);font-size:0.42rem;margin-bottom:0.2rem;">${PILLAR_LABELS[s.pillar] || s.pillar}</div>
+                  <div style="font-size:0.5rem;color:var(--text3);line-height:1.4;font-style:italic;">"${s.evidence}"</div>
+                </div>`;
+            });
+        }
+
+        // Set in file ID for manual score entry
+        const msFileId = document.getElementById('ms-file-id');
+        if (msFileId) msFileId.value = fileId;
+
+        panel.innerHTML = html;
+    } catch (e) {
+        panel.innerHTML = `<div style="color:var(--red);font-family:var(--mono);font-size:0.52rem;">Error loading scores: ${e.message}</div>`;
+    }
+}
+
+async function nriLoadHeatmap() {
+    const container = document.getElementById('nri-heatmap-container');
+    if (!container) return;
+    container.innerHTML = '<div style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:1rem;">Loading heatmap data...</div>';
+
+    try {
+        const allScores = await fetch('/api/nri/scores?limit=300').then(r => r.json());
+        if (!allScores.length) {
+            container.innerHTML = '<div style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:1rem;">No score data available yet</div>';
+            return;
+        }
+
+        // Group by filename
+        const fileMap = {};
+        allScores.forEach(s => {
+            if (!fileMap[s.filepath]) fileMap[s.filepath] = { filename: s.filename, scores: {} };
+            fileMap[s.filepath].scores[s.pillar] = s.relevance_score;
+        });
+
+        const files = Object.values(fileMap).slice(0, 30); // limit to 30 rows
+
+        let html = '<div class="nri-heatmap">';
+        // Top-left empty
+        html += '<div class="nri-hm-hdr" style="writing-mode:horizontal-tb;height:auto;padding:0.5rem;font-family:var(--mono);font-size:0.4rem;text-align:center;">File / Pillar</div>';
+
+        // Column headers
+        NRI_PILLARS.forEach(p => {
+            const short = (PILLAR_LABELS[p] || p).replace('ency', '').replace('tion', '').replace('ment', '').slice(0, 10);
+            html += `<div class="nri-hm-hdr">${short}</div>`;
+        });
+
+        // Data rows
+        files.forEach(f => {
+            html += `<div class="nri-hm-file" title="${f.filename}">${f.filename.replace(/\.[^.]+$/, '').slice(0, 18)}</div>`;
+            NRI_PILLARS.forEach(p => {
+                const val = f.scores[p];
+                const bg = heatColor(val);
+                const display = val != null ? (parseFloat(val) * 100).toFixed(0) + '%' : '—';
+                html += `<div class="nri-hm-cell" style="background:${bg};color:${parseFloat(val || 0) >= 0.3 ? 'var(--text)' : 'var(--text4)'};" title="${PILLAR_LABELS[p]}: ${display}">${display}</div>`;
+            });
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = `<div style="color:var(--red);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:1rem;">Heatmap error: ${e.message}</div>`;
+    }
+}
+
+async function nriSubmitManualScore() {
+    const fileId = parseInt(document.getElementById('ms-file-id')?.value);
+    const pillar = document.getElementById('ms-pillar')?.value;
+    const relevance = parseFloat(document.getElementById('ms-relevance')?.value);
+    const score = parseFloat(document.getElementById('ms-score')?.value);
+    const evidence = document.getElementById('ms-evidence')?.value || '';
+
+    if (!fileId || !pillar) { alert('File ID and Pillar are required'); return; }
+
+    const file = nriFiles.find(f => f.id === fileId);
+    if (!file) { alert('File ID not found in registry. Scan first.'); return; }
+
+    try {
+        await fetch('/api/nri/scores', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fileId,
+                filepath: file.filepath,
+                pillar,
+                relevanceScore: isNaN(relevance) ? 0 : relevance,
+                isRelevant: relevance >= 0.3,
+                rawScore: isNaN(score) ? null : score,
+                effectiveScore: isNaN(score) ? null : score,
+                confidence: 1.0,
+                evidence
+            })
+        });
+
+        // Update file state to done if first score
+        if (file.processing_state === 'pending' || file.processing_state === 'queued') {
+            await fetch(`/api/nri/files/${fileId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ processing_state: 'done', pillar_scored: 1 })
+            });
+        }
+
+        qLog('ok', `[NRI] Saved score for ${file.filename} — ${PILLAR_LABELS[pillar]}: ${score}`);
+        await nriLoadAll();
+        if (selectedNriFileId === fileId) await nriShowScoreDetail(fileId);
+    } catch (e) {
+        qLog('err', '[NRI] Score save failed: ' + e.message);
+    }
+}
+
+// Auto-refresh NRI stats every 30s when tab is visible
+setInterval(async () => {
+    const ppView = document.getElementById('v-preproving');
+    if (ppView && ppView.classList.contains('active')) {
+        await nriLoadStats();
+        await nriLoadQueue();
+    }
+}, 30000);
+

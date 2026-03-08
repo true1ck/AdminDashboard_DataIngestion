@@ -971,6 +971,193 @@ async function runImport(jobId, config) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  NRI PRE-PROCESSING PIPELINE API
+// ═══════════════════════════════════════════════════════════════
+
+// GET /api/nri/stats — pipeline overview stats
+app.get('/api/nri/stats', async (req, res) => {
+    try {
+        res.json(await db.nriGetStats());
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/nri/files — list all discovered files
+app.get('/api/nri/files', async (req, res) => {
+    try {
+        const filter = req.query.filter || 'all';
+        res.json(await db.nriGetFiles(filter));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/nri/files/discover — register a new file (idempotent)
+app.post('/api/nri/files/discover', async (req, res) => {
+    try {
+        const result = await db.nriDiscoverFile(req.body);
+        res.json(result);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/nri/files/scan — scan DataCollected folder and register all .txt files
+app.post('/api/nri/files/scan', async (req, res) => {
+    try {
+        const rootDir = path.join(__dirname, '..', 'DataCollected');
+        if (!fs.existsSync(rootDir)) {
+            return res.json({ discovered: 0, new: 0, existing: 0, files: [] });
+        }
+
+        const PLATFORM_MAP = {
+            'twitter': 'twitter', 'facebook': 'facebook', 'youtube': 'youtube',
+            'whisper': 'youtube', 'whatsapp': 'whatsapp', 'news': 'news',
+            'rss': 'news', 'pdf': 'document', 'image': 'document', 'database': 'database'
+        };
+
+        let discovered = 0, newFiles = 0, existingFiles = 0;
+        const fileResults = [];
+
+        function scanDir(dir, relPath = '') {
+            try {
+                if (!fs.existsSync(dir)) return;
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (entry.name.startsWith('.')) continue; // skip hidden
+                    const fullPath = path.join(dir, entry.name);
+                    const itemRelPath = relPath ? path.join(relPath, entry.name) : entry.name;
+
+                    if (entry.isDirectory()) {
+                        scanDir(fullPath, itemRelPath);
+                    } else if (entry.isFile()) {
+                        const ext = path.extname(entry.name).toLowerCase();
+                        if (ext === '.txt' || ext === '.md') {
+                            discovered++;
+                            fileResults.push({
+                                fullPath,
+                                relPath: itemRelPath,
+                                name: entry.name,
+                                folder: relPath || '.'
+                            });
+                        }
+                    }
+                }
+            } catch (e) { console.error(`[NRI Scan] Error scanning ${dir}:`, e.message); }
+        }
+
+        scanDir(rootDir);
+
+        // Process in a controlled async loop
+        for (const f of fileResults) {
+            const stats = fs.existsSync(f.fullPath) ? fs.statSync(f.fullPath) : null;
+            const folderParts = f.folder.split(path.sep);
+
+            // Smarter platform detection
+            let platform = 'unknown';
+            const folderLower = f.folder.toLowerCase();
+            if (PLATFORM_MAP[folderParts[0]?.toLowerCase()]) {
+                platform = PLATFORM_MAP[folderParts[0].toLowerCase()];
+            } else {
+                for (const [key, val] of Object.entries(PLATFORM_MAP)) {
+                    if (folderLower.includes(key)) {
+                        platform = val;
+                        break;
+                    }
+                }
+            }
+
+            const result = await db.nriDiscoverFile({
+                filepath: f.fullPath,
+                filename: f.name,
+                folder: f.folder,
+                platform,
+                fileSizeBytes: stats ? stats.size : 0
+            });
+            if (result.existing) existingFiles++;
+            else newFiles++;
+        }
+
+        res.json({ discovered, new: newFiles, existing: existingFiles });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/nri/files/:id — update file processing state
+app.put('/api/nri/files/:id', async (req, res) => {
+    try {
+        const file = await db.nriUpdateFile(parseInt(req.params.id), req.body);
+        res.json(file);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/nri/scores — get all scores (optionally filtered by fileId)
+app.get('/api/nri/scores', async (req, res) => {
+    try {
+        if (req.query.fileId) {
+            res.json(await db.nriGetScores(parseInt(req.query.fileId)));
+        } else {
+            res.json(await db.nriGetAllScores(parseInt(req.query.limit) || 500));
+        }
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/nri/scores — save pillar score for a file
+app.post('/api/nri/scores', async (req, res) => {
+    try {
+        await db.nriSaveScore(req.body);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/nri/queue — list queue
+app.get('/api/nri/queue', async (req, res) => {
+    try {
+        const status = req.query.status || 'all';
+        res.json(await db.nriGetQueue(status));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/nri/queue — enqueue a file
+app.post('/api/nri/queue', async (req, res) => {
+    try {
+        const { fileId, filepath, priority } = req.body;
+        if (!fileId) return res.status(400).json({ error: 'fileId required' });
+        const entry = await db.nriEnqueue(fileId, filepath, priority || 5);
+        await db.appendLog('info', `[NRI] Queued file #${fileId} for scoring`);
+        res.json(entry);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/nri/queue/:id — update queue item status
+app.put('/api/nri/queue/:id', async (req, res) => {
+    try {
+        await db.nriUpdateQueue(parseInt(req.params.id), req.body);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/nri/queue/:fileId — remove from queue
+app.delete('/api/nri/queue/:fileId', async (req, res) => {
+    try {
+        await db.nriRemoveFromQueue(parseInt(req.params.fileId));
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/nri/queue/batch — enqueue multiple files
+app.post('/api/nri/queue/batch', async (req, res) => {
+    try {
+        const { fileIds } = req.body;
+        if (!Array.isArray(fileIds)) return res.status(400).json({ error: 'fileIds array required' });
+        const results = [];
+        for (const fid of fileIds) {
+            const file = await db.nriGetFiles('all').then(files => files.find(f => f.id === fid));
+            if (file && file.processing_state !== 'done') {
+                const entry = await db.nriEnqueue(fid, file.filepath, 5);
+                results.push(entry);
+            }
+        }
+        await db.appendLog('info', `[NRI] Batch queued ${results.length} files`);
+        res.json({ queued: results.length, results });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════
 //  MYDATABASE API — Direct SQLite query engine for the MyDB tab
 // ═══════════════════════════════════════════════════════════════
 const MYDB_PATH = path.join(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', 'dev.db');
