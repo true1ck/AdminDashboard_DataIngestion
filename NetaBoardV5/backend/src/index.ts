@@ -91,34 +91,38 @@ app.post('/api/ingest', async (req, res) => {
         const { source, content, author, title, fileName, fileData } = req.body;
 
         // ── SAVE TO FILE SYSTEM (`DataCollected` folder) ──
-        try {
-            const dataCollectedDir = path.resolve(process.cwd(), '../../DataCollected');
+        if (!req.body.skipFileSave) {
+            try {
+                const dataCollectedDir = path.resolve(process.cwd(), '../../DataCollected');
 
-            // Create a direct folder for the item based on its title or source
-            let folderName = (title || source || 'Unknown').replace(/[^a-zA-Z0-9]/g, '_');
-            const targetFolder = path.join(dataCollectedDir, folderName);
+                // Create a direct folder for the item based on its title or source
+                let folderName = (title || source || 'Unknown').replace(/[^a-zA-Z0-9]/g, '_');
+                const targetFolder = path.join(dataCollectedDir, folderName);
 
-            if (!fs.existsSync(targetFolder)) {
-                fs.mkdirSync(targetFolder, { recursive: true });
+                if (!fs.existsSync(targetFolder)) {
+                    fs.mkdirSync(targetFolder, { recursive: true });
+                }
+
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const fileHeader = `Timestamp: ${new Date().toISOString()}\nSource: ${source}\nAuthor: ${author}\n${'='.repeat(40)}\n\n`;
+
+                // Save extracted text
+                const textFilePath = path.join(targetFolder, `extracted_text_${timestamp}.txt`);
+                fs.writeFileSync(textFilePath, fileHeader + (content || ''));
+                console.log(`[Ingest] Saved text to -> ${textFilePath}`);
+
+                // Save original file if provided
+                if (fileData && fileName) {
+                    const origFilePath = path.join(targetFolder, fileName.replace(/[^a-zA-Z0-9.-]/g, '_'));
+                    const base64Data = fileData.includes(',') ? fileData.split(',')[1] : fileData;
+                    fs.writeFileSync(origFilePath, Buffer.from(base64Data, 'base64'));
+                    console.log(`[Ingest] Saved original file to -> ${origFilePath}`);
+                }
+            } catch (fsError) {
+                console.error('[Ingest] File system save failed: ', fsError);
             }
-
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const fileHeader = `Timestamp: ${new Date().toISOString()}\nSource: ${source}\nAuthor: ${author}\n${'='.repeat(40)}\n\n`;
-
-            // Save extracted text
-            const textFilePath = path.join(targetFolder, `extracted_text_${timestamp}.txt`);
-            fs.writeFileSync(textFilePath, fileHeader + (content || ''));
-            console.log(`[Ingest] Saved text to -> ${textFilePath}`);
-
-            // Save original file if provided
-            if (fileData && fileName) {
-                const origFilePath = path.join(targetFolder, fileName.replace(/[^a-zA-Z0-9.-]/g, '_'));
-                const base64Data = fileData.includes(',') ? fileData.split(',')[1] : fileData;
-                fs.writeFileSync(origFilePath, Buffer.from(base64Data, 'base64'));
-                console.log(`[Ingest] Saved original file to -> ${origFilePath}`);
-            }
-        } catch (fsError) {
-            console.error('[Ingest] File system save failed: ', fsError);
+        } else {
+            console.log(`[Ingest] SkipFileSave flag detected. Only saving to database for source: ${source}`);
         }
 
         // ── SAVE TO DATABASE (SQLite) ──
@@ -142,24 +146,33 @@ app.post('/api/ingest', async (req, res) => {
 });
 
 // ==========================================
-// Phase 2 + 3: Job Queue & Proxy Routes
+// Phase 2 + 3: Job Queue (In-Memory Session Storage)
 // ==========================================
 import axios from 'axios';
 import multer from 'multer';
 
 const upload = multer({ dest: 'uploads/' });
 
+// In-memory job store
+let sessionJobs: any[] = [];
+
 // Create a new job
 app.post('/api/jobs', async (req, res) => {
     try {
         const { name, sourceType, totalItems } = req.body;
-        const job = await prisma.ingestJob.create({
-            data: {
-                name: name || 'Unnamed Job',
-                sourceType: sourceType || 'unknown',
-                totalItems: Number(totalItems) || 1,
-            }
-        });
+        const job = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: name || 'Unnamed Job',
+            sourceType: sourceType || 'unknown',
+            status: 'queued',
+            progress: 0,
+            itemsProcessed: 0,
+            totalItems: Number(totalItems) || 1,
+            logs: '[]',
+            createdAt: new Date(),
+            completedAt: null
+        };
+        sessionJobs.push(job);
         res.json(job);
     } catch (error) {
         console.error(error);
@@ -170,10 +183,7 @@ app.post('/api/jobs', async (req, res) => {
 // List jobs
 app.get('/api/jobs', async (req, res) => {
     try {
-        const jobs = await prisma.ingestJob.findMany({
-            orderBy: { createdAt: 'desc' },
-            take: 50
-        });
+        const jobs = [...sessionJobs].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 50);
         res.json(jobs);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch jobs' });
@@ -186,25 +196,21 @@ app.put('/api/jobs/:id', async (req, res) => {
         const { id } = req.params;
         const { status, progress, itemsProcessed, logs } = req.body;
 
-        const dataToUpdate: any = {};
-        if (status) dataToUpdate.status = status;
-        if (progress !== undefined) dataToUpdate.progress = progress;
-        if (itemsProcessed !== undefined) dataToUpdate.itemsProcessed = itemsProcessed;
-        if (status === 'done' || status === 'failed') dataToUpdate.completedAt = new Date();
+        const jobIndex = sessionJobs.findIndex(j => j.id === id);
+        if (jobIndex === -1) return res.status(404).json({ error: 'Job not found' });
+
+        const job = sessionJobs[jobIndex];
+        if (status) job.status = status;
+        if (progress !== undefined) job.progress = progress;
+        if (itemsProcessed !== undefined) job.itemsProcessed = itemsProcessed;
+        if (status === 'done' || status === 'failed') job.completedAt = new Date();
 
         if (logs) {
-            const existingJob = await prisma.ingestJob.findUnique({ where: { id } });
-            if (existingJob) {
-                const currentLogs = JSON.parse(existingJob.logs || '[]');
-                currentLogs.push(logs);
-                dataToUpdate.logs = JSON.stringify(currentLogs);
-            }
+            const currentLogs = JSON.parse(job.logs || '[]');
+            currentLogs.push(logs);
+            job.logs = JSON.stringify(currentLogs);
         }
 
-        const job = await prisma.ingestJob.update({
-            where: { id },
-            data: dataToUpdate
-        });
         res.json(job);
     } catch (error) {
         res.status(500).json({ error: 'Failed to update job' });
@@ -213,7 +219,8 @@ app.put('/api/jobs/:id', async (req, res) => {
 
 app.delete('/api/jobs/:id', async (req, res) => {
     try {
-        await prisma.ingestJob.delete({ where: { id: req.params.id } });
+        const { id } = req.params;
+        sessionJobs = sessionJobs.filter(j => j.id !== id);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete job' });

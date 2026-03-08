@@ -604,16 +604,35 @@ app.get('/api/db/tables', (req, res) => {
     }
 });
 
+const PRISMA_MODELS = [
+    'Archetype', 'Constituency', 'PillarScore', 'SansadRecord', 'Rival', 
+    'Feedback', 'SocialItem', 'Alert', 'IASCLAction', 'IASCLCriteria', 
+    'IASCLTransition', 'Channel', 'ChannelInstance'
+];
+
+function autoQuotePgQuery(sql) {
+    if (!sql) return sql;
+    let modified = sql;
+    PRISMA_MODELS.forEach(model => {
+        // Match unquoted model names. 
+        // We look for word boundaries but avoid things already quoted.
+        // This is a heuristic but covers the most common "SELECT * FROM Archetype" cases.
+        const regex = new RegExp(`(?<!["'\\w])${model}(?!["'\\w])`, 'g');
+        modified = modified.replace(regex, `"${model}"`);
+    });
+    return modified;
+}
+
 // Query the DB directly using sqlite3
 app.post('/api/db/query', async (req, res) => {
     const { table, query, limit, uri, host, port, dbName, user, password, dbType } = req.body;
     if (!table) return res.status(400).json({ error: 'Table name required' });
 
     const dbUrl = uri || (dbType === 'pg' ? `postgresql://${user}:${password}@${host}:${port}/${dbName}` : '');
-    const isSqlite = dbUrl.startsWith('file:') || dbType === 'sqlite' || dbType === 'pg'; // pg fallback since Neta schema is sqlite
     const finalLimit = limit || 20;
+    const isSqlite = dbUrl.startsWith('file:') || dbType === 'sqlite';
 
-    if (isSqlite && dbUrl) {
+    if (isSqlite && dbUrl && dbType === 'sqlite') {
         const dbPath = dbUrl.replace('file:', '');
         const fullPath = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', dbPath);
         
@@ -626,9 +645,8 @@ app.post('/api/db/query', async (req, res) => {
             if (err) return res.json({ ok: false, error: 'Cannot open DB: ' + err.message });
         });
 
-        // Use custom query if provided, else simple SELECT
         const sql = query && query.trim() !== '' ? query : `SELECT * FROM ${table} LIMIT ${finalLimit}`;
-        console.log(`[DB Query] Executing SQL: ${sql}`);
+        console.log(`[DB Query] Executing SQLite: ${sql}`);
 
         tempDb.all(sql, [], (err, rows) => {
             tempDb.close();
@@ -636,12 +654,34 @@ app.post('/api/db/query', async (req, res) => {
                 console.error(`[DB Query] Error: ${err.message}`);
                 return res.json({ ok: false, error: `Query failed: ${err.message}` });
             }
-            console.log(`[DB Query] Success: ${rows.length} rows returned`);
             res.json({ ok: true, rows: rows, count: rows.length });
         });
+    } else if (dbType === 'pg') {
+        // Query PostgreSQL
+        const { Client } = require('pg');
+        const client = new Client({ connectionString: dbUrl });
+        
+        let sql = query && query.trim() !== '' ? query : `SELECT * FROM "${table}" LIMIT ${finalLimit}`;
+        
+        // Auto-quote if it's a custom query for Postgres
+        if (query && query.trim() !== '') {
+            sql = autoQuotePgQuery(sql);
+        }
+
+        console.log(`[DB Query] Executing Postgres: ${sql}`);
+
+        try {
+            await client.connect();
+            const result = await client.query(sql);
+            await client.end();
+            res.json({ ok: true, rows: result.rows, count: result.rowCount });
+        } catch (err) {
+            console.error(`[DB Query] PG Error: ${err.message}`);
+            try { await client.end(); } catch (e) {}
+            res.json({ ok: false, error: `Postgres query failed: ${err.message}` });
+        }
     } else {
-        // Fallback or non-SQLite database logic
-        res.json({ ok: true, rows: [], count: 0, note: `Custom query engine not implemented for ${dbType}. Use Prisma Studio to browse.` });
+        res.json({ ok: true, rows: [], count: 0, note: `Query engine not implemented for ${dbType}. Use Prisma Studio.` });
     }
 });
 
@@ -668,21 +708,33 @@ const DATA_COLLECTED_DIR = path.join(__dirname, '..', 'DataCollected', 'database
 if (!fs.existsSync(DATA_COLLECTED_DIR)) fs.mkdirSync(DATA_COLLECTED_DIR, { recursive: true });
 
 // ══════════════════════════════════════════════
-//  SAVED QUERIES API
+//  SAVED QUERIES API (In-Memory Session Storage)
 // ══════════════════════════════════════════════
+let sessionSavedQueries = [];
+let nextQueryId = 1;
+
 app.get('/api/db/saved-queries', async (req, res) => {
-    try { res.json(await db.getSavedQueries()); }
-    catch (err) { res.status(500).json({ error: err.message }); }
+    try { 
+        res.json(sessionSavedQueries); 
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/db/saved-queries', async (req, res) => {
-    try { res.json(await db.createSavedQuery(req.body)); }
-    catch (err) { res.status(500).json({ error: err.message }); }
+    try { 
+        const newQuery = { 
+            ...req.body, 
+            id: nextQueryId++, 
+            created_at: new Date().toISOString() 
+        };
+        sessionSavedQueries.unshift(newQuery);
+        res.json(newQuery); 
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/db/saved-queries/:id', async (req, res) => {
     try {
-        await db.deleteSavedQuery(parseInt(req.params.id));
+        const idToDelete = parseInt(req.params.id);
+        sessionSavedQueries = sessionSavedQueries.filter(q => q.id !== idToDelete);
         res.json({ ok: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -719,30 +771,37 @@ app.get('/api/db/import/status/:jobId', (req, res) => {
 });
 
 async function runImport(jobId, config) {
-    const { dbType, uri, table, query, mapping, tables, batch } = config;
+    const { dbType, uri, table, query, mapping, tables, batch, host, port, dbName, user, pass } = config;
     const state = activeDbImports[jobId];
     const logPrefix = `[Import ${jobId}]`;
 
     try {
-        if (dbType !== 'sqlite') throw new Error(`Only SQLite currently supported for ingestion.`);
+        let sourceDb;
+        let pClient;
 
-        let dbPath = uri.startsWith('file:') ? path.resolve(uri.replace('file:', '')) : path.resolve(uri);
-        
-        // Robust relative path checking
-        if (!fs.existsSync(dbPath)) {
-            const relPath1 = path.resolve(__dirname, uri.replace('file:', ''));
-            const relPath2 = path.resolve(__dirname, '..', uri.replace('file:', ''));
-            const relPath3 = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', uri.replace('file:', ''));
-            
-            if (fs.existsSync(relPath1)) dbPath = relPath1;
-            else if (fs.existsSync(relPath2)) dbPath = relPath2;
-            else if (fs.existsSync(relPath3)) dbPath = relPath3;
-            else throw new Error(`Database not found: ${dbPath} (checked project-specific locations)`);
+        if (dbType === 'sqlite') {
+            let dbPath = uri.startsWith('file:') ? path.resolve(uri.replace('file:', '')) : path.resolve(uri);
+            if (!fs.existsSync(dbPath)) {
+                const relPath1 = path.resolve(__dirname, uri.replace('file:', ''));
+                const relPath2 = path.resolve(__dirname, '..', uri.replace('file:', ''));
+                const relPath3 = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', uri.replace('file:', ''));
+                if (fs.existsSync(relPath1)) dbPath = relPath1;
+                else if (fs.existsSync(relPath2)) dbPath = relPath2;
+                else if (fs.existsSync(relPath3)) dbPath = relPath3;
+                else throw new Error(`Database not found: ${dbPath}`);
+            }
+            console.log(`${logPrefix} Connecting to SQLite: ${dbPath}`);
+            sourceDb = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
+        } else if (dbType === 'pg') {
+            const { Client } = require('pg');
+            const connectionString = uri || `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public`;
+            console.log(`${logPrefix} Connecting to Postgres: ${connectionString.replace(/:([^@:]+)@/, ':****@')}`);
+            pClient = new Client({ connectionString });
+            await pClient.connect();
+        } else {
+            throw new Error(`Unsupported database type for ingestion: ${dbType}`);
         }
 
-        console.log(`${logPrefix} Connecting to: ${dbPath}`);
-        const sourceDb = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
-        
         // Descriptive filename generation
         let baseName = "db_import";
         if (tables === 'all') baseName = "Full_DB_Sync";
@@ -754,46 +813,74 @@ async function runImport(jobId, config) {
         const outputPath = path.join(DATA_COLLECTED_DIR, `${safeName}_${jobId}.txt`);
         const fileStream = fs.createWriteStream(outputPath);
 
-        // 1. Build the list of tasks (table or query)
+        // 1. Build the list of tasks
         let tasks = [];
         if (batch && Array.isArray(batch)) {
-            tasks = batch; // [{ name, query, mapping }]
+            tasks = batch;
         } else if (tables === 'all') {
-            const allTables = await new Promise((res, rej) => {
-                sourceDb.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'prisma_%'", [], (err, rows) => err ? rej(err) : res(rows));
-            });
-            tasks = allTables.map(t => ({ name: t.name, table: t.name, mapping }));
+            if (dbType === 'sqlite') {
+                const allTables = await new Promise((res, rej) => {
+                    sourceDb.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'prisma_%'", [], (err, rows) => err ? rej(err) : res(rows));
+                });
+                tasks = allTables.map(t => ({ name: t.name, table: t.name, mapping }));
+            } else {
+                const res = await pClient.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'");
+                tasks = res.rows.map(t => ({ name: t.table_name, table: t.table_name, mapping }));
+            }
         } else {
             tasks = [{ name: table || 'Custom Query', table, query, mapping }];
         }
 
-        // 2. Count total rows across all tasks
+        // 2. Count total rows
         let totalRows = 0;
         for (const t of tasks) {
-            const countSql = t.query ? `SELECT COUNT(*) as cnt FROM (${t.query})` : `SELECT COUNT(*) as cnt FROM ${t.table}`;
-            const count = await new Promise((res, rej) => sourceDb.get(countSql, [], (err, row) => err ? rej(err) : res(row.cnt)));
-            t.total = count;
-            totalRows += count;
+            const quot = dbType === 'pg' ? '"' : '';
+            const tableName = t.table ? (dbType === 'pg' ? `"${t.table}"` : t.table) : null;
+            let countSql = t.query ? `SELECT COUNT(*) as cnt FROM (${t.query}) as sub` : `SELECT COUNT(*) as cnt FROM ${tableName}`;
+            
+            if (dbType === 'pg') {
+                countSql = autoQuotePgQuery(countSql);
+            }
+
+            if (dbType === 'sqlite') {
+                const count = await new Promise((res, rej) => sourceDb.get(countSql, [], (err, row) => err ? rej(err) : res(row.cnt)));
+                t.total = count;
+                totalRows += count;
+            } else {
+                const res = await pClient.query(countSql);
+                const count = parseInt(res.rows[0].cnt);
+                t.total = count;
+                totalRows += count;
+            }
         }
         state.total = totalRows;
         await db.updateJob(jobId, { status: 'processing', progress: 0 });
 
         // 3. Process sequentially
         let globalIdx = 0;
-        fileStream.write(`# Consolidated DB Import Job #${jobId}\n# Date: ${new Date().toISOString()}\n# Source: ${dbPath}\n\n`);
+        fileStream.write(`# Consolidated DB Import Job #${jobId}\n# Date: ${new Date().toISOString()}\n# Source: ${dbType.toUpperCase()}\n\n`);
 
         for (const t of tasks) {
-            console.log(`${logPrefix} Processing ${t.name}...`);
-            const sql = t.query || `SELECT * FROM ${t.table}`;
+            const tableName = t.table ? (dbType === 'pg' ? `"${t.table}"` : t.table) : null;
+            let sql = t.query || `SELECT * FROM ${tableName}`;
             
+            if (dbType === 'pg') {
+                sql = autoQuotePgQuery(sql);
+            }
+
             fileStream.write(`\n## SECTION: ${t.name}\n`);
             if (t.query) fileStream.write(`### SQL: ${t.query}\n`);
             fileStream.write(`${'='.repeat(20)}\n\n`);
             
-            const rows = await new Promise((res, rej) => sourceDb.all(sql, [], (err, rows) => err ? rej(err) : res(rows)));
+            let rows = [];
+            if (dbType === 'sqlite') {
+                rows = await new Promise((res, rej) => sourceDb.all(sql, [], (err, rows) => err ? rej(err) : res(rows)));
+            } else {
+                const res = await pClient.query(sql);
+                rows = res.rows;
+            }
 
             for (const row of rows) {
-                // Formatting
                 const contentBlock = Object.entries(row)
                     .map(([k, v]) => `- **${k}**: ${v}`)
                     .join('\n');
@@ -806,16 +893,14 @@ async function runImport(jobId, config) {
                     timestamp: t.mapping && row[t.mapping.time] ? new Date(row[t.mapping.time]).toISOString() : new Date().toISOString()
                 };
 
-                // Push to NetaBoard
                 try {
                     await fetch(`${BACKEND_URL}/api/ingest`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify({ ...payload, skipFileSave: true })
                     });
                 } catch (e) { console.warn(`${logPrefix} Push error:`, e.message); }
 
-                // Save to file
                 fileStream.write(`${'#'.repeat(10)}\n${payload.title}\n${payload.content}\n\n`);
 
                 globalIdx++;
@@ -825,14 +910,12 @@ async function runImport(jobId, config) {
                 if (globalIdx % 10 === 0) {
                     await db.updateJob(jobId, { progress: state.progress, itemsProcessed: globalIdx });
                 }
-                
-                // Throttle
-                await new Promise(r => setTimeout(r, 10));
             }
         }
 
         fileStream.end();
-        sourceDb.close();
+        if (sourceDb) sourceDb.close();
+        if (pClient) await pClient.end();
         
         state.status = 'done';
         await db.updateJob(jobId, { status: 'done', progress: 100, itemsProcessed: totalRows });

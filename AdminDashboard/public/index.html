@@ -3090,12 +3090,7 @@
             </div>
             <div class="card-body">
               <div class="dbtype-grid" id="db-type-grid">
-                <div class="dbtype-btn active"
-                  onclick="dbSelectType(this,'sqlite','3000','file:./dev.db')">
-                  <div class="dbtype-ico">🗃️</div>
-                  <div class="dbtype-lbl">SQLite</div>
-                </div>
-                <div class="dbtype-btn"
+                <div class="dbtype-btn active" id="db-btn-pg"
                   onclick="dbSelectType(this,'pg','5432','postgresql://user:pass@host:5432/dbname')">
                   <div class="dbtype-ico">🐘</div>
                   <div class="dbtype-lbl">PostgreSQL</div>
@@ -3122,29 +3117,29 @@
                   id="db-type-badge">PostgreSQL</span>
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:0.65rem;">
-                <div class="fg">
-                  <div class="fl">URI / Connection String</div><input class="fi" id="db-uri" type="text"
-                    value="file:./dev.db" placeholder="postgresql://user:pass@localhost:5432/dbname">
+                <div class="fg" style="display:none;">
+                  <input class="fi" id="db-uri" type="text"
+                    value="postgresql://postgres:1234@localhost:5432/netaboard?schema=public">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Host</div><input class="fi" id="db-host" value="localhost" disabled style="opacity:0.5;">
+                    <div class="fl">Host</div><input class="fi" id="db-host" value="localhost">
                   </div>
                   <div class="fg">
-                    <div class="fl">Port</div><input class="fi" id="db-port" value="3000" disabled style="opacity:0.5;">
+                    <div class="fl">Port</div><input class="fi" id="db-port" value="5432">
                   </div>
                   <div class="fg">
-                    <div class="fl">Database</div><input class="fi" id="db-name" value="netaBoardV5" disabled style="opacity:0.5;">
+                    <div class="fl">Database</div><input class="fi" id="db-name" value="netaboard">
                   </div>
                 </div>
                 <div class="g2" style="gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Username</div><input class="fi" id="db-user" type="text" value="admin" disabled style="opacity:0.5;">
+                    <div class="fl">Username</div><input class="fi" id="db-user" type="text" value="postgres">
                   </div>
                   <div class="fg">
                     <div class="fl">Password</div>
                     <div style="position:relative;">
-                      <input class="fi" id="db-pass" type="password" style="padding-right:2.5rem;opacity:0.5;" disabled>
+                      <input class="fi" id="db-pass" type="password" value="1234" style="padding-right:2.5rem;">
                       <button id="db-pass-toggle" type="button" title="Show password" onclick="dbTogglePassword()"
                         style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--text3);padding:0.2rem 0.3rem;line-height:1;border-radius:3px;transition:color 0.15s;"
                         onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--text3)'">👁</button>
@@ -3189,7 +3184,7 @@
                 </div>
                 <div class="fg">
                   <div class="fl">Custom Query / Filter (SQL)</div><textarea class="fi" id="db-query" rows="2"
-                    placeholder="SELECT * FROM posts WHERE created_at > '2024-01-01'"></textarea>
+                    placeholder='SELECT * FROM "Archetype" WHERE "archetypeKey" = &apos;example&apos; LIMIT 5'></textarea>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
                   <div class="fg">
@@ -4597,11 +4592,10 @@
     let dbType = 'sqlite';
     let dbPrismaStudioOpen = false;
 
-    function dbSelectType(el, type, port, uriPlaceholder) {
+    function dbSelectType(el, type, port) {
       document.querySelectorAll('.dbtype-btn').forEach(b => b.classList.remove('active'));
       el.classList.add('active'); dbType = type;
       document.getElementById('db-port').value = port;
-      document.getElementById('db-uri').placeholder = uriPlaceholder;
       document.getElementById('db-type-badge').textContent = el.querySelector('.dbtype-lbl').textContent;
       document.getElementById('db-test-status').textContent = '';
 
@@ -4633,20 +4627,21 @@
     async function dbTest() {
       const el = document.getElementById('db-test-status');
       const prismaSection = document.getElementById('db-prisma-section');
-      el.textContent = '⟲ Testing connection...'; el.style.color = 'var(--amber)';
+      if (el) { el.textContent = '⟲ Testing connection...'; el.style.color = 'var(--amber)'; }
+
+      const host = document.getElementById('db-host').value;
+      const port = document.getElementById('db-port').value;
+      const dbName = document.getElementById('db-name').value;
+      const user = document.getElementById('db-user').value;
+      const pass = document.getElementById('db-pass').value;
+      
+      const uri = dbType === 'pg' ? `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public` : '';
+
       try {
         const res = await fetch('/api/db/test-connection', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            host: document.getElementById('db-host').value,
-            port: document.getElementById('db-port').value,
-            dbName: document.getElementById('db-name').value,
-            user: document.getElementById('db-user').value,
-            password: document.getElementById('db-pass').value,
-            uri: document.getElementById('db-uri').value,
-            dbType
-          })
+          body: JSON.stringify({ host, port, dbName, user, password: pass, uri, dbType })
         });
         const data = await res.json();
         if (data.ok) {
@@ -4718,6 +4713,14 @@
       if (!table) { alert('Select a table first.'); return; }
       if (sec) sec.style.display = 'block';
       if (body) body.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--amber);padding:1rem;">⟲ Querying...</td></tr>';
+
+      const host = document.getElementById('db-host').value;
+      const port = document.getElementById('db-port').value;
+      const dbName = document.getElementById('db-name').value;
+      const user = document.getElementById('db-user').value;
+      const pass = document.getElementById('db-pass').value;
+      const uri = dbType === 'pg' ? `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public` : '';
+
       try {
         const res = await fetch('/api/db/query', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -4725,13 +4728,7 @@
             table, 
             query: queryEl ? queryEl.value : '', 
             limit: 20,
-            host: document.getElementById('db-host').value,
-            port: document.getElementById('db-port').value,
-            dbName: document.getElementById('db-name').value,
-            user: document.getElementById('db-user').value,
-            password: document.getElementById('db-pass').value,
-            uri: document.getElementById('db-uri').value,
-            dbType
+            host, port, dbName, user, password: pass, uri, dbType
           })
         });
         const data = await res.json();
@@ -4882,9 +4879,16 @@
         return { name: q.name, query: q.query, mapping: q.mapping };
       });
 
+      const host = document.getElementById('db-host').value;
+      const port = document.getElementById('db-port').value;
+      const dbName = document.getElementById('db-name').value;
+      const user = document.getElementById('db-user').value;
+      const pass = document.getElementById('db-pass').value;
+      const uri = dbType === 'pg' ? `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public` : '';
+
       const config = {
         dbType,
-        uri: document.getElementById('db-uri').value,
+        uri,
         batch: batchData,
         includeAll: document.getElementById('db-include-rows').checked
       };
@@ -4897,13 +4901,15 @@
       const isAll = document.getElementById('db-ingest-all').checked;
       const table = document.getElementById('db-table').value || 'table';
       
+      const host = document.getElementById('db-host').value;
+      const port = document.getElementById('db-port').value;
+      const dbName = document.getElementById('db-name').value;
+      const user = document.getElementById('db-user').value;
+      const pass = document.getElementById('db-pass').value;
+      const uri = dbType === 'pg' ? `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public` : '';
+      
       const config = {
-        host: document.getElementById('db-host').value,
-        port: document.getElementById('db-port').value,
-        dbName: document.getElementById('db-name').value,
-        user: document.getElementById('db-user').value,
-        pass: document.getElementById('db-pass').value,
-        uri: document.getElementById('db-uri').value,
+        host, port, dbName, user, pass, uri,
         dbType: dbType,
         table: table,
         query: document.getElementById('db-query').value,
@@ -5015,6 +5021,10 @@
     renderKaggle();
     renderQueue();
     updateStats();
+
+    // Trigger Postgres default selection
+    const pgBtn = document.getElementById('db-btn-pg');
+    if (pgBtn) dbSelectType(pgBtn, 'pg', '5432');
   </script>
 </body>
 
