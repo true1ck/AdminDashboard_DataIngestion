@@ -140,25 +140,24 @@
     }
 
     ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
     }
 
     ::-webkit-scrollbar-track {
-      background: var(--bg1);
-      border-left: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 3px;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: var(--text4);
-      border-radius: 4px;
-      border: 2px solid var(--bg1);
-      /* Padding effect */
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 3px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: var(--text3);
+      background: rgba(255, 255, 255, 0.4);
     }
+
 
     /* ── LAYOUT ── */
     .shell {
@@ -469,6 +468,83 @@
       min-height: 0;
       scrollbar-gutter: stable;
     }
+
+    /* ── PIPELINE VIEW LAYOUT ── */
+    #v-pipeline>.pl-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      padding: 1rem 1.25rem;
+      gap: 0.75rem;
+    }
+
+    #v-pipeline .pl-top-section {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    #v-pipeline .pl-feed-card {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    #v-pipeline .pl-feed-card>.card-hdr {
+      flex-shrink: 0;
+    }
+
+    #v-pipeline .pl-feed-wrapper {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0.6rem 0.75rem;
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      background: var(--bg1);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      word-break: break-word;
+      scrollbar-gutter: stable;
+    }
+
+    #v-pipeline .pl-feed-footer {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.72rem;
+      color: var(--text3);
+      border-top: 1px solid var(--border);
+    }
+
+    #v-pipeline .pl-filter-bar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    #v-pipeline .pl-filter-bar .fs,
+    #v-pipeline .pl-filter-bar .fi {
+      width: auto;
+      min-width: 130px;
+      font-size: 0.6rem;
+      padding: 0.4rem 0.65rem;
+    }
+
 
     .card-body-scroll {
       max-height: 500px;
@@ -1303,8 +1379,15 @@
     }
 
     @keyframes slideDown {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .results-content {
@@ -2044,6 +2127,15 @@
         <div class="tb-badge" id="qwen-status"
           style="border-color:var(--border2);color:var(--text3);background:transparent;"><span class="dot dot-a"
             style="margin-right:4px;"></span>QWEN(5001)</div>
+        <div class="tb-badge" id="twitter-status"
+          style="border-color:var(--border2);color:var(--text3);background:transparent;"><span class="dot dot-a"
+            style="margin-right:4px;"></span>TWITTER(6060)</div>
+        <div class="tb-badge" id="fb-status"
+          style="border-color:var(--border2);color:var(--text3);background:transparent;"><span class="dot dot-a"
+            style="margin-right:4px;"></span>FB(7070)</div>
+        <div class="tb-badge" id="admin-status"
+          style="border-color:var(--border2);color:var(--text3);background:transparent;"><span class="dot dot-a"
+            style="margin-right:4px;"></span>ADMIN(4000)</div>
         <div class="tb-badge" id="neta-status"
           style="border-color:var(--border2);color:var(--text3);background:transparent;"><span class="dot dot-a"
             style="margin-right:4px;"></span>NETA(3000)</div>
@@ -2115,10 +2207,20 @@
         <div class="nav-lbl">Pipeline</div>
       </div>
 
+      <div class="nav-item" data-view="preprocessing" title="Data Visualization">
+        <div class="nav-ico">🧠</div>
+        <div class="nav-lbl">Data Visualization</div>
+      </div>
+
       <div class="nav-item" data-view="servers" title="Node Server Management">
         <div class="nav-ico">🖥️</div>
         <div class="nav-lbl">Servers</div>
       </div>
+      <div class="nav-item" data-view="mydb" title="My Database Viewer">
+        <div class="nav-ico">🗃️</div>
+        <div class="nav-lbl">MyDatabase</div>
+      </div>
+
     </nav>
 
     <!-- ══════════════════════════════════════
@@ -2131,85 +2233,96 @@
         <div class="vhdr">
           <div class="vhdr-left">
             <div class="vhdr-title"><span class="src-icon">🔄</span> Pipeline Intelligence Monitor</div>
-            <div class="vhdr-sub">Real-time data collection · Entity tracking · Live stage logs · SSE streaming from port 8500</div>
+            <div class="vhdr-sub">Real-time data collection · Entity tracking · Live stage logs · SSE streaming from
+              port 8500</div>
           </div>
           <div class="vhdr-actions">
-            <span id="pl-api-badge" style="font-size:0.72rem;padding:3px 10px;border-radius:20px;border:1px solid var(--border2);color:var(--text3);">● Offline</span>
+            <span id="pl-api-badge"
+              style="font-size:0.72rem;padding:3px 10px;border-radius:20px;border:1px solid var(--border2);color:var(--text3);">●
+              Offline</span>
             <button class="btn btn-primary" onclick="plStartSSE()">▶ Connect Feed</button>
             <button class="btn" onclick="plStopSSE()">■ Stop</button>
             <button class="btn" onclick="plClearFeed()">🗑 Clear</button>
           </div>
         </div>
-        <div class="vscroll">
 
-          <!-- Pipeline status cards -->
-          <div id="pl-pipeline-cards" style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
-            <div class="card" style="padding:1rem;text-align:center;opacity:0.5;flex:1;min-width:200px;" id="pl-no-pipelines">
-              <div style="font-size:2rem;">🔄</div>
-              <div style="font-size:0.8rem;color:var(--text3);margin-top:0.4rem;">No pipelines — start the pipeline API (port 8500)</div>
-            </div>
-          </div>
+        <div class="pl-body">
+          <!-- ── Top: pipeline cards + trigger (pinned, never scrolls) ── -->
+          <div class="pl-top-section">
 
-          <!-- Trigger entity collection -->
-          <div class="card" style="margin-bottom:1rem;">
-            <div class="card-hdr">
-              <div class="card-title"><span class="icon">🔍</span> Trigger Entity Collection</div>
-              <span class="tag tag-p">Ad-hoc</span>
+            <!-- Pipeline status cards -->
+            <div id="pl-pipeline-cards" style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+              <div class="card" style="padding:1rem;text-align:center;opacity:0.5;flex:1;min-width:200px;"
+                id="pl-no-pipelines">
+                <div style="font-size:1.6rem;">🔄</div>
+                <div style="font-size:0.75rem;color:var(--text3);margin-top:0.3rem;">No pipelines — start the pipeline
+                  API (port 8500)</div>
+              </div>
             </div>
-            <div class="card-body">
-              <div style="display:flex;gap:0.6rem;align-items:flex-end;flex-wrap:wrap;">
-                <div class="fg" style="flex:2;min-width:160px;">
-                  <div class="fl">Entity / Person Name</div>
-                  <input class="fi" id="pl-entity" type="text" placeholder="e.g. Rahul Gandhi">
+
+            <!-- Trigger entity collection -->
+            <div class="card">
+              <div class="card-hdr">
+                <div class="card-title"><span class="icon">🔍</span> Trigger Entity Collection</div>
+                <span class="tag tag-p">Ad-hoc</span>
+              </div>
+              <div class="card-body">
+                <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+                  <div class="fg" style="flex:2;min-width:160px;">
+                    <div class="fl">Entity / Person Name</div>
+                    <input class="fi" id="pl-entity" type="text" placeholder="e.g. Rahul Gandhi">
+                  </div>
+                  <div class="fg" style="min-width:100px;max-width:130px;">
+                    <div class="fl">Results per source</div>
+                    <input class="fi" id="pl-count" type="number" value="5" min="1" max="50">
+                  </div>
+                  <div class="fg" style="min-width:150px;max-width:200px;">
+                    <div class="fl">Sources (ctrl+click multi)</div>
+                    <select class="fs" id="pl-sources" multiple style="height:62px;">
+                      <option value="youtube" selected>YouTube</option>
+                      <option value="news_rss" selected>News RSS</option>
+                      <option value="twitter">Twitter/X</option>
+                      <option value="instagram">Instagram</option>
+                    </select>
+                  </div>
+                  <button class="btn btn-primary" style="flex-shrink:0;align-self:flex-end;"
+                    onclick="plTriggerEntity()">⚡ Collect Now</button>
                 </div>
-                <div class="fg" style="max-width:130px;">
-                  <div class="fl">Results per source</div>
-                  <input class="fi" id="pl-count" type="number" value="5" min="1" max="50">
-                </div>
-                <div class="fg" style="max-width:180px;">
-                  <div class="fl">Sources (ctrl+click multi)</div>
-                  <select class="fs" id="pl-sources" multiple style="height:62px;">
-                    <option value="youtube" selected>YouTube</option>
-                    <option value="news_rss" selected>News RSS</option>
-                    <option value="twitter">Twitter/X</option>
-                    <option value="instagram">Instagram</option>
-                  </select>
-                </div>
-                <button class="btn btn-primary" style="flex-shrink:0;align-self:flex-end;" onclick="plTriggerEntity()">⚡ Collect Now</button>
               </div>
             </div>
           </div>
 
-          <!-- Live feed -->
-          <div class="card">
+          <!-- ── Live feed card (fills all remaining space) ── -->
+          <div class="pl-feed-card">
             <div class="card-hdr" style="flex-wrap:wrap;gap:0.5rem;">
               <div class="card-title"><span class="icon">📡</span> Live Pipeline Feed</div>
-              <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-left:auto;align-items:center;">
-                <select class="fs" id="pl-filter-topic" style="min-width:160px;" onchange="plApplyFilters()">
-                  <option value="">All Topics</option>
-                </select>
-                <select class="fs" id="pl-filter-stage" style="min-width:130px;" onchange="plApplyFilters()">
+              <div class="pl-filter-bar">
+                <select class="fs" id="pl-filter-stage" onchange="plApplyFilters()">
                   <option value="">All Stages</option>
                   <option value="collector">Collector</option>
                   <option value="transformer">Transformer</option>
                   <option value="processor">Processor</option>
                   <option value="consumer">Consumer</option>
                 </select>
-                <select class="fs" id="pl-filter-pipeline" style="min-width:150px;" onchange="plApplyFilters()">
+                <select class="fs" id="pl-filter-topic" onchange="plApplyFilters()">
+                  <option value="">All Topics</option>
+                </select>
+                <select class="fs" id="pl-filter-pipeline" onchange="plApplyFilters()">
                   <option value="">All Pipelines</option>
                 </select>
-                <input class="fi" id="pl-filter-search" type="text" placeholder="Search text…" style="min-width:130px;" oninput="plApplyFilters()">
+                <input class="fi" id="pl-filter-search" type="text" placeholder="Search…" oninput="plApplyFilters()">
               </div>
             </div>
-            <div id="pl-feed" style="font-family:monospace;font-size:0.76rem;max-height:540px;overflow-y:auto;padding:0.7rem;background:var(--bg2);border-radius:6px;display:flex;flex-direction:column;gap:5px;"></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.2rem 0;font-size:0.72rem;color:var(--text3);">
+            <div id="pl-feed" class="pl-feed-wrapper"></div>
+            <div class="pl-feed-footer">
               <span id="pl-event-count">0 events</span>
-              <span id="pl-sse-status" style="color:var(--text3);">● Disconnected</span>
+              <span id="pl-sse-status">● Disconnected</span>
             </div>
           </div>
-
         </div>
+
       </div><!-- /v-pipeline -->
+
 
 
       <!-- ██ YOUTUBE ██ -->
@@ -2357,8 +2470,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-youtube" style="font-size:0.5rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-youtube" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg2); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-youtube"
+                style="font-size:0.5rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-youtube"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg2); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -2573,8 +2688,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-whatsapp" style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-whatsapp" class="results-content" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-whatsapp"
+                style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-whatsapp" class="results-content"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -2768,8 +2885,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-facebook" style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-facebook" class="results-content" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-facebook"
+                style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-facebook" class="results-content"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -2955,8 +3074,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-twitter" style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-twitter" class="results-content" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-twitter"
+                style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-twitter" class="results-content"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -3071,8 +3192,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-pdfs" style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-pdfs" class="results-content" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-pdfs"
+                style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-pdfs" class="results-content"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -3192,8 +3315,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-images" style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-images" class="results-content" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-images"
+                style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-images" class="results-content"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -3315,8 +3440,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-zips" style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-zips" class="results-content" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-zips"
+                style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-zips" class="results-content"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -3398,8 +3525,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-kaggle" style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-kaggle" class="results-content" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-kaggle"
+                style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-kaggle" class="results-content"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -3424,7 +3553,13 @@
             </div>
             <div class="card-body">
               <div class="dbtype-grid" id="db-type-grid">
-                <div class="dbtype-btn active" id="db-btn-pg">
+                <div class="dbtype-btn active" onclick="dbSelectType(this,'sqlite','3000','file:./dev.db')">
+                  <div class="dbtype-ico">🗃️</div>
+                  <div class="dbtype-lbl">SQLite</div>
+                </div>
+                <div class="dbtype-btn"
+                  onclick="dbSelectType(this,'pg','5432','postgresql://user:pass@host:5432/dbname')">
+
                   <div class="dbtype-ico">🐘</div>
                   <div class="dbtype-lbl">PostgreSQL</div>
                 </div>
@@ -3460,18 +3595,24 @@
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Host</div><input class="fi" id="db-host" value="localhost">
+                    <div class="fl">Host</div><input class="fi" id="db-host" value="localhost" disabled
+                      style="opacity:0.5;">
+
                   </div>
                   <div class="fg">
                     <div class="fl">Port</div><input class="fi" id="db-port" value="5432">
                   </div>
                   <div class="fg">
-                    <div class="fl">Database</div><input class="fi" id="db-name" value="netaboard">
+                    <div class="fl">Database</div><input class="fi" id="db-name" value="netaBoardV5" disabled
+                      style="opacity:0.5;">
+
                   </div>
                 </div>
                 <div class="g2" style="gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Username</div><input class="fi" id="db-user" type="text" value="postgres">
+                    <div class="fl">Username</div><input class="fi" id="db-user" type="text" value="admin" disabled
+                      style="opacity:0.5;">
+
                   </div>
                   <div class="fg">
                     <div class="fl">Password</div>
@@ -3646,8 +3787,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-database" style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-database" class="results-content" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-database"
+                style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-database" class="results-content"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -3746,8 +3889,10 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="results-meta-rss" style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
-              <pre id="results-content-rss" class="results-content" style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
+              <div id="results-meta-rss"
+                style="font-size:0.55rem; color:var(--text3); margin-bottom:0.5rem; font-family:var(--mono);"></div>
+              <pre id="results-content-rss" class="results-content"
+                style="white-space:pre-wrap; font-family:var(--mono); font-size:0.75rem; background:var(--bg); padding:1rem; border-radius:4px; max-height:500px; overflow-y:auto; border:1px solid var(--border2); color:var(--text2);"></pre>
             </div>
           </div>
         </div>
@@ -3757,37 +3902,39 @@
       <div class="view" id="v-preprocessing">
         <div class="vhdr">
           <div class="vhdr-left">
-            <div class="vhdr-title"><span class="src-icon">🧠</span> Preprocessing & Data Visualization</div>
+            <div class="vhdr-title"><span class="src-icon">📊</span> Data Visualization</div>
             <div class="vhdr-sub">View collected outputs from DataCollected folder, refine and interact with extracted
               data</div>
           </div>
           <div class="vhdr-actions">
-            <button class="btn btn-outline btn-sm" onclick="loadDataCollectedFolder()">⟲ Refresh Data</button>
+            <button class="btn btn-outline btn-sm" onclick="loadDataCollectedFolder()">⟲ Refresh Files</button>
           </div>
         </div>
-        <div class="vscroll" style="flex-direction:row; padding:0; overflow:hidden;">
-          <!-- Left Sidebar for Folders/Files -->
-          <div
-            style="width:260px; border-right:1px solid var(--border); background:var(--bg2); display:flex; flex-direction:column; overflow:hidden;">
-            <div
-              style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); font-weight:600; font-family:var(--mono); font-size:0.6rem; letter-spacing:0.05em; color:var(--text3); text-transform:uppercase;">
-              Files in DataCollected</div>
-            <div id="data-col-tree"
-              style="flex:1; overflow-y:auto; padding:0.5rem; font-family:var(--mono); font-size:0.75rem; color:var(--text2);">
-              <div style="color:var(--text4); padding:0.5rem;">Loading data...</div>
+        <div class="vscroll">
+          <div style="display:grid;grid-template-columns:300px 1fr;gap:1.5rem;height:100%;">
+            <!-- Left: File Tree -->
+            <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 160px);">
+              <div class="card-hdr">
+                <div class="card-title">📁 DataCollected Folder</div>
+              </div>
+              <div class="card-body" id="data-col-tree"
+                style="overflow-y:auto;flex:1;font-family:var(--mono);font-size:0.55rem;">
+                <div style="color:var(--text4);padding:0.5rem;">Click Refresh to load...</div>
+              </div>
             </div>
-          </div>
-          <!-- Right Content Area -->
-          <div style="flex:1; display:flex; flex-direction:column; background:var(--bg); overflow:hidden;">
-            <div id="data-col-hdr"
-              style="padding:0.6rem 1rem; border-bottom:1px solid var(--border); font-family:var(--mono); font-size:0.75rem; color:var(--text); background:var(--bg1);">
-              Select a file to view its contents
-            </div>
-            <div id="data-col-content-wrapper"
-              style="flex:1; overflow:hidden; display:flex; flex-direction:column; position:relative;">
-              <textarea id="data-col-preview"
-                style="flex:1; width:100%; height:100%; border:none; resize:none; padding:1rem; font-family:var(--mono); font-size:0.8rem; line-height:1.5; color:var(--text2); background:transparent;"
-                readonly></textarea>
+
+            <!-- Right: Preview -->
+            <div style="display:flex;flex-direction:column;gap:1rem;height:100%;">
+              <div class="card" style="flex:1;display:flex;flex-direction:column;">
+                <div class="card-hdr" id="data-col-hdr">
+                  <div class="card-title">📄 File Preview</div>
+                </div>
+                <div class="card-body" style="padding:0;flex:1;display:flex;">
+                  <textarea id="data-col-preview" class="fi" readonly
+                    style="flex:1;background:var(--bg);color:var(--text2);font-family:var(--mono);font-size:0.7rem;padding:1rem;border:none;resize:none;"
+                    placeholder="Select a file from the tree to view its content..."></textarea>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -3809,6 +3956,145 @@
           <div id="servers-grid"
             style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1rem; width:100%;">
             <div style="color:var(--text4);">Loading server cluster health...</div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- ██ MYDATABASE ██ -->
+      <div class="view" id="v-mydb">
+        <div class="vhdr">
+          <div class="vhdr-left">
+            <div class="vhdr-title"><span class="src-icon">🗃️</span> MyDatabase</div>
+            <div class="vhdr-sub">Browse, query and inspect your Prisma SQLite database in real-time</div>
+          </div>
+          <div class="vhdr-actions">
+            <a href="http://localhost:5555" target="_blank" class="btn btn-outline btn-sm"
+              style="text-decoration:none;">↗ Open Prisma Studio</a>
+            <button class="btn btn-primary btn-sm" onclick="mydbRunQuery()">▶ Run Query</button>
+          </div>
+        </div>
+        <div class="vscroll">
+
+          <!-- Status Bar -->
+          <div id="mydb-status-bar"
+            style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 1rem;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1rem;">
+            <span id="mydb-status-dot"
+              style="width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 6px var(--amber);flex-shrink:0;"></span>
+            <span id="mydb-status-txt" style="font-family:var(--mono);font-size:0.52rem;color:var(--text2);">Checking
+              Prisma Studio...</span>
+            <span style="margin-left:auto;font-family:var(--mono);font-size:0.48rem;color:var(--text4);">SQLite · dev.db
+              · Port 5555</span>
+          </div>
+
+          <!-- Two-column layout -->
+          <div style="display:grid;grid-template-columns:240px 1fr;gap:1rem;align-items:start;">
+
+            <!-- LEFT: Table Browser -->
+            <div style="display:flex;flex-direction:column;gap:0.75rem;">
+              <div class="card">
+                <div class="card-hdr">
+                  <div class="card-title"><span class="icon">📋</span> Tables</div>
+                  <button class="btn btn-xs btn-outline" onclick="mydbLoadTables()">↺</button>
+                </div>
+                <div class="card-body" style="padding:0.5rem;">
+                  <div id="mydb-table-list" style="display:flex;flex-direction:column;gap:0.25rem;">
+                    <div style="color:var(--text4);font-size:0.52rem;padding:0.5rem;">Click ↺ to load tables</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-hdr">
+                  <div class="card-title"><span class="icon">⚡</span> Quick Queries</div>
+                </div>
+                <div class="card-body" style="display:flex;flex-direction:column;gap:0.35rem;">
+                  <button class="btn btn-xs btn-outline" style="text-align:left;justify-content:flex-start;"
+                    onclick="mydbSetQuery('SELECT * FROM SocialItem ORDER BY rowid DESC LIMIT 20')">📱 Latest
+                    SocialItems</button>
+                  <button class="btn btn-xs btn-outline" style="text-align:left;justify-content:flex-start;"
+                    onclick="mydbSetQuery('SELECT * FROM Archetype LIMIT 20')">🏛️ Archetypes</button>
+                  <button class="btn btn-xs btn-outline" style="text-align:left;justify-content:flex-start;"
+                    onclick="mydbSetQuery('SELECT * FROM Constituency LIMIT 20')">🗺️ Constituencies</button>
+                  <button class="btn btn-xs btn-outline" style="text-align:left;justify-content:flex-start;"
+                    onclick="mydbSetQuery('SELECT * FROM PillarScore ORDER BY rowid DESC LIMIT 20')">📊 Pillar
+                    Scores</button>
+                  <button class="btn btn-xs btn-outline" style="text-align:left;justify-content:flex-start;"
+                    onclick="mydbSetQuery('SELECT * FROM Alert ORDER BY rowid DESC LIMIT 20')">🔔 Alerts</button>
+                  <button class="btn btn-xs btn-outline" style="text-align:left;justify-content:flex-start;"
+                    onclick="mydbSetQuery('SELECT COUNT(*) as total FROM SocialItem')">🔢 Count All Items</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- RIGHT: Query + Results + Iframe -->
+            <div style="display:flex;flex-direction:column;gap:0.75rem;">
+
+              <!-- SQL Editor -->
+              <div class="card">
+                <div class="card-hdr">
+                  <div class="card-title"><span class="icon">⬡</span> SQL Query Editor</div>
+                  <div style="display:flex;gap:0.4rem;">
+                    <button class="btn btn-xs btn-outline" onclick="mydbClearQuery()">✕ Clear</button>
+                    <button class="btn btn-xs btn-primary" onclick="mydbRunQuery()">▶ Run</button>
+                  </div>
+                </div>
+                <div class="card-body" style="padding:0.65rem;">
+                  <textarea id="mydb-query-input" class="fi" rows="4"
+                    style="font-family:var(--mono);font-size:0.65rem;resize:vertical;width:100%;box-sizing:border-box;"
+                    placeholder="SELECT * FROM SocialItem LIMIT 20;
+SELECT COUNT(*) FROM Constituency;
+SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER BY rowid DESC LIMIT 20;</textarea>
+                  <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem;">
+                    <span id="mydb-query-status"
+                      style="font-family:var(--mono);font-size:0.48rem;color:var(--text4);"></span>
+                    <span id="mydb-row-count"
+                      style="margin-left:auto;font-family:var(--mono);font-size:0.48rem;color:var(--cyan);"></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Results Table -->
+              <div class="card" id="mydb-results-card" style="display:none;">
+                <div class="card-hdr" style="justify-content:space-between;">
+                  <div class="card-title"><span class="icon">📊</span> Query Results</div>
+                  <button class="btn btn-xs btn-outline" onclick="mydbExportCSV()">⬇ Export CSV</button>
+                </div>
+                <div style="overflow-x:auto;max-height:380px;overflow-y:auto;background:var(--bg1);">
+                  <table id="mydb-results-table"
+                    style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:0.52rem;">
+                    <thead id="mydb-results-thead" style="position:sticky;top:0;background:var(--bg3);"></thead>
+                    <tbody id="mydb-results-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Prisma Studio Embed -->
+              <div class="card">
+                <div class="card-hdr">
+                  <div class="card-title">
+                    <span class="icon" style="display:inline-flex;align-items:center;gap:0.4rem;">
+                      <span id="mydb-prisma-dot"
+                        style="width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);display:inline-block;"></span>
+                    </span>
+                    Prisma Studio
+                    <span class="tag tag-g" style="margin-left:0.3rem;">LIVE · :5555</span>
+                  </div>
+                  <div style="display:flex;gap:0.4rem;">
+                    <a href="http://localhost:5555" target="_blank" class="btn btn-xs btn-outline"
+                      style="text-decoration:none;">↗ Pop Out</a>
+                    <button class="btn btn-xs btn-outline" onclick="mydbReloadIframe()">⟲ Reload</button>
+                  </div>
+                </div>
+                <div class="card-body p0">
+                  <iframe id="mydb-prisma-iframe" src="http://localhost:5555"
+                    style="width:100%;height:600px;border:none;border-radius:0 0 var(--radius) var(--radius);background:var(--bg);"
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation">
+                  </iframe>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       </div>
@@ -5161,7 +5447,27 @@
     /* ═══════════════════════════════════════════════
        DATABASE
     ═══════════════════════════════════════════════ */
-    let dbType = 'pg';
+    let dbType = 'sqlite';
+    let dbPrismaStudioOpen = false;
+
+    function dbSelectType(el, type, port, uriPlaceholder) {
+      document.querySelectorAll('.dbtype-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active'); dbType = type;
+      document.getElementById('db-port').value = port;
+      document.getElementById('db-uri').placeholder = uriPlaceholder;
+      document.getElementById('db-type-badge').textContent = el.querySelector('.dbtype-lbl').textContent;
+      document.getElementById('db-test-status').textContent = '';
+
+      const isSqlite = type === 'sqlite';
+      ['db-host', 'db-port', 'db-name', 'db-user', 'db-pass'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+          input.disabled = isSqlite;
+          input.style.opacity = isSqlite ? '0.5' : '1';
+        }
+      });
+    }
+
 
     function dbTogglePassword() {
       const inp = document.getElementById('db-pass');
@@ -5264,7 +5570,17 @@
           qLog('info', `Fetched ${data.tables.length} tables from database`);
         }
       } catch (err) {
-        qLog('err', `Failed to load tables: ${err.message}`);
+        const fallback = ['Archetype', 'Constituency', 'PillarScore', 'SansadRecord', 'Feedback', 'SocialItem', 'Alert'];
+        const tableList = document.getElementById('db-table-chips');
+        const tableInput = document.getElementById('db-table');
+        if (tableList) {
+          tableList.innerHTML = fallback.map(t =>
+            `<span class="db-table-chip" onclick="dbSelectTable('${t}')">${t}</span>`
+          ).join('');
+          tableList.style.display = 'flex';
+        }
+        if (tableInput) tableInput.value = fallback[0];
+
       }
     }
 
@@ -5527,6 +5843,7 @@
                 j.outputFile = sData.outputFile;
                 viewOutputFile(j.id);
               }
+
               clearInterval(poller);
               renderQueue(); updateStats();
               qLog('ok', `✓ Job ${j.id} completed successfully.`);
@@ -5810,7 +6127,8 @@
         </div>
       </div>
       <div style="padding:1rem; flex:1; overflow:hidden; display:flex; flex-direction:column;">
-        <div id="output-modal-filename" style="font-family:var(--mono); font-size:0.7rem; color:var(--text3); margin-bottom:0.5rem;"></div>
+        <div id="output-modal-filename"
+          style="font-family:var(--mono); font-size:0.7rem; color:var(--text3); margin-bottom:0.5rem;"></div>
         <div id="output-modal-content"
           style="flex:1; overflow-y:auto; white-space:pre-wrap; background:var(--bg); border:1px solid var(--border2); border-radius:4px; padding:1.5rem; font-family:var(--mono); font-size:0.8rem; color:var(--text2); line-height:1.6; user-select:text;">
         </div>
@@ -5834,6 +6152,29 @@
       'database': 'database',
       'news': 'rss',
       'rss': 'rss'
+    }
+
+    const STAGE_COLORS_PL = {
+      collector: '#f59e0b',
+      transformer: '#3b82f6',
+      processor: '#8b5cf6',
+      consumer: '#10b981',
+    };
+    const EVENT_TYPE_LABELS = {
+      raw_fetch: 'fetch',
+      normalized: 'norm',
+      dedup_drop: 'dedup',
+      drop: 'drop',
+      sentiment: 'sentiment',
+      ner: 'ner',
+      stored: 'stored',
+      audit: 'audit',
+      trace: 'trace',
+      error: 'error',
+    };
+    const PLATFORM_ICONS_PL = {
+      youtube: '▶', twitter: '𝕏', instagram: '📷',
+      news_rss: '📰', india_news: '📰', mock: '🧪',
     };
 
     async function viewOutputFile(id) {
@@ -5842,7 +6183,7 @@
 
       let fileInfo = j.outputFile;
       if (!fileInfo && j.extraMeta && j.extraMeta.startsWith('{')) {
-        try { fileInfo = JSON.parse(j.extraMeta); } catch(e) {}
+        try { fileInfo = JSON.parse(j.extraMeta); } catch (e) { }
       }
 
       if (!fileInfo) {
@@ -5874,7 +6215,7 @@
           const text = await res.text();
           contentEl.textContent = text;
           window[`_tabFile_${viewId}`] = { name: fileInfo.filename, content: text };
-          
+
           // Smooth scroll to the results section within the vscroll
           cardEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
         } else {
@@ -5902,7 +6243,7 @@
           contentEl.textContent = text;
           window._currentModalFile = { name: fileInfo.filename, content: text };
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     function downloadTabResults(viewId) {
@@ -5934,35 +6275,60 @@
     }
 
     function plEventRow(ev) {
-      const colorMap = { 'collector': '#3b82f6', 'transformer': '#8b5cf6', 'processor': '#f59e0b', 'consumer': '#10b981' };
-      const color = colorMap[ev.stage] || '#6b7280';
-      const ts = new Date(ev.timestamp).toLocaleTimeString();
-      const text = ev.text || ev.message || JSON.stringify(ev.data || {});
-      return `<div style="display:flex;gap:6px;align-items:flex-start;padding:4px 6px;border-radius:4px;border-left:3px solid ${color};background:rgba(0,0,0,0.15);" data-stage="${ev.stage||''}" data-topic="${ev.topic||''}" data-pipeline="${ev.pipeline_id||''}" data-text="${(text).toLowerCase()}">
-        <span style="color:var(--text3);flex-shrink:0;width:65px;">[${ts}]</span>
-        <span style="color:${color};font-weight:600;width:75px;flex-shrink:0;">${(ev.stage||'log').toUpperCase()}</span>
-        <span style="color:var(--text2);flex:1;">${text}</span>
+      const color = STAGE_COLORS_PL[ev.stage] || '#6b7280';
+      const icon = PLATFORM_ICONS_PL[ev.platform] || '●';
+      const ts = ev.timestamp ? new Date(ev.timestamp).toTimeString().slice(0, 8) : '--:--:--';
+      const topic = ev.topic ? `<span style="color:#64748b;margin-left:6px;font-size:0.66rem;">[${ev.topic}]</span>` : '';
+      const text = (ev.text || ev.error_message || ev.event_type || '').slice(0, 220);
+      const typeLabel = EVENT_TYPE_LABELS[ev.event_type] || ev.event_type || '';
+      const isError = ev.event_type === 'error';
+      const isDrop = ev.event_type === 'drop' || ev.event_type === 'dedup_drop';
+
+      const slabel = ev.sentiment_label;
+      const sentimentBadge = slabel
+        ? `<span style="margin-left:6px;padding:1px 6px;border-radius:8px;font-size:0.62rem;background:${slabel === 'positive' ? '#10b98118' : slabel === 'negative' ? '#ef444418' : '#94a3b818'};color:${slabel === 'positive' ? '#10b981' : slabel === 'negative' ? '#ef4444' : '#94a3b8'};white-space:nowrap;">${slabel}</span>`
+        : '';
+
+      const entList = Array.isArray(ev.entities) && ev.entities.length
+        ? `<span style="margin-left:6px;color:#a78bfa;font-size:0.62rem;white-space:nowrap;">${ev.entities.slice(0, 3).join(', ')}</span>`
+        : '';
+
+      const threatBadge = ev.is_threat
+        ? `<span style="margin-left:6px;padding:1px 6px;border-radius:8px;font-size:0.62rem;background:#ef444418;color:#ef4444;white-space:nowrap;">⚠ threat</span>`
+        : '';
+
+      const rowBg = isError ? 'rgba(239,68,68,0.06)' : isDrop ? 'rgba(107,114,128,0.06)' : 'rgba(255,255,255,0.02)';
+      const borderColor = isError ? '#ef4444' : color;
+
+      return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 10px;border-radius:5px;border-left:3px solid ${borderColor};background:${rowBg};transition:background 0.15s;" data-stage="${ev.stage || ''}" data-topic="${ev.topic || ''}" data-pipeline="${ev.pipeline_id || ''}" data-text="${text.toLowerCase()}">
+        <span style="color:var(--text3);min-width:58px;flex-shrink:0;font-size:0.7rem;padding-top:1px;">${ts}</span>
+        <span style="background:${color}18;color:${color};border:1px solid ${color}33;border-radius:10px;padding:1px 8px;font-size:0.62rem;flex-shrink:0;white-space:nowrap;">${ev.stage || '?'}</span>
+        ${typeLabel ? `<span style="color:var(--text4);font-size:0.6rem;flex-shrink:0;padding-top:2px;white-space:nowrap;">${typeLabel}</span>` : ''}
+        <span style="flex-shrink:0;font-size:0.82rem;line-height:1;">${icon}</span>
+        <span style="flex:1;color:${isError ? '#ef4444' : isDrop ? 'var(--text3)' : 'var(--text2)'};word-break:break-word;line-height:1.45;">${text}${topic}${sentimentBadge}${entList}${threatBadge}</span>
+
       </div>`;
     }
 
     function plRenderFeed() {
       const feed = document.getElementById('pl-feed');
       if (!feed) return;
-      const stageFil  = document.getElementById('pl-filter-stage')?.value   || '';
-      const topicFil  = document.getElementById('pl-filter-topic')?.value   || '';
-      const pipeFil   = document.getElementById('pl-filter-pipeline')?.value  || '';
-      const searchFil = (document.getElementById('pl-filter-search')?.value  || '').toLowerCase();
-      const filtered  = plEvents.filter(ev =>
-        (!stageFil  || ev.stage === stageFil) &&
-        (!topicFil  || (ev.topic || '') === topicFil) &&
-        (!pipeFil   || (ev.pipeline_id || '') === pipeFil) &&
+      const stageFil = document.getElementById('pl-filter-stage')?.value || '';
+      const topicFil = document.getElementById('pl-filter-topic')?.value || '';
+      const pipeFil = document.getElementById('pl-filter-pipeline')?.value || '';
+      const searchFil = (document.getElementById('pl-filter-search')?.value || '').toLowerCase();
+      const filtered = plEvents.filter(ev =>
+        (!stageFil || ev.stage === stageFil) &&
+        (!topicFil || (ev.topic || '') === topicFil) &&
+        (!pipeFil || (ev.pipeline_id || '') === pipeFil) &&
+
         (!searchFil || (ev.text || ev.event_type || '').toLowerCase().includes(searchFil))
       );
       if (filtered.length === 0) {
-        feed.innerHTML = '<div style="color:var(--text3);text-align:center;padding:2rem;">No events match the current filters.</div>';
+        feed.innerHTML = '<div style="color:var(--text3);text-align:center;padding:3rem 1rem;font-size:0.8rem;">No events match the current filters.</div>';
       } else {
         feed.innerHTML = filtered.slice(-200).map(plEventRow).join('');
-        feed.scrollTop = feed.scrollHeight;
+        requestAnimationFrame(() => { feed.scrollTop = feed.scrollHeight; });
       }
       document.getElementById('pl-event-count').textContent = `${plEvents.length} events (${filtered.length} shown)`;
     }
@@ -5999,10 +6365,10 @@
         document.getElementById('pl-sse-status').style.color = '#10b981';
       };
       plESS.onmessage = (e) => {
-        try { plAddEvent(JSON.parse(e.data)); } catch(_) {}
+        try { plAddEvent(JSON.parse(e.data)); } catch (_) { }
       };
       plESS.addEventListener('event', (e) => {
-        try { plAddEvent(JSON.parse(e.data)); } catch(_) {}
+        try { plAddEvent(JSON.parse(e.data)); } catch (_) { }
       });
       plESS.onerror = () => {
         document.getElementById('pl-sse-status').textContent = '● Error — retrying…';
@@ -6042,28 +6408,28 @@
             <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.3rem;">🔄 ${p.pipeline_id}</div>
             <div style="font-size:0.72rem;color:var(--text3);margin-bottom:0.5rem;">${p.config_path || ''}</div>
             <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
-              <span style="font-size:0.7rem;padding:2px 8px;border-radius:10px;border:1px solid ${isRunning?'#10b981':'#6b7280'};color:${isRunning?'#10b981':'#9ca3af'};">${isRunning ? '● Running' : '○ Stopped'}</span>
+              <span style="font-size:0.7rem;padding:2px 8px;border-radius:10px;border:1px solid ${isRunning ? '#10b981' : '#6b7280'};color:${isRunning ? '#10b981' : '#9ca3af'};">${isRunning ? '● Running' : '○ Stopped'}</span>
               ${isRunning
-                ? `<button class="btn" style="font-size:0.7rem;padding:2px 10px;" onclick="plStopPipeline('${p.pipeline_id}')">■ Stop</button>`
-                : `<button class="btn btn-primary" style="font-size:0.7rem;padding:2px 10px;" onclick="plStartPipeline('${p.pipeline_id}')">▶ Start</button>`}
+              ? `<button class="btn" style="font-size:0.7rem;padding:2px 10px;" onclick="plStopPipeline('${p.pipeline_id}')">■ Stop</button>`
+              : `<button class="btn btn-primary" style="font-size:0.7rem;padding:2px 10px;" onclick="plStartPipeline('${p.pipeline_id}')">▶ Start</button>`}
             </div>`;
           container.appendChild(card);
         });
-      } catch(e) { /* pipeline API offline */ }
+      } catch (e) { /* pipeline API offline */ }
     }
 
     async function plStartPipeline(id) {
       try {
         await fetch(`${PL_API}/pipelines/${id}/start`, { method: 'POST' });
         setTimeout(plFetchPipelines, 800);
-      } catch(e) { alert('Could not start pipeline — is the pipeline API running on port 8500?'); }
+      } catch (e) { alert('Could not start pipeline.'); }
     }
 
     async function plStopPipeline(id) {
       try {
         await fetch(`${PL_API}/pipelines/${id}/stop`, { method: 'POST' });
         setTimeout(plFetchPipelines, 800);
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function plFetchTopics() {
@@ -6081,14 +6447,14 @@
             plTopicsKnown.add(t);
           }
         });
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function plTriggerEntity() {
       const entity = document.getElementById('pl-entity').value.trim();
       if (!entity) { alert('Enter an entity name first.'); return; }
-      const count   = parseInt(document.getElementById('pl-count').value) || 5;
-      const srcSel  = document.getElementById('pl-sources');
+      const count = parseInt(document.getElementById('pl-count').value) || 5;
+      const srcSel = document.getElementById('pl-sources');
       const sources = [...srcSel.options].filter(o => o.selected).map(o => o.value);
       if (sources.length === 0) { alert('Select at least one source.'); return; }
       try {
@@ -6105,7 +6471,7 @@
           const err = await r.json().catch(() => ({}));
           alert('Collection failed: ' + (err.detail || r.status));
         }
-      } catch(e) {
+      } catch (e) {
         alert('Cannot reach pipeline API on port 8500. Make sure it is running.');
       }
     }
@@ -6127,6 +6493,244 @@
       });
     });
 
+    // ═══════════════════════════════════════════════════════════════
+    //  DATA VISUALIZATION LOGIC
+    // ═══════════════════════════════════════════════════════════════
+    async function loadDataCollectedFolder() {
+      const treeEl = document.getElementById('data-col-tree');
+      if (!treeEl) return;
+      treeEl.innerHTML = '<div style="color:var(--text4); padding:0.5rem;">Loading data...</div>';
+      try {
+        const res = await fetch('/api/fs/datacollected');
+        const data = await res.json();
+        if (!data.files || data.files.length === 0) {
+          treeEl.innerHTML = '<div style="color:var(--text4); padding:0.5rem;">No files found in DataCollected folder.</div>';
+          return;
+        }
+        const grouped = {};
+        data.files.forEach(f => {
+          const parts = f.path.split('/');
+          const folderName = parts.length > 1 ? parts[0] : 'root';
+          if (!grouped[folderName]) grouped[folderName] = [];
+          grouped[folderName].push(f);
+        });
+        let html = '';
+        for (const [folder, files] of Object.entries(grouped)) {
+          html += `<div style="margin-bottom:0.75rem;">
+                    <div style="font-weight:600; color:var(--text); margin-bottom:0.2rem; cursor:pointer;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none';">📁 ${folder}</div>
+                    <div style="padding-left:1rem;">
+                        ${files.map(f => {
+            const kb = (f.size / 1024).toFixed(1);
+            return `<div style="padding:0.2rem 0; cursor:pointer; color:var(--text2);" 
+                                      onmouseover="this.style.color='var(--cyan)'" 
+                                      onmouseout="this.style.color='var(--text2)'"
+                                      onclick="openDataCollectedFile('${f.path}')" title="${f.name}">
+                                    📄 ${f.name} <span style="font-size:0.6rem; color:var(--text4); margin-left:4px;">(${kb} KB)</span>
+                                  </div>`;
+          }).join('')}
+                    </div>
+                </div>`;
+        }
+        treeEl.innerHTML = html;
+      } catch (e) {
+        treeEl.innerHTML = `<div style="color:var(--red); padding:0.5rem;">Error loading data: ${e.message}</div>`;
+      }
+    }
+
+    async function openDataCollectedFile(path) {
+      const hdr = document.getElementById('data-col-hdr');
+      const preview = document.getElementById('data-col-preview');
+      if (!hdr || !preview) return;
+      hdr.textContent = `Loading: ${path}...`;
+      preview.value = 'Loading contents...';
+      try {
+        const res = await fetch(`/api/fs/datacollected/file?path=${encodeURIComponent(path)}`);
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to load file');
+        }
+        const content = await res.text();
+        hdr.innerHTML = `Viewing: <strong>${path}</strong>`;
+        preview.value = content;
+      } catch (e) {
+        hdr.textContent = `Error: ${path}`;
+        preview.value = `Error loading file: ${e.message}`;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  SERVERS MANAGEMENT LOGIC
+    // ═══════════════════════════════════════════════════════════════
+    async function loadServersHealth() {
+      const grid = document.getElementById('servers-grid');
+      if (!grid) return;
+      grid.innerHTML = '<div style="color:var(--text4);">Checking server ports...</div>';
+      try {
+        const res = await fetch('/api/servers');
+        const data = await res.json();
+        grid.innerHTML = data.servers.map(s => {
+          const isUp = s.status === 'online';
+          const badgeCol = isUp ? 'var(--green)' : 'var(--red)';
+          const badgeText = isUp ? 'ONLINE' : 'OFFLINE';
+          return `
+          <div class="card" style="border:1px solid ${isUp ? 'var(--border2)' : 'var(--red3)'}; position:relative; overflow:hidden;">
+            ${isUp ? `<div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--green);"></div>` : `<div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--red);"></div>`}
+            <div class="card-hdr" style="padding-bottom:0.4rem;">
+              <div class="card-title" style="font-size:0.95rem;">${s.name}</div>
+              <div style="background:${badgeCol}22; color:${badgeCol}; padding:0.15rem 0.4rem; border-radius:4px; font-family:var(--mono); font-size:0.55rem; font-weight:700;">${badgeText}</div>
+            </div>
+            <div class="card-body" style="padding-top:0.2rem;">
+              <div style="font-family:var(--mono); font-size:0.6rem; color:var(--text3); margin-bottom:0.6rem; display:flex; justify-content:space-between;">
+                <span>PORT: ${s.port}</span>
+                <span>TYPE: ${s.type.toUpperCase()}</span>
+              </div>
+              <div style="color:var(--text2); font-size:0.75rem; min-height:40px; margin-bottom:1rem; line-height:1.4;">
+                ${s.desc}
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; border-top:1px solid var(--border); margin:0 -1.25rem -1.25rem -1.25rem; padding:0.75rem 1.25rem; background:var(--bg2);">
+                ${isUp ? `
+                  <button class="btn btn-xs btn-outline" style="border-color:var(--red3); color:var(--red);" onclick="controlServer('${s.id}', 'stop')">⏹ Stop</button>
+                  <button class="btn btn-xs btn-primary" onclick="controlServer('${s.id}', 'restart')">⟲ Restart</button>
+                ` : `
+                  <button class="btn btn-xs btn-outline" disabled style="opacity:0.5; cursor:not-allowed;">⏹ Stop</button>
+                  <button class="btn btn-xs btn-primary" style="background:var(--green); color:black;" onclick="controlServer('${s.id}', 'start')">▶ Start</button>
+                `}
+              </div>
+            </div>
+          </div>
+          `;
+        }).join('');
+      } catch (err) {
+        grid.innerHTML = `<div style="color:var(--red);">Failed to connect to monitoring service: ${err.message}</div>`;
+      }
+    }
+
+    async function controlServer(id, action) {
+      if (id === 'admin' && action === 'stop') {
+        if (!confirm("Stopping the Admin Dashboard will kill the interface you are looking at. Are you sure?")) return;
+      }
+      try {
+        const res = await fetch(`/api/servers/${id}/control`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action })
+        });
+        if (!res.ok) throw new Error("Action failed");
+        if (action === 'start' || action === 'restart') {
+          qLog('info', `Issued ${action} command to ${id}. Waiting for port...`);
+          setTimeout(loadServersHealth, 2500);
+        } else {
+          setTimeout(loadServersHealth, 1000);
+        }
+      } catch (e) {
+        alert("Server control issue: " + e.message);
+        loadServersHealth();
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  MYDATABASE LOGIC
+    // ═══════════════════════════════════════════════════════════════
+    let mydbLastResults = [];
+    async function mydbCheckStatus() {
+      const dot = document.getElementById('mydb-status-dot');
+      const txt = document.getElementById('mydb-status-txt');
+      const prismaDot = document.getElementById('mydb-prisma-dot');
+      if (!dot) return;
+      try {
+        await fetch('http://localhost:5555', { signal: AbortSignal.timeout(2000), mode: 'no-cors' });
+        dot.style.background = 'var(--green)'; dot.style.boxShadow = '0 0 6px var(--green)';
+        if (txt) txt.textContent = '✓ Prisma Studio connected — SQLite dev.db';
+        if (prismaDot) { prismaDot.style.background = 'var(--green)'; prismaDot.style.boxShadow = '0 0 6px var(--green)'; }
+      } catch (_) {
+        dot.style.background = 'var(--red)'; dot.style.boxShadow = '0 0 6px var(--red)';
+        if (txt) txt.textContent = '✗ Prisma Studio offline — run ./start_all.sh';
+        if (prismaDot) { prismaDot.style.background = 'var(--red)'; prismaDot.style.boxShadow = '0 0 6px var(--red)'; }
+      }
+    }
+    async function mydbLoadTables() {
+      const listEl = document.getElementById('mydb-table-list');
+      if (!listEl) return;
+      listEl.innerHTML = '<div style="color:var(--text4);font-size:0.52rem;padding:0.5rem;">Loading...</div>';
+      try {
+        const res = await fetch('/api/mydb/tables');
+        const data = await res.json();
+        if (!data.tables || !data.tables.length) { listEl.innerHTML = 'No tables found'; return; }
+        listEl.innerHTML = data.tables.map(t => `<button class="btn btn-xs btn-outline" style="text-align:left;justify-content:flex-start;font-family:var(--mono);font-size:0.55rem;padding:0.35rem 0.5rem;" onclick="mydbSelectTable('${t.name}')"><span style="color:var(--cyan);margin-right:0.35rem;">▸</span>${t.name} <span style="margin-left:auto;color:var(--text4);font-size:0.44rem;">${t.count} rows</span></button>`).join('');
+      } catch (e) { listEl.innerHTML = `Error: ${e.message}`; }
+    }
+    function mydbSelectTable(name) { mydbSetQuery(`SELECT * FROM "${name}" LIMIT 50;`); mydbRunQuery(); }
+    function mydbSetQuery(sql) { const el = document.getElementById('mydb-query-input'); if (el) el.value = sql; }
+    function mydbClearQuery() {
+      const el = document.getElementById('mydb-query-input'); if (el) el.value = '';
+      const rc = document.getElementById('mydb-results-card'); if (rc) rc.style.display = 'none';
+      const qs = document.getElementById('mydb-query-status'); if (qs) qs.textContent = '';
+      const qc = document.getElementById('mydb-row-count'); if (qc) qc.textContent = '';
+      mydbLastResults = [];
+    }
+    async function mydbRunQuery() {
+      const input = document.getElementById('mydb-query-input');
+      const statusEl = document.getElementById('mydb-query-status');
+      const countEl = document.getElementById('mydb-row-count');
+      const resultsCard = document.getElementById('mydb-results-card');
+      if (!input) return;
+      const sql = input.value.trim();
+      if (!sql) { if (statusEl) statusEl.textContent = 'No query entered.'; return; }
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--amber);">⟳ Running...</span>';
+      try {
+        const res = await fetch('/api/mydb/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sql }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Query failed');
+        mydbLastResults = data.rows || [];
+        mydbRenderResults(mydbLastResults);
+        if (statusEl) statusEl.innerHTML = `<span style="color:var(--green);">✓ Done in ${data.ms}ms</span>`;
+        if (countEl) countEl.textContent = `${mydbLastResults.length} row${mydbLastResults.length !== 1 ? 's' : ''}`;
+        if (resultsCard) resultsCard.style.display = mydbLastResults.length > 0 ? 'block' : 'none';
+      } catch (e) { statusEl.innerHTML = `<span style="color:var(--red);">✗ ${e.message}</span>`; if (resultsCard) resultsCard.style.display = 'none'; }
+    }
+    function mydbRenderResults(rows) {
+      const thead = document.getElementById('mydb-results-thead');
+      const tbody = document.getElementById('mydb-results-tbody');
+      if (!thead || !tbody || !rows.length) return;
+      const cols = Object.keys(rows[0]);
+      thead.innerHTML = '<tr>' + cols.map(c => `<th style="padding:0.4rem 0.65rem;border-bottom:1px solid var(--border);color:var(--cyan);font-weight:600;white-space:nowrap;text-align:left;">${c}</th>`).join('') + '</tr>';
+      tbody.innerHTML = rows.map((row, i) => `<tr style="background:${i % 2 === 0 ? 'var(--bg2)' : 'var(--bg1)'};" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${i % 2 === 0 ? 'var(--bg2)' : 'var(--bg1)'}'">` + cols.map(c => {
+        const raw = row[c] == null ? '' : String(row[c]);
+        const display = raw.length > 80 ? raw.substring(0, 80) + '…' : raw;
+        const cell = raw === '' ? '<span style="color:var(--text4);">NULL</span>' : display;
+        return `<td style="padding:0.4rem 0.65rem;border-bottom:1px solid var(--border2);color:var(--text2);white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis;" title="${raw.replace(/"/g, '&quot;')}">${cell}</td>`;
+      }).join('') + '</tr>').join('');
+    }
+    function mydbExportCSV() {
+      if (!mydbLastResults.length) return;
+      const cols = Object.keys(mydbLastResults[0]);
+      const csv = [cols.join(','), ...mydbLastResults.map(row => cols.map(c => `"${String(row[c] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `query_results_${Date.now()}.csv`; a.click();
+    }
+    function mydbReloadIframe() { const iframe = document.getElementById('mydb-prisma-iframe'); if (iframe) { iframe.src = 'about:blank'; setTimeout(() => { iframe.src = 'http://localhost:5555'; }, 100); } }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  ADDITIONAL HEALTH CHECKS
+    // ═══════════════════════════════════════════════════════════════
+    setInterval(() => {
+      checkServiceHealth('twitter-status', 'http://localhost:6060/api/health');
+      checkServiceHealth('fb-status', 'http://localhost:7070/api/health');
+      checkServiceHealth('admin-status', 'http://localhost:4000/api/health');
+    }, 5000);
+    checkServiceHealth('twitter-status', 'http://localhost:6060/api/health');
+    checkServiceHealth('fb-status', 'http://localhost:7070/api/health');
+    checkServiceHealth('admin-status', 'http://localhost:4000/api/health');
+
+    // ═══════════════════════════════════════════════════════════════
+    //  TAB AUTO-LOADERS
+    // ═══════════════════════════════════════════════════════════════
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        if (item.dataset.view === 'preprocessing') loadDataCollectedFolder();
+        if (item.dataset.view === 'servers') loadServersHealth();
+        if (item.dataset.view === 'mydb') { mydbCheckStatus(); mydbLoadTables(); }
+      });
+    });
   </script>
 
 </body>

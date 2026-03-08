@@ -1,0 +1,121 @@
+pipeline:
+  name: entity-intel-demo
+  description: "Real-time intelligence collection for a named entity"
+  version: "1.0"
+  entity: "Rahul Gandhi"          # Change to any person you want to track
+  known_topics:
+    - RahulGandhi_Youtube
+    - RahulGandhi_News
+    - RahulGandhi_Twitter
+
+kafka:
+  bootstrap_servers: "memory"     # Use "localhost:9092" when Kafka is running
+  topics:
+    raw: "raw-items"
+    normalized: "normalized-items"
+    processed: "processed-items"
+    dlq: "dead-letter-queue"
+
+collectors:
+  - id: col-youtube
+    platform: youtube
+    enabled: true
+    entity: "Rahul Gandhi"
+    who:
+      search_queries:
+        - "Rahul Gandhi speech"
+        - "Rahul Gandhi rally"
+      max_results: 5
+    what:
+      content_types: ["video"]
+      include_media: false
+    when:
+      mode: once
+      poll_interval_sec: 300
+    config:
+      extract_captions: true
+      extract_audio: false
+
+  - id: col-news
+    platform: news_rss
+    enabled: true
+    entity: "Rahul Gandhi"
+    who:
+      track_keywords:
+        - "Rahul Gandhi"
+        - "Congress"
+      max_results: 10
+    when:
+      mode: once
+      poll_interval_sec: 120
+    config:
+      use_google_news: true
+
+transformers:
+  - id: tfm-normalizer
+    type: normalizer
+    enabled: true
+
+  - id: tfm-dedup
+    type: deduplicator
+    enabled: true
+    config:
+      ttl_sec: 86400
+      max_size: 10000
+
+processors:
+  - id: proc-ner
+    type: ner
+    enabled: true
+    timeout_sec: 30
+    config:
+      use_spacy: true
+      analyze_visual: false
+
+  - id: proc-sentiment
+    type: sentiment
+    enabled: true
+    timeout_sec: 15
+    config:
+      use_vader: true
+      use_textblob: true
+
+  - id: proc-topic
+    type: topic
+    enabled: true
+    timeout_sec: 10
+
+  - id: proc-embedder
+    type: embedder
+    enabled: true
+    timeout_sec: 60
+    config:
+      model_name: "all-MiniLM-L6-v2"
+
+consumers:
+  - id: con-dashboard
+    type: dashboard
+    enabled: true
+    config:
+      api_url: "http://localhost:8500/api/v1/events"
+
+  - id: con-stdout
+    type: stdout
+    enabled: true
+
+  # Uncomment and configure when PostgreSQL is running:
+  # - id: con-postgres
+  #   type: postgres
+  #   enabled: false
+  #   config:
+  #     connection_string: "postgresql://postgres:postgres@localhost:5432/entity_intel"
+  #     table_name: processed_items
+
+  # Uncomment and configure when Qdrant is running:
+  # - id: con-qdrant
+  #   type: qdrant
+  #   enabled: false
+  #   config:
+  #     url: "http://localhost:6333"
+  #     collection_name: "entity_intel"
+  #     vector_size: 384
