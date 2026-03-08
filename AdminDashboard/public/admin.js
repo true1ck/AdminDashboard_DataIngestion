@@ -2227,6 +2227,11 @@ async function nriSubmitManualScore() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ processing_state: 'done', pillar_scored: 1 })
             });
+            await fetch(`/api/nri/queue/${fileId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'done', completedAt: new Date().toISOString() })
+            });
         }
 
         qLog('ok', `[NRI] Saved score for ${file.filename} — ${PILLAR_LABELS[pillar]}: ${score}`);

@@ -375,7 +375,7 @@ async function nriGetQueue(status = 'all') {
     return rows.filter(r => r.status === status);
 }
 
-async function nriUpdateQueue(id, data) {
+async function nriUpdateQueue(fileId, data) {
     const sets = [];
     const vals = [];
     if (data.status !== undefined) { sets.push('status = ?'); vals.push(data.status); }
@@ -383,8 +383,8 @@ async function nriUpdateQueue(id, data) {
     if (data.completedAt !== undefined) { sets.push('completed_at = ?'); vals.push(data.completedAt); }
     if (data.errorMsg !== undefined) { sets.push('error_msg = ?'); vals.push(data.errorMsg); }
     if (!sets.length) return;
-    vals.push(id);
-    await run(`UPDATE nri_queue SET ${sets.join(', ')} WHERE id=?`, vals);
+    vals.push(fileId);
+    await run(`UPDATE nri_queue SET ${sets.join(', ')} WHERE file_id=?`, vals);
 }
 
 async function nriRemoveFromQueue(fileId) {

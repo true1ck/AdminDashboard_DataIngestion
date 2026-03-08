@@ -6923,6 +6923,11 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ processing_state: 'done', pillar_scored: 1 })
             });
+            await fetch(`/api/nri/queue/${fileId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'done', completedAt: new Date().toISOString() })
+            });
         }
 
         qLog('ok', `✓ Manual score saved: ${PILLAR_LABELS[pillar] || pillar} = ${score}`);
