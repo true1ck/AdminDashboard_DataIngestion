@@ -64,6 +64,37 @@
       --radius: 6px;
     }
 
+    body.light-mode {
+      --bg: #f5f7fa;
+      --bg1: #ffffff;
+      --bg2: #f0f2f5;
+      --bg3: #e4e7eb;
+      --bg4: #d1d5db;
+      --bg5: #9ca3af;
+
+      --text: #1a1c21;
+      --text2: rgba(26, 28, 33, 0.75);
+      --text3: rgba(26, 28, 33, 0.45);
+      --text4: rgba(26, 28, 33, 0.25);
+
+      --border: rgba(0, 0, 0, 0.08);
+      --border2: rgba(0, 0, 0, 0.12);
+      --border3: rgba(0, 0, 0, 0.20);
+
+      --cyan2: rgba(0, 150, 199, 0.08);
+      --cyan3: rgba(0, 150, 199, 0.15);
+      --cyan4: rgba(0, 150, 199, 0.03);
+
+      --amber2: rgba(217, 119, 6, 0.08);
+      --amber3: rgba(217, 119, 6, 0.15);
+
+      --green2: rgba(5, 150, 105, 0.08);
+      --green3: rgba(5, 150, 105, 0.15);
+
+      --red2: rgba(220, 38, 38, 0.08);
+      --red3: rgba(220, 38, 38, 0.15);
+    }
+
     *,
     *::before,
     *::after {
@@ -2036,6 +2067,9 @@
             style="margin-right:4px;"></span>PIPELINE(8500)</div>
         <div class="tb-divider"></div>
         <div class="live-dot"></div>
+        <button id="theme-toggle" class="btn btn-xs btn-outline"
+          style="border:none; background:transparent; font-size:1.1rem; padding:0 0.5rem; cursor:pointer;"
+          onclick="toggleTheme()" title="Toggle Light/Dark Mode">🌓</button>
         <div class="tb-clock" id="clock">00:00:00</div>
       </div>
     </header>
@@ -3866,6 +3900,24 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
     (function tick() {
       document.getElementById('clock').textContent = new Date().toTimeString().slice(0, 8);
       setTimeout(tick, 1000);
+    })();
+
+    /* ═══════════════════════════════════════════════
+       THEME TOGGLE (LIGHT/DARK)
+    ═══════════════════════════════════════════════ */
+    function toggleTheme() {
+      const body = document.body;
+      const isLight = body.classList.toggle('light-mode');
+      localStorage.setItem('nb-theme', isLight ? 'light' : 'dark');
+      qLog('info', `Theme switched to ${isLight ? 'Light' : 'Dark'} mode`);
+    }
+
+    // Load theme on startup
+    (function () {
+      const savedTheme = localStorage.getItem('nb-theme');
+      if (savedTheme === 'light') {
+        document.body.classList.add('light-mode');
+      }
     })();
 
     async function checkServiceHealth(id, url) {
