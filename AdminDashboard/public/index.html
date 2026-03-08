@@ -2792,7 +2792,9 @@
             <div class="card-body card-body-scroll" style="display:flex;flex-direction:column;gap:0.75rem;">
 
               <div class="info-box info">ℹ No live API access? Upload a Kaggle Facebook posts dataset in CSV or JSON
-                format. Field mapping is auto-detected.</div>
+                format. 
+                <button class="btn btn-xs btn-outline" style="margin-left: 0.5rem; color: var(--primary);" onclick="applyFbStatusPreset()">📂 Apply "Status" Schema Preset</button>
+              </div>
               <div class="drop-zone" id="fb-dz" ondragover="dzOver(event,'fb-dz')" ondragleave="dzLeave('fb-dz')"
                 ondrop="dzDrop(event,'fb-dz','fb')">
                 <input type="file" accept=".csv,.json,.zip" onchange="dzFile(event,'fb-dz','fb-dz-lbl','fb')">
@@ -2809,50 +2811,77 @@
                   <option value="text_video">Text + Audio/Video (Whisper)</option>
                 </select>
               </div>
+
+              <div class="vhdr-sub" style="margin: 0.5rem 0 0.2rem 0; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3);">Core Columns</div>
               <div class="g2">
                 <div class="fg">
                   <div class="fl">Text Column</div><input class="fi" id="fb-col-text" type="text"
-                    value="status_message" placeholder="e.g., status_message">
+                    placeholder="e.g., status_message">
                 </div>
                 <div class="fg">
                   <div class="fl">Timestamp</div><input class="fi" id="fb-col-time" type="text"
-                    value="status_published" placeholder="e.g., status_published">
+                    placeholder="e.g., status_published">
                 </div>
                 <div class="fg">
                   <div class="fl">Status Type</div><input class="fi" id="fb-col-type" type="text"
-                    value="status_type" placeholder="e.g., status_type">
+                    placeholder="e.g., status_type">
                 </div>
                 <div class="fg">
                   <div class="fl">ID Column</div><input class="fi" id="fb-col-id" type="text"
-                    value="status_id" placeholder="e.g., status_id">
+                    placeholder="e.g., status_id">
                 </div>
               </div>
-              <div class="g3">
-                <div class="fg">
-                  <div class="fl">Likes</div><input class="fi" id="fb-col-likes" type="text"
-                    value="num_likes" placeholder="e.g., num_likes">
-                </div>
-                <div class="fg">
-                  <div class="fl">Comments</div><input class="fi" id="fb-col-replies" type="text"
-                    value="num_comments" placeholder="e.g., num_comments">
-                </div>
-                <div class="fg">
-                  <div class="fl">Shares</div><input class="fi" id="fb-col-shares" type="text"
-                    value="num_shares" placeholder="e.g., num_shares">
-                </div>
-              </div>
+
+              <div class="vhdr-sub" style="margin: 0.5rem 0 0.2rem 0; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3);">Engagement Metrics</div>
               <div class="g3">
                 <div class="fg">
                   <div class="fl">Total Reactions</div><input class="fi" id="fb-col-reactions" type="text"
-                    value="num_reactions" placeholder="e.g., num_reactions">
+                    placeholder="num_reactions">
+                </div>
+                <div class="fg">
+                  <div class="fl">Likes</div><input class="fi" id="fb-col-likes" type="text"
+                    placeholder="num_likes">
+                </div>
+                <div class="fg">
+                  <div class="fl">Comments</div><input class="fi" id="fb-col-replies" type="text"
+                    placeholder="num_comments">
+                </div>
+                <div class="fg">
+                  <div class="fl">Shares</div><input class="fi" id="fb-col-shares" type="text"
+                    placeholder="num_shares">
                 </div>
                 <div class="fg">
                   <div class="fl">Status Link</div><input class="fi" id="fb-col-link" type="text"
-                    value="status_link" placeholder="e.g., status_link">
+                    placeholder="status_link">
                 </div>
                 <div class="fg">
                   <div class="fl">Category</div><input class="fi" id="fb-col-cat" type="text"
-                    value="category" placeholder="e.g., category">
+                    placeholder="category">
+                </div>
+              </div>
+
+              <div class="vhdr-sub" style="margin: 0.5rem 0 0.2rem 0; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3);">Detailed Reactions (Optional)</div>
+              <div class="g4" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+                <div class="fg">
+                  <div class="fl">Loves</div><input class="fi" id="fb-col-loves" type="text" placeholder="num_loves">
+                </div>
+                <div class="fg">
+                  <div class="fl">Wows</div><input class="fi" id="fb-col-wows" type="text" placeholder="num_wows">
+                </div>
+                <div class="fg">
+                  <div class="fl">Hahas</div><input class="fi" id="fb-col-hahas" type="text" placeholder="num_hahas">
+                </div>
+                <div class="fg">
+                  <div class="fl">Sads</div><input class="fi" id="fb-col-sads" type="text" placeholder="num_sads">
+                </div>
+                <div class="fg">
+                  <div class="fl">Angrys</div><input class="fi" id="fb-col-angrys" type="text" placeholder="num_angrys">
+                </div>
+                <div class="fg">
+                  <div class="fl">Special</div><input class="fi" id="fb-col-special" type="text" placeholder="num_special">
+                </div>
+                <div class="fg">
+                  <div class="fl">Link Name</div><input class="fi" id="fb-col-linkname" type="text" placeholder="link_name">
                 </div>
               </div>
               <div class="fg">
@@ -4747,7 +4776,34 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
       renderQueue(); updateStats();
     }
 
-    function queueFacebookKaggle() {
+    function applyFbStatusPreset() {
+      const mapping = {
+        'fb-col-text': 'status_message',
+        'fb-col-time': 'status_published',
+        'fb-col-type': 'status_type',
+        'fb-col-id': 'status_id',
+        'fb-col-reactions': 'num_reactions',
+        'fb-col-likes': 'num_likes',
+        'fb-col-replies': 'num_comments',
+        'fb-col-shares': 'num_shares',
+        'fb-col-link': 'status_link',
+        'fb-col-cat': 'category',
+        'fb-col-loves': 'num_loves',
+        'fb-col-wows': 'num_wows',
+        'fb-col-hahas': 'num_hahas',
+        'fb-col-sads': 'num_sads',
+        'fb-col-angrys': 'num_angrys',
+        'fb-col-special': 'num_special',
+        'fb-col-linkname': 'link_name'
+      };
+      for (const [id, val] of Object.entries(mapping)) {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+      }
+      qLog('info', 'Applied Facebook "Status" schema preset');
+    }
+
+function queueFacebookKaggle() {
       const dzId = 'fb-dz';
       const dz = document.getElementById(dzId);
       if (!dz || !dz.classList.contains('filled') || !dzFiles[dzId]) {
@@ -4771,9 +4827,25 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
         col_reactions: document.getElementById('fb-col-reactions').value,
         col_link: document.getElementById('fb-col-link').value,
         col_cat: document.getElementById('fb-col-cat').value,
-        custom_cols: document.getElementById('fb-col-custom').value,
         extract_all: document.getElementById('fb-extract-all').checked
       };
+
+      // Aggregate extra fields into custom_cols for backend compatibility
+      const extras = [
+        document.getElementById('fb-col-loves').value,
+        document.getElementById('fb-col-wows').value,
+        document.getElementById('fb-col-hahas').value,
+        document.getElementById('fb-col-sads').value,
+        document.getElementById('fb-col-angrys').value,
+        document.getElementById('fb-col-special').value,
+        document.getElementById('fb-col-linkname').value
+      ].filter(x => x && x.trim() !== '');
+      
+      let baseCustom = document.getElementById('fb-col-custom').value || '';
+      if (extras.length > 0) {
+        baseCustom = (baseCustom ? baseCustom + ', ' : '') + extras.join(', ');
+      }
+      j.facebookMeta.custom_cols = baseCustom;
 
       setTimeout(() => startJob(j.id), 200);
 
