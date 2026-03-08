@@ -6,7 +6,8 @@ export type BOModule =
   | 'overview' | 'pillars' | 'alerts' | 'analytics'
   | 'chunav' | 'sansad' | 'vikas' | 'jandarbar' | 'samikaran' | 'dal'
   | 'social' | 'pratikriya' | 'ingest' | 'vault'
-  | 'arthbal' | 'shield' | 'gathbandhan' | 'planning' | 'settings';
+  | 'arthbal' | 'shield' | 'gathbandhan' | 'planning' | 'settings'
+  | 'pipeline';
 
 export type PPModule =
   | 'pp_parichay' | 'pp_shikayat' | 'pp_vani' | 'pp_vikas'

@@ -34,95 +34,6 @@ const upload = multer({ dest: uploadsDir });
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ══════════════════════════════════════════════
-//  SERVERS MANAGEMENT API
-// ══════════════════════════════════════════════
-const net = require('net');
-const { exec } = require('child_process');
-
-const SERVERS = [
-    { id: 'backend', name: 'NetaBoard Backend', port: 3000, type: 'node', path: '../NetaBoardV5/backend', cmd: 'npm install --silent && npm run dev', desc: 'Main Express API connecting DB and React frontend' },
-    { id: 'qwen', name: 'ImageToTextQwen', port: 5001, type: 'flask', path: '../ImageToTextQwen/backend', cmd: 'source venv/bin/activate && python3 app.py', desc: 'Offline Qwen Vision OCR engine API' },
-    { id: 'whisper', name: 'MediaToTextWhisper', port: 8000, type: 'fastapi', path: '../MediaToTextWhisper/backend', cmd: 'source venv/bin/activate && python3 main.py', desc: 'FastAPI server for local Whisper audio transcription' },
-    { id: 'twitter', name: 'TwitterIngestionServer', port: 6060, type: 'flask', path: '../TwitterIngestionServer/backend', cmd: 'source venv/bin/activate && python3 app.py', desc: 'Flask Python microservice for scraping Twitter' },
-    { id: 'facebook', name: 'FacebookIngestionServer', port: 7070, type: 'flask', path: '../FacebookIngestionServer/backend', cmd: 'source venv/bin/activate && python3 app.py', desc: 'Flask endpoint wrapping Meta Graph APIs' },
-    { id: 'admin', name: 'Admin Dashboard', port: 4000, type: 'node', path: '.', cmd: 'npm install --silent && node server.js', desc: 'Central orchestration dashboard (This node)' },
-    { id: 'frontend', name: 'NetaBoard App', port: 5180, type: 'vite', path: '../NetaBoardV5', cmd: 'npm install --silent && npm run dev', desc: 'Vite React user interface application' }
-];
-
-function checkPortHost(port, host) {
-    return new Promise((resolve) => {
-        const socket = new net.Socket();
-        socket.setTimeout(800);
-        socket.on('connect', () => { socket.destroy(); resolve(true); });
-        socket.on('timeout', () => { socket.destroy(); resolve(false); });
-        socket.on('error', () => { socket.destroy(); resolve(false); });
-        socket.connect(port, host);
-    });
-}
-
-async function checkPort(port) {
-    let isUp = await checkPortHost(port, '127.0.0.1');
-    if (!isUp) {
-        isUp = await checkPortHost(port, '::1');
-    }
-    return isUp;
-}
-
-function killPort(port) {
-    return new Promise((resolve) => {
-        exec(`lsof -t -i:${port}`, (err, stdout) => {
-            if (stdout) {
-                const pid = stdout.trim().split('\\n')[0]; // Safe kill
-                exec(`kill -9 ${pid}`, () => resolve(true));
-            } else {
-                resolve(true);
-            }
-        });
-    });
-}
-
-function startServerProcess(srv) {
-    return new Promise((resolve) => {
-        const absPath = path.resolve(__dirname, srv.path);
-        const script = `osascript -e 'tell application "Terminal"' -e 'do script "printf \\"\\\\\\\\033[1m[${srv.name}]\\\\\\\\033[0m\\\\\\\\n\\" && cd \\"${absPath}\\" && ${srv.cmd}"' -e 'activate' -e 'end tell'`;
-        exec(script, () => resolve(true));
-    });
-}
-
-app.get('/api/servers', async (req, res) => {
-    const statusPromises = SERVERS.map(async (s) => {
-        const isUp = await checkPort(s.port);
-        return { ...s, status: isUp ? 'online' : 'offline' };
-    });
-    const results = await Promise.all(statusPromises);
-    res.json({ servers: results });
-});
-
-app.post('/api/servers/:id/control', async (req, res) => {
-    try {
-        const srv = SERVERS.find(s => s.id === req.params.id);
-        if (!srv) return res.status(404).json({ error: 'Server not found' });
-
-        const action = req.body.action;
-
-        if (action === 'stop' || action === 'restart') {
-            await killPort(srv.port);
-            if (action === 'stop') await new Promise(r => setTimeout(r, 500));
-        }
-
-        if (action === 'start' || action === 'restart') {
-            if (srv.id !== 'admin' || action === 'start') {
-                await startServerProcess(srv);
-            }
-        }
-
-        res.json({ success: true, server: req.params.id, action });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// ══════════════════════════════════════════════
 //  HEALTH CHECK
 // ══════════════════════════════════════════════
 app.get('/api/health', (req, res) => {
@@ -465,10 +376,10 @@ app.post('/api/proxy/twitter-ingest', upload.single('file'), async (req, res) =>
         fd.append('file', fs.createReadStream(req.file.path), req.file.originalname);
         if (req.body.meta) fd.append('meta', req.body.meta);
 
-        const r = await fetch(`${TWITTER_URL}/api/process-twitter`, {
-            method: 'POST',
-            body: fd,
-            headers: fd.getHeaders()
+        const r = await fetch(`${TWITTER_URL}/api/process-twitter`, { 
+            method: 'POST', 
+            body: fd, 
+            headers: fd.getHeaders() 
         });
         const data = await r.json();
 
@@ -521,73 +432,6 @@ app.post('/api/save_local_file', async (req, res) => {
     }
 });
 
-// List DataCollected contents
-app.get('/api/fs/datacollected', async (req, res) => {
-    try {
-        const rootDir = path.join(__dirname, '..', 'DataCollected');
-        if (!fs.existsSync(rootDir)) {
-            return res.json({ files: [] });
-        }
-
-        const filesList = [];
-
-        function scanDir(dir, relPath = '') {
-            try {
-                const entries = fs.readdirSync(dir, { withFileTypes: true });
-                for (const entry of entries) {
-                    if (entry.name.startsWith('.')) continue; // skip hidden
-
-                    const fullPath = path.join(dir, entry.name);
-                    const itemRelPath = path.join(relPath, entry.name);
-
-                    if (entry.isDirectory()) {
-                        scanDir(fullPath, itemRelPath);
-                    } else if (entry.isFile()) {
-                        const stats = fs.statSync(fullPath);
-                        filesList.push({
-                            name: entry.name,
-                            path: itemRelPath,
-                            size: stats.size,
-                            modified: stats.mtime
-                        });
-                    }
-                }
-            } catch (e) { }
-        }
-
-        scanDir(rootDir);
-        res.json({ files: filesList });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Read file from DataCollected
-app.get('/api/fs/datacollected/file', async (req, res) => {
-    try {
-        const filePath = req.query.path;
-        if (!filePath) return res.status(400).json({ error: 'Missing path' });
-
-        const rootDir = path.join(__dirname, '..', 'DataCollected');
-        const targetPath = path.join(rootDir, filePath);
-
-        // Security check - prevent escaping directory
-        if (!targetPath.startsWith(path.resolve(rootDir))) {
-            return res.status(403).json({ error: 'Access denied' });
-        }
-
-        if (!fs.existsSync(targetPath)) {
-            return res.status(404).json({ error: 'File not found' });
-        }
-
-        // Return raw file contents
-        const content = fs.readFileSync(targetPath, 'utf8');
-        res.send(content);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // Helper function for proxying requests with file uploads
 async function proxyRequest(req, res, targetUrl, targetPath) {
     try {
@@ -621,150 +465,183 @@ async function proxyRequest(req, res, targetUrl, targetPath) {
 
 // Proxy: Twitter Ingestion Processor (refactored to use proxyRequest)
 app.all('/api/proxy/twitter-ingest', upload.single('file'), (req, res) => {
-    proxyRequest(req, res, TWITTER_URL, '/api/process-twitter');
+  proxyRequest(req, res, TWITTER_URL, '/api/process-twitter');
 });
 
 // Proxy: Facebook Ingestion Processor
 app.all('/api/proxy/facebook-ingest', upload.single('file'), (req, res) => {
-    proxyRequest(req, res, FACEBOOK_URL, '/api/process-facebook');
+  proxyRequest(req, res, FACEBOOK_URL, '/api/process-facebook');
 });
 
-
-// List discovered tables
-app.get('/api/db/tables', (req, res) => {
-    res.json({ tables: knownTables });
-});
-
-let knownTables = [];
-
-async function fetchKnownTables(client) {
-    const tableRes = await client.query(`
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_type = 'BASE TABLE'
-        ORDER BY table_name
-    `);
-    const tables = tableRes.rows.map(r => r.table_name);
-    knownTables = tables;
-    return tables;
-}
-
-function autoQuotePgQuery(sql, tables = []) {
-    if (!sql) return sql;
-    let modified = sql;
-    const targetList = tables.length > 0 ? tables : knownTables;
-
-    targetList.forEach(tableName => {
-        const regex = new RegExp(`(?<!["'\\w])${tableName}(?!["'\\w])`, 'gi');
-        modified = modified.replace(regex, `"${tableName}"`);
-    });
-    return modified;
-}
-
-// Query the DB directly
-app.post('/api/db/query', async (req, res) => {
-    const { table, query, limit, host, port, dbName, user, password } = req.body;
-    if (!table && !query) return res.status(400).json({ error: 'Table name or query required' });
-
-    const dbUrl = `postgresql://${user}:${password}@${host}:${port}/${dbName}`;
-    const finalLimit = limit || 20;
-
-    const { Client } = require('pg');
-    const client = new Client({ connectionString: dbUrl });
-
-    try {
-        await client.connect();
-
-        // Ensure we have table metadata for quoting
-        if (knownTables.length === 0) {
-            console.log("[DB Query] knownTables empty, performing quick introspection...");
-            await fetchKnownTables(client);
-        }
-
-        let sql = query && query.trim() !== '' ? query : `SELECT * FROM "${table}" LIMIT ${finalLimit}`;
-        if (query && query.trim() !== '') {
-            sql = autoQuotePgQuery(sql);
-        }
-
-        console.log(`[DB Query] Executing Postgres: ${sql}`);
-
-        const dbRes = await client.query(sql);
-        await client.end();
-        res.json({ ok: true, rows: dbRes.rows, count: dbRes.rowCount });
-    } catch (err) {
-        console.error(`[DB Query] Error: ${err.message}`);
-        res.json({ ok: false, error: `Postgres query failed: ${err.message}` });
-        try { await client.end(); } catch (e) { }
-    }
-});
-
+// ══════════════════════════════════════════════
+//  DATABASE IMPORT — NetaBoardV5 Prisma DB
+// ══════════════════════════════════════════════
 let prismaStudioProcess = null;
 
-// Test connection and introspect tables
+// Test connection to NetaBoardV5 backend or custom DB
 app.post('/api/db/test-connection', async (req, res) => {
-    const { host, port, dbName, user, password } = req.body;
-    const dbUrl = `postgresql://${user}:${password}@${host}:${port}/${dbName}`;
-
-    const { Client } = require('pg');
-    const client = new Client({ connectionString: dbUrl });
-
     try {
-        await client.connect();
-        const tables = await fetchKnownTables(client);
-        await client.end();
+        const { uri, host, port, dbName, user, password, dbType } = req.body;
+        const dbUrl = uri || (dbType === 'pg' ? `postgresql://${user}:${password}@${host}:${port}/${dbName}` : '');
 
-        // ── OPTIONAL: Launch Prisma Studio if in NetaBoard environment ──
-        let prismaStudioUrl = null;
-        const prismaDir = path.join(__dirname, '..', 'NetaBoardV5', 'backend');
-        if (fs.existsSync(prismaDir)) {
-            console.log(`[DB Test] Prisma environment detected at ${prismaDir}. Attempting to launch Studio...`);
-
-            // Kill existing
-            if (prismaStudioProcess) {
-                try { process.kill(-prismaStudioProcess.pid); } catch (e) { prismaStudioProcess.kill(); }
-                prismaStudioProcess = null;
-                await new Promise(r => setTimeout(r, 800));
-            }
-
-            // Spawn
-            const { spawn } = require('child_process');
-            prismaStudioProcess = spawn('npx', ['prisma', 'studio', '--port', '5555', '--browser', 'none'], {
-                cwd: prismaDir,
-                shell: true,
-                stdio: 'ignore',
-                detached: false,
-                env: { ...process.env, DATABASE_URL: dbUrl }
-            });
-            prismaStudioProcess.on('exit', () => { prismaStudioProcess = null; });
-            prismaStudioProcess.on('error', () => { prismaStudioProcess = null; });
-
-            // Give it a moment to boot
-            await new Promise(r => setTimeout(r, 2000));
-            prismaStudioUrl = 'http://localhost:5555';
+        if (!dbUrl) {
+            return res.json({ ok: false, error: 'No connection URI or valid credentials provided' });
         }
 
-        res.json({
-            ok: true,
-            tables: knownTables,
-            prismaStudioUrl,
-            message: `Connected successfully. Discovered ${knownTables.length} tables.${prismaStudioUrl ? ' Prisma Studio ready.' : ''}`
+        // Real connection test
+        if (dbUrl.startsWith('file:') || dbType === 'sqlite') {
+            const dbPath = dbUrl.replace('file:', '');
+            const fullPath = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', dbPath);
+            
+            if (!fs.existsSync(fullPath)) {
+                return res.json({ ok: false, error: `Database file not found at ${fullPath}` });
+            }
+
+            // Test SQLite connection directly
+            const sqlite3 = require('sqlite3').verbose();
+            await new Promise((resolve, reject) => {
+                const tempDb = new sqlite3.Database(fullPath, sqlite3.OPEN_READONLY, (err) => {
+                    if (err) return reject(new Error('Failed to open database file: ' + err.message));
+                });
+                
+                // Run a simple query to ensure the file is a valid readable SQLite database
+                tempDb.get('SELECT sqlite_version()', (err, row) => {
+                    tempDb.close();
+                    if (err) return reject(new Error('Failed to read from database: ' + err.message));
+                    resolve(true);
+                });
+            });
+            console.log(`[DB Test] Successfully connected to SQLite DB: ${dbPath}`);
+        } else {
+            // Test network connection (TCP) for PG, Redis, Elasticsearch, Qdrant
+            const net = require('net');
+            const targetHost = host || 'localhost';
+            const targetPort = parseInt(port) || (dbType === 'pg' ? 5432 : dbType === 'redis' ? 6379 : 80);
+            
+            await new Promise((resolve, reject) => {
+                const socket = new net.Socket();
+                socket.setTimeout(2500);
+                
+                socket.on('connect', () => {
+                    socket.destroy();
+                    console.log(`[DB Test] Successfully reached ${dbType.toUpperCase()} on ${targetHost}:${targetPort}`);
+                    resolve(true);
+                });
+                
+                socket.on('timeout', () => {
+                    socket.destroy();
+                    reject(new Error(`Connection to ${targetHost}:${targetPort} timed out`));
+                });
+                
+                socket.on('error', (err) => {
+                    socket.destroy();
+                    reject(new Error(`Connection refused to ${targetHost}:${targetPort} (${err.code})`));
+                });
+                
+                socket.connect(targetPort, targetHost);
+            });
+        }
+
+        // Restart Prisma Studio
+        if (prismaStudioProcess) {
+            try {
+                process.kill(-prismaStudioProcess.pid);
+            } catch (e) {
+                prismaStudioProcess.kill();
+            }
+            prismaStudioProcess = null;
+            await new Promise(resolve => setTimeout(resolve, 800));
+        }
+
+        // Spawn Prisma Studio
+        const { spawn } = require('child_process');
+        const prismaDir = path.join(__dirname, '..', 'NetaBoardV5', 'backend');
+        prismaStudioProcess = spawn('npx', ['prisma', 'studio', '--port', '5555', '--browser', 'none'], {
+            cwd: prismaDir,
+            shell: true,
+            stdio: 'ignore',
+            detached: false,
+            env: { ...process.env, DATABASE_URL: dbUrl }
         });
+        prismaStudioProcess.on('exit', () => { prismaStudioProcess = null; });
+        prismaStudioProcess.on('error', () => { prismaStudioProcess = null; });
+
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        res.json({ ok: true, prismaStudioUrl: 'http://localhost:5555' });
     } catch (err) {
-        console.error(`[DB Test] Error: ${err.message}`);
-        res.json({ ok: false, error: err.message });
-        try { await client.end(); } catch (e) { }
+        res.json({ ok: false, error: `Connection failed: ${err.message}` });
     }
 });
 
 // Check Prisma Studio status
 app.get('/api/db/prisma-status', async (req, res) => {
-    if (!prismaStudioProcess) return res.json({ running: false });
     try {
-        const r = await fetch('http://localhost:5555', { signal: AbortSignal.timeout(1000) });
-        res.json({ running: r.ok });
+        const r = await fetch('http://localhost:5555', { signal: AbortSignal.timeout(2000) });
+        res.json({ running: true });
     } catch (e) {
         res.json({ running: false });
+    }
+});
+
+// List tables from Prisma schema
+app.get('/api/db/tables', (req, res) => {
+    try {
+        const schemaPath = path.join(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', 'schema.prisma');
+        if (!fs.existsSync(schemaPath)) {
+            return res.status(404).json({ error: 'Prisma schema not found' });
+        }
+        const schema = fs.readFileSync(schemaPath, 'utf8');
+        const models = [];
+        const regex = /^model\s+(\w+)\s*\{/gm;
+        let m;
+        while ((m = regex.exec(schema)) !== null) {
+            models.push(m[1]);
+        }
+        res.json({ tables: models });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Query the DB directly using sqlite3
+app.post('/api/db/query', async (req, res) => {
+    const { table, query, limit, uri, host, port, dbName, user, password, dbType } = req.body;
+    if (!table) return res.status(400).json({ error: 'Table name required' });
+
+    const dbUrl = uri || (dbType === 'pg' ? `postgresql://${user}:${password}@${host}:${port}/${dbName}` : '');
+    const isSqlite = dbUrl.startsWith('file:') || dbType === 'sqlite' || dbType === 'pg'; // pg fallback since Neta schema is sqlite
+    const finalLimit = limit || 20;
+
+    if (isSqlite && dbUrl) {
+        const dbPath = dbUrl.replace('file:', '');
+        const fullPath = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', dbPath);
+        
+        if (!fs.existsSync(fullPath)) {
+            return res.json({ ok: false, error: `Database file not found at ${fullPath}` });
+        }
+
+        const sqlite3 = require('sqlite3').verbose();
+        const tempDb = new sqlite3.Database(fullPath, sqlite3.OPEN_READONLY, (err) => {
+            if (err) return res.json({ ok: false, error: 'Cannot open DB: ' + err.message });
+        });
+
+        // Use custom query if provided, else simple SELECT
+        const sql = query && query.trim() !== '' ? query : `SELECT * FROM ${table} LIMIT ${finalLimit}`;
+        console.log(`[DB Query] Executing SQL: ${sql}`);
+
+        tempDb.all(sql, [], (err, rows) => {
+            tempDb.close();
+            if (err) {
+                console.error(`[DB Query] Error: ${err.message}`);
+                return res.json({ ok: false, error: `Query failed: ${err.message}` });
+            }
+            console.log(`[DB Query] Success: ${rows.length} rows returned`);
+            res.json({ ok: true, rows: rows, count: rows.length });
+        });
+    } else {
+        // Fallback or non-SQLite database logic
+        res.json({ ok: true, rows: [], count: 0, note: `Custom query engine not implemented for ${dbType}. Use Prisma Studio to browse.` });
     }
 });
 
@@ -791,33 +668,21 @@ const DATA_COLLECTED_DIR = path.join(__dirname, '..', 'DataCollected', 'database
 if (!fs.existsSync(DATA_COLLECTED_DIR)) fs.mkdirSync(DATA_COLLECTED_DIR, { recursive: true });
 
 // ══════════════════════════════════════════════
-//  SAVED QUERIES API (In-Memory Session Storage)
+//  SAVED QUERIES API
 // ══════════════════════════════════════════════
-let sessionSavedQueries = [];
-let nextQueryId = 1;
-
 app.get('/api/db/saved-queries', async (req, res) => {
-    try {
-        res.json(sessionSavedQueries);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    try { res.json(await db.getSavedQueries()); }
+    catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/db/saved-queries', async (req, res) => {
-    try {
-        const newQuery = {
-            ...req.body,
-            id: nextQueryId++,
-            created_at: new Date().toISOString()
-        };
-        sessionSavedQueries.unshift(newQuery);
-        res.json(newQuery);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    try { res.json(await db.createSavedQuery(req.body)); }
+    catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/db/saved-queries/:id', async (req, res) => {
     try {
-        const idToDelete = parseInt(req.params.id);
-        sessionSavedQueries = sessionSavedQueries.filter(q => q.id !== idToDelete);
+        await db.deleteSavedQuery(parseInt(req.params.id));
         res.json({ ok: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -854,51 +719,59 @@ app.get('/api/db/import/status/:jobId', (req, res) => {
 });
 
 async function runImport(jobId, config) {
-    const { dbType, uri, table, query, mapping, tables, batch, host, port, dbName, user, pass } = config;
+    const { dbType, uri, table, query, mapping, tables, batch } = config;
     const state = activeDbImports[jobId];
     const logPrefix = `[Import ${jobId}]`;
 
     try {
-        let pClient;
+        if (dbType !== 'sqlite') throw new Error(`Only SQLite currently supported for ingestion.`);
 
-        const { Client } = require('pg');
-        const connectionString = `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public`;
-        console.log(`${logPrefix} Connecting to Postgres: ${connectionString.replace(/:([^@:]+)@/, ':****@')}`);
-        pClient = new Client({ connectionString });
-        await pClient.connect();
+        let dbPath = uri.startsWith('file:') ? path.resolve(uri.replace('file:', '')) : path.resolve(uri);
+        
+        // Robust relative path checking
+        if (!fs.existsSync(dbPath)) {
+            const relPath1 = path.resolve(__dirname, uri.replace('file:', ''));
+            const relPath2 = path.resolve(__dirname, '..', uri.replace('file:', ''));
+            const relPath3 = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', uri.replace('file:', ''));
+            
+            if (fs.existsSync(relPath1)) dbPath = relPath1;
+            else if (fs.existsSync(relPath2)) dbPath = relPath2;
+            else if (fs.existsSync(relPath3)) dbPath = relPath3;
+            else throw new Error(`Database not found: ${dbPath} (checked project-specific locations)`);
+        }
 
+        console.log(`${logPrefix} Connecting to: ${dbPath}`);
+        const sourceDb = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
+        
         // Descriptive filename generation
         let baseName = "db_import";
         if (tables === 'all') baseName = "Full_DB_Sync";
         else if (batch && batch.length) baseName = `Batch_Import_${batch.length}_Queries`;
         else if (table) baseName = `Table_${table}`;
         else if (query) baseName = `Query_Result`;
-
+        
         const safeName = baseName.replace(/[^a-z0-9_\-]/gi, '_');
         const outputPath = path.join(DATA_COLLECTED_DIR, `${safeName}_${jobId}.txt`);
         const fileStream = fs.createWriteStream(outputPath);
 
-        // 1. Build the list of tasks
+        // 1. Build the list of tasks (table or query)
         let tasks = [];
         if (batch && Array.isArray(batch)) {
-            tasks = batch;
+            tasks = batch; // [{ name, query, mapping }]
         } else if (tables === 'all') {
-            const res = await pClient.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'");
-            tasks = res.rows.map(t => ({ name: t.table_name, table: t.table_name, mapping }));
+            const allTables = await new Promise((res, rej) => {
+                sourceDb.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'prisma_%'", [], (err, rows) => err ? rej(err) : res(rows));
+            });
+            tasks = allTables.map(t => ({ name: t.name, table: t.name, mapping }));
         } else {
             tasks = [{ name: table || 'Custom Query', table, query, mapping }];
         }
 
-        // 2. Count total rows
+        // 2. Count total rows across all tasks
         let totalRows = 0;
         for (const t of tasks) {
-            const tableName = t.table ? `"${t.table}"` : null;
-            let countSql = t.query ? `SELECT COUNT(*) as cnt FROM (${t.query}) as sub` : `SELECT COUNT(*) as cnt FROM ${tableName}`;
-
-            countSql = autoQuotePgQuery(countSql);
-
-            const res = await pClient.query(countSql);
-            const count = parseInt(res.rows[0].cnt);
+            const countSql = t.query ? `SELECT COUNT(*) as cnt FROM (${t.query})` : `SELECT COUNT(*) as cnt FROM ${t.table}`;
+            const count = await new Promise((res, rej) => sourceDb.get(countSql, [], (err, row) => err ? rej(err) : res(row.cnt)));
             t.total = count;
             totalRows += count;
         }
@@ -907,26 +780,24 @@ async function runImport(jobId, config) {
 
         // 3. Process sequentially
         let globalIdx = 0;
-        fileStream.write(`# Consolidated DB Import Job #${jobId}\n# Date: ${new Date().toISOString()}\n# Source: ${dbType.toUpperCase()}\n\n`);
+        fileStream.write(`# Consolidated DB Import Job #${jobId}\n# Date: ${new Date().toISOString()}\n# Source: ${dbPath}\n\n`);
 
         for (const t of tasks) {
-            const tableName = t.table ? `"${t.table}"` : null;
-            let sql = t.query || `SELECT * FROM ${tableName}`;
-
-            sql = autoQuotePgQuery(sql);
-
+            console.log(`${logPrefix} Processing ${t.name}...`);
+            const sql = t.query || `SELECT * FROM ${t.table}`;
+            
             fileStream.write(`\n## SECTION: ${t.name}\n`);
             if (t.query) fileStream.write(`### SQL: ${t.query}\n`);
             fileStream.write(`${'='.repeat(20)}\n\n`);
-
-            const res = await pClient.query(sql);
-            const rows = res.rows;
+            
+            const rows = await new Promise((res, rej) => sourceDb.all(sql, [], (err, rows) => err ? rej(err) : res(rows)));
 
             for (const row of rows) {
+                // Formatting
                 const contentBlock = Object.entries(row)
                     .map(([k, v]) => `- **${k}**: ${v}`)
                     .join('\n');
-
+                
                 const payload = {
                     source: `DB_IMPORT:${t.name}`,
                     title: `${t.name} — Entry #${globalIdx + 1}`,
@@ -935,30 +806,34 @@ async function runImport(jobId, config) {
                     timestamp: t.mapping && row[t.mapping.time] ? new Date(row[t.mapping.time]).toISOString() : new Date().toISOString()
                 };
 
+                // Push to NetaBoard
                 try {
-                    const targetIngestUrl = config.ingestUrl || `${BACKEND_URL}/api/ingest`;
-                    await fetch(targetIngestUrl, {
+                    await fetch(`${BACKEND_URL}/api/ingest`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...payload, skipFileSave: true })
+                        body: JSON.stringify(payload)
                     });
                 } catch (e) { console.warn(`${logPrefix} Push error:`, e.message); }
 
+                // Save to file
                 fileStream.write(`${'#'.repeat(10)}\n${payload.title}\n${payload.content}\n\n`);
 
                 globalIdx++;
                 state.processed = globalIdx;
                 state.progress = Math.round((globalIdx / totalRows) * 100);
-
+                
                 if (globalIdx % 10 === 0) {
                     await db.updateJob(jobId, { progress: state.progress, itemsProcessed: globalIdx });
                 }
+                
+                // Throttle
+                await new Promise(r => setTimeout(r, 10));
             }
         }
 
         fileStream.end();
-        if (pClient) await pClient.end();
-
+        sourceDb.close();
+        
         state.status = 'done';
         await db.updateJob(jobId, { status: 'done', progress: 100, itemsProcessed: totalRows });
         console.log(`${logPrefix} Successfully saved to ${outputPath}`);

@@ -20,6 +20,9 @@ import { EB, ALGO_ENGINE, SMART_TEMPLATES, AI_RESOLVER, AI_AUDIT, PROMPTS_REGIST
 import ShikayatKendra from './pp/ShikayatKendra';
 import IngestHub from './ingest/IngestHub';
 import VaultBrowser from './ingest/VaultBrowser';
+import PipelineMonitor from './pipeline/PipelineMonitor';
+import PipelineVisualize from './pipeline/PipelineVisualize';
+import PipelineLogs from './pipeline/PipelineLogs';
 import { Stat, Tag, ProgressBar } from './shared/Primitives';
 import { MotionCard } from './shared/Motion';
 import type { ModuleProps, IASCLStateType } from './ModuleProps';
@@ -1312,6 +1315,23 @@ export default function ContentRouter(P: ModuleProps) {
 
     return renderFallback();
   };
+
+  // ── Pipeline Intel module ──────────────────────────────────────────────────
+  const renderPipeline = () => {
+    return (
+      <>
+        <h2 className="nb-section anim">🔄 Pipeline Intel</h2>
+        <div className="anim" style={{ minHeight: '70vh' }}>
+          {curPill === 'monitor' && <PipelineMonitor />}
+          {curPill === 'visualize' && <PipelineVisualize />}
+          {curPill === 'logs' && <PipelineLogs />}
+          {!curPill && <PipelineMonitor />}
+        </div>
+      </>
+    );
+  };
+
+  if (curMod === 'pipeline') return renderPipeline();
 
   return renderContent();
 }

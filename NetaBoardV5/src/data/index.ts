@@ -136,6 +136,8 @@ export const BO_MODULES: ModuleItem[] = [
   { k: 'gathbandhan', ic: '🤝', l: 'Gathbandhan', pills: ['alliance_map', 'seats'] },
   { k: 'planning', ic: '📅', l: 'Planning Hub', pills: ['calendar', 'content_cal', 'whatif'] },
   { k: 'settings', ic: '⚙', l: 'Settings', pills: ['profile', 'ai_usage', 'export'] },
+  { sec: 'PIPELINE' },
+  { k: 'pipeline', ic: '🔄', l: 'Pipeline Intel', pills: ['monitor', 'visualize', 'logs'] },
 ];
 
 // ─── Jan Setu Portal Modules ───

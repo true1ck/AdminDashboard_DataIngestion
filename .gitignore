@@ -121,3 +121,5 @@ temp/
 
 # ── multer temp uploads ───────────────────────────
 NetaBoardV5/backend/uploads/
+AdminDashboard/dashboard.db-shm
+AdminDashboard/dashboard.db-wal

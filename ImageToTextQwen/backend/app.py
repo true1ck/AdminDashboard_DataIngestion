@@ -1,8 +1,10 @@
 import os
+import json
+import zipfile
 import base64
 import io
 import traceback
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
@@ -165,6 +167,180 @@ def analyze_image():
             return jsonify({
                 'error': f'Failed to analyze image: {error_msg}'
             }), 500
+
+@app.route('/api/analyze-batch', methods=['POST'])
+def analyze_batch():
+    """Analyze multiple uploaded images using Qwen2.5-VL."""
+
+    # Validate API token
+    if not HF_API_TOKEN or HF_API_TOKEN == 'your_huggingface_token_here':
+        return jsonify({
+            'error': 'HuggingFace API token not configured. Please add your token to the .env file.',
+            'help': 'Get a free token at https://huggingface.co/settings/tokens'
+        }), 401
+
+    if 'images' not in request.files:
+        return jsonify({'error': 'No image files provided. Please upload at least one image.'}), 400
+
+    files = request.files.getlist('images')
+    if not files or files[0].filename == '':
+        return jsonify({'error': 'No files selected.'}), 400
+
+    # Get optional prompt
+    prompt = request.form.get('prompt', 'Describe this image in detail. If there are any people or entities in the picture, please attempt to identify who they are. If there is any text in the image, extract and include it.')
+
+    client = InferenceClient(api_key=HF_API_TOKEN)
+    results = []
+    
+    for i, file in enumerate(files):
+        if not allowed_file(file.filename):
+            results.append(f"--- Image {i+1} ({file.filename}) ---\n[Error: Invalid file type]\n")
+            continue
+
+        file.seek(0, 2)
+        file_size = file.tell()
+        file.seek(0)
+        if file_size > MAX_FILE_SIZE:
+            results.append(f"--- Image {i+1} ({file.filename}) ---\n[Error: File too large (>10MB)]\n")
+            continue
+
+        try:
+            image_data_uri = image_to_base64(file)
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image_data_uri
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }
+            ]
+            completion = client.chat.completions.create(
+                model=MODEL_ID,
+                messages=messages,
+                max_tokens=2048
+            )
+            result_text = completion.choices[0].message.content
+            results.append(f"--- Image {i+1} ({file.filename}) ---\n{result_text}\n")
+        except Exception as e:
+            results.append(f"--- Image {i+1} ({file.filename}) ---\n[Error analyzing image: {str(e)}]\n")
+            traceback.print_exc()
+
+    return jsonify({
+        'success': True,
+        'result': "\n".join(results),
+        'model': MODEL_ID,
+        'prompt': prompt,
+        'image_count': len(files)
+    })
+
+@app.route('/api/analyze-kaggle', methods=['POST'])
+def analyze_kaggle():
+    """Analyze up to N images from a Kaggle ZIP dataset using Qwen2.5-VL. Streams SSE progress."""
+    if not HF_API_TOKEN or HF_API_TOKEN == 'your_huggingface_token_here':
+        return jsonify({'error': 'HuggingFace API token not configured.'}), 401
+
+    if 'zipfile' not in request.files:
+        return jsonify({'error': 'No zipfile provided.'}), 400
+
+    file = request.files['zipfile']
+    if not file.filename.lower().endswith('.zip'):
+        return jsonify({'error': 'Invalid file type. Must be ZIP.'}), 400
+
+    prompt = request.form.get('prompt', 'Describe this image in detail. Identify any people or entities present.')
+    try:
+        max_images = int(request.form.get('max_images', 10))
+    except ValueError:
+        max_images = 10
+
+    # Read the ZIP into memory so we can iterate it inside the generator
+    zip_bytes = io.BytesIO(file.read())
+
+    def generate():
+        client = InferenceClient(api_key=HF_API_TOKEN)
+        results = []
+
+        try:
+            with zipfile.ZipFile(zip_bytes, 'r') as z:
+                # First pass: count eligible images
+                eligible = [zi for zi in z.infolist()
+                            if not zi.is_dir()
+                            and zi.file_size <= MAX_FILE_SIZE
+                            and allowed_file(zi.filename)]
+
+                total = min(len(eligible), max_images)
+
+                for idx, zip_info in enumerate(eligible[:total]):
+                    status = "ok"
+                    result_text = ""
+                    try:
+                        with z.open(zip_info) as f:
+                            image_data = f.read()
+
+                        image_data_uri = image_to_base64(io.BytesIO(image_data))
+                        messages = [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {"url": image_data_uri}
+                                    },
+                                    {"type": "text", "text": prompt}
+                                ]
+                            }
+                        ]
+                        completion = client.chat.completions.create(
+                            model=MODEL_ID,
+                            messages=messages,
+                            max_tokens=2048
+                        )
+                        result_text = completion.choices[0].message.content
+                        results.append(f"--- Kaggle Image: {zip_info.filename} ---\n{result_text}\n")
+                    except Exception as e:
+                        status = "error"
+                        results.append(f"--- Kaggle Image: {zip_info.filename} ---\n[Error analyzing image: {str(e)}]\n")
+                        traceback.print_exc()
+
+                    # Emit progress event
+                    progress_data = json.dumps({
+                        "type": "progress",
+                        "current": idx + 1,
+                        "total": total,
+                        "filename": zip_info.filename,
+                        "status": status
+                    })
+                    yield f"data: {progress_data}\n\n"
+
+            # Emit final done event
+            done_data = json.dumps({
+                "type": "done",
+                "success": True,
+                "result": "\n".join(results),
+                "model": MODEL_ID,
+                "prompt": prompt,
+                "image_count": total
+            })
+            yield f"data: {done_data}\n\n"
+
+        except Exception as e:
+            traceback.print_exc()
+            error_data = json.dumps({
+                "type": "error",
+                "error": f"Failed processing ZIP: {str(e)}"
+            })
+            yield f"data: {error_data}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
+
 
 @app.route('/api/analyze-pdf', methods=['POST'])
 def analyze_pdf():

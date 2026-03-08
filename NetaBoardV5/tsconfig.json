@@ -8,5 +8,6 @@
     "allowSyntheticDefaultImports": true, "esModuleInterop": true
   },
   "include": ["src"],
+  "exclude": ["backend", "node_modules"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

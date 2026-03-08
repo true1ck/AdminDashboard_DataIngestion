@@ -10,13 +10,22 @@ export default function ServiceStatusBar() {
         const fetchHealth = async () => {
             try {
                 const res = await axios.get(`${API_BASE}/health/all`);
-                setHealth(res.data);
+                const data = { ...res.data };
+                // Also check pipeline API
+                try {
+                    await axios.get('http://localhost:8500/health', { timeout: 2000 });
+                    data.pipeline = 'online';
+                } catch {
+                    data.pipeline = 'offline';
+                }
+                setHealth(data);
             } catch (e) {
                 setHealth({
                     backend: 'offline',
                     frontend: 'online',
                     qwen: 'offline',
-                    whisper: 'offline'
+                    whisper: 'offline',
+                    pipeline: 'offline',
                 });
             }
         };
@@ -31,6 +40,7 @@ export default function ServiceStatusBar() {
         { key: 'backend', label: 'BE', icon: '⚙️' },
         { key: 'qwen', label: 'QN', icon: '🧠' },
         { key: 'whisper', label: 'WH', icon: '🎧' },
+        { key: 'pipeline', label: 'PL', icon: '🔄' },
     ];
 
     return (
