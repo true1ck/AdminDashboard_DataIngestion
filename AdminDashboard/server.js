@@ -481,6 +481,19 @@ app.get('/api/db/tables', (req, res) => {
 
 let knownTables = [];
 
+async function fetchKnownTables(client) {
+    const tableRes = await client.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+    `);
+    const tables = tableRes.rows.map(r => r.table_name);
+    knownTables = tables;
+    return tables;
+}
+
 function autoQuotePgQuery(sql, tables = []) {
     if (!sql) return sql;
     let modified = sql;
@@ -504,15 +517,22 @@ app.post('/api/db/query', async (req, res) => {
     const { Client } = require('pg');
     const client = new Client({ connectionString: dbUrl });
     
-    let sql = query && query.trim() !== '' ? query : `SELECT * FROM "${table}" LIMIT ${finalLimit}`;
-    if (query && query.trim() !== '') {
-        sql = autoQuotePgQuery(sql);
-    }
-
-    console.log(`[DB Query] Executing Postgres: ${sql}`);
-
     try {
         await client.connect();
+
+        // Ensure we have table metadata for quoting
+        if (knownTables.length === 0) {
+            console.log("[DB Query] knownTables empty, performing quick introspection...");
+            await fetchKnownTables(client);
+        }
+
+        let sql = query && query.trim() !== '' ? query : `SELECT * FROM "${table}" LIMIT ${finalLimit}`;
+        if (query && query.trim() !== '') {
+            sql = autoQuotePgQuery(sql);
+        }
+
+        console.log(`[DB Query] Executing Postgres: ${sql}`);
+
         const dbRes = await client.query(sql);
         await client.end();
         res.json({ ok: true, rows: dbRes.rows, count: dbRes.rowCount });
@@ -522,6 +542,8 @@ app.post('/api/db/query', async (req, res) => {
         try { await client.end(); } catch (e) {}
     }
 });
+
+let prismaStudioProcess = null;
 
 // Test connection and introspect tables
 app.post('/api/db/test-connection', async (req, res) => {
@@ -533,25 +555,60 @@ app.post('/api/db/test-connection', async (req, res) => {
 
     try {
         await client.connect();
-        const tableRes = await client.query(`
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_type = 'BASE TABLE'
-            ORDER BY table_name
-        `);
-        knownTables = tableRes.rows.map(r => r.table_name);
+        const tables = await fetchKnownTables(client);
         await client.end();
+
+        // ── OPTIONAL: Launch Prisma Studio if in NetaBoard environment ──
+        let prismaStudioUrl = null;
+        const prismaDir = path.join(__dirname, '..', 'NetaBoardV5', 'backend');
+        if (fs.existsSync(prismaDir)) {
+            console.log(`[DB Test] Prisma environment detected at ${prismaDir}. Attempting to launch Studio...`);
+            
+            // Kill existing
+            if (prismaStudioProcess) {
+                try { process.kill(-prismaStudioProcess.pid); } catch (e) { prismaStudioProcess.kill(); }
+                prismaStudioProcess = null;
+                await new Promise(r => setTimeout(r, 800));
+            }
+
+            // Spawn
+            const { spawn } = require('child_process');
+            prismaStudioProcess = spawn('npx', ['prisma', 'studio', '--port', '5555', '--browser', 'none'], {
+                cwd: prismaDir,
+                shell: true,
+                stdio: 'ignore',
+                detached: false,
+                env: { ...process.env, DATABASE_URL: dbUrl }
+            });
+            prismaStudioProcess.on('exit', () => { prismaStudioProcess = null; });
+            prismaStudioProcess.on('error', () => { prismaStudioProcess = null; });
+            
+            // Give it a moment to boot
+            await new Promise(r => setTimeout(r, 2000));
+            prismaStudioUrl = 'http://localhost:5555';
+        }
 
         res.json({ 
             ok: true, 
             tables: knownTables,
-            message: `Connected successfully. Discovered ${knownTables.length} tables.`
+            prismaStudioUrl,
+            message: `Connected successfully. Discovered ${knownTables.length} tables.${prismaStudioUrl ? ' Prisma Studio ready.' : ''}`
         });
     } catch (err) {
         console.error(`[DB Test] Error: ${err.message}`);
         res.json({ ok: false, error: err.message });
         try { await client.end(); } catch (e) {}
+    }
+});
+
+// Check Prisma Studio status
+app.get('/api/db/prisma-status', async (req, res) => {
+    if (!prismaStudioProcess) return res.json({ running: false });
+    try {
+        const r = await fetch('http://localhost:5555', { signal: AbortSignal.timeout(1000) });
+        res.json({ running: r.ok });
+    } catch (e) {
+        res.json({ running: false });
     }
 });
 

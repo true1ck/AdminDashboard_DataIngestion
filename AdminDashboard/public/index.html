@@ -394,6 +394,9 @@
       display: flex;
       gap: 0.5rem;
       align-items: center;
+      overflow-x: auto;
+      white-space: nowrap;
+      padding-bottom: 2px;
     }
 
     /* ── SCROLLABLE CONTENT ── */
@@ -854,7 +857,8 @@
       min-height: 44px;
       padding: 0.35rem 0.6rem;
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
       gap: 0.3rem;
       align-items: center;
       cursor: text;
@@ -1405,6 +1409,8 @@
       display: flex;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+      overflow-x: auto;
+      white-space: nowrap;
     }
 
     .qtab {
@@ -1690,8 +1696,10 @@
     /* ── DB TABLE CHIPS ── */
     .db-table-chips {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
       gap: 0.35rem;
+      padding-bottom: 4px;
     }
 
     .db-table-chip {
@@ -3148,6 +3156,7 @@
                 </div>
                 <div class="flex-row" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                   <button class="btn btn-outline btn-sm" onclick="dbTest()">⟲ Test Connection</button>
+                  <button class="btn btn-sm" id="btn-open-prisma" style="display:none;background:var(--purple2);color:var(--purple);border:1px solid var(--purple3);" onclick="dbOpenPrisma()">🎚️ Open Advanced Explorer</button>
                   <span style="font-family:var(--mono);font-size:0.5rem;" id="db-test-status"></span>
                 </div>
 
@@ -3241,6 +3250,17 @@
                     </table>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <!-- ── Prisma Studio Section (Hidden by default) ── -->
+            <div class="card" id="db-prisma-section" style="display:none;margin-top:1rem;">
+              <div class="card-hdr">
+                <div class="card-title"><span class="icon">💎</span> Prisma Studio</div>
+                <button class="btn btn-xs btn-outline" onclick="dbClosePrisma()">× Close Explorer</button>
+              </div>
+              <div class="card-body" style="padding:0;height:600px;overflow:hidden;background:#fff;border-radius:0 0 var(--radius) var(--radius);">
+                <iframe id="db-prisma-iframe" src="about:blank" style="width:100%;height:100%;border:none;"></iframe>
               </div>
             </div>
 
@@ -4650,6 +4670,14 @@
           el.textContent = `✓ ${data.message || 'Connected successfully'}`; el.style.color = 'var(--green)';
           qLog('ok', `DB connection OK: ${dbName} @ ${host}`);
 
+          const prismaBtn = document.getElementById('btn-open-prisma');
+          if (data.prismaStudioUrl) {
+            prismaBtn.style.display = 'inline-flex';
+            prismaBtn.dataset.url = data.prismaStudioUrl;
+          } else {
+            prismaBtn.style.display = 'none';
+          }
+
           // Update table list immediately
           if (data.tables && data.tables.length) {
             renderTableChips(data.tables);
@@ -4657,11 +4685,31 @@
         } else {
           el.textContent = '✕ ' + (data.error || 'Connection failed'); el.style.color = 'var(--red)';
           qLog('err', `DB connection failed: ${data.error || 'Unknown'}`);
+          document.getElementById('btn-open-prisma').style.display = 'none';
         }
       } catch (err) {
         el.textContent = '✕ Network error — is the server running?'; el.style.color = 'var(--red)';
         qLog('err', `DB test error: ${err.message}`);
+        document.getElementById('btn-open-prisma').style.display = 'none';
       }
+    }
+
+    function dbOpenPrisma() {
+      const btn = document.getElementById('btn-open-prisma');
+      const sec = document.getElementById('db-prisma-section');
+      const iframe = document.getElementById('db-prisma-iframe');
+      if (btn && sec && iframe && btn.dataset.url) {
+        sec.style.display = 'block';
+        iframe.src = btn.dataset.url;
+        sec.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function dbClosePrisma() {
+      const sec = document.getElementById('db-prisma-section');
+      const iframe = document.getElementById('db-prisma-iframe');
+      if (sec) sec.style.display = 'none';
+      if (iframe) iframe.src = 'about:blank';
     }
 
     function renderTableChips(tables) {
