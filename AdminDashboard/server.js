@@ -1139,6 +1139,16 @@ app.delete('/api/nri/queue/:fileId', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// DELETE /api/nri/scores/file/:fileId — remove scores and reset file
+app.delete('/api/nri/scores/file/:fileId', async (req, res) => {
+    try {
+        const fileId = parseInt(req.params.fileId);
+        await db.nriRemoveScores(fileId);
+        await db.appendLog('info', `[NRI] Deleted scores and reset file #${fileId}`);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/nri/queue/batch — enqueue multiple files
 app.post('/api/nri/queue/batch', async (req, res) => {
     try {
@@ -1155,6 +1165,84 @@ app.post('/api/nri/queue/batch', async (req, res) => {
         await db.appendLog('info', `[NRI] Batch queued ${results.length} files`);
         res.json({ queued: results.length, results });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  NRI SCORING ENGINE — keyword-based 15-pillar scorer
+// ═══════════════════════════════════════════════════════════════
+const NRI_PILLARS = {
+    electoral_strength: ['election','vote','voter','constituency','margin','mandate','win','won','defeat','candidate','polling','booth','ballot','electoral','majority','winning','result','seat'],
+    legislative_performance: ['parliament','lok sabha','rajya sabha','bill','legislation','debate','session','assembly','question hour','attendance','committee','amendment','pass','mla','mp','lawmaker'],
+    constituency_development: ['road','infrastructure','hospital','school','water','electricity','mplad','development','project','fund','grant','construction','village','district','welfare','scheme','rural'],
+    public_accessibility: ['public meeting','rally','jan sabha','accessible','helpline','office','complaint','grievance','listen','citizen','reach','camp','available','contact','representative'],
+    communication: ['speech','address','statement','press','media','interview','conference','announcement','tweet','post','message','said','declared','spoke','mentioned','claimed'],
+    party_standing: ['party','bjp','congress','inc','aap','tmc','sp','bsp','ncp','coalition','leader','president','general secretary','faction','disciplinary','expelled','loyal','alliance'],
+    media_coverage: ['news','newspaper','channel','coverage','report','journalist','headline','broadcast','television','radio','viral','trending','print','media','story','publication'],
+    digital_influence: ['twitter','facebook','instagram','youtube','social media','followers','likes','share','retweet','hashtag','viral','online','digital','internet','website','platform'],
+    financial_muscle: ['crore','lakh','funding','donation','asset','affidavit','income','property','wealth','money','expenditure','campaign','business','industry','finance','investment'],
+    alliance_intel: ['alliance','coalition','partner','nda','upa','india bloc','seat sharing','tie-up','support','backing','ally','joint','agreement','mou','cooperation','front','pact'],
+    caste_equation: ['caste','community','obc','sc','st','dalit','brahmin','yadav','jat','rajput','reservation','minority','religion','hindu','muslim','sikh','demographic','vote bank'],
+    anti_incumbency: ['anti-incumbency','dissatisfaction','unhappy','anger','protest','agitation','complaint','failure','corrupt','controversy','scandal','criticism','oppose','backlash','discontent'],
+    grassroots_network: ['worker','booth','block','panchayat','ground','volunteer','cadre','network','local','karyakarta','mandal','ward','grassroot','shakha','connect','community'],
+    ideology_consistency: ['ideology','policy','position','stand','consistent','flip-flop','principle','manifesto','promise','agenda','vision','platform','socialist','nationalist','secular'],
+    scandal_index: ['scam','scandal','fraud','corruption','fir','case','arrested','chargesheet','allegation','accused','convicted','court','bail','criminal','bribery','money laundering']
+};
+
+function scoreTextAgainstPillars(text) {
+    const lower = text.toLowerCase();
+    const totalWords = Math.max(lower.split(/\s+/).length, 1);
+    const results = [];
+    for (const [pillar, keywords] of Object.entries(NRI_PILLARS)) {
+        let hits = 0;
+        const evidenceHits = [];
+        for (const kw of keywords) {
+            const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escaped, 'gi');
+            const count = (lower.match(regex) || []).length;
+            if (count > 0) { hits += count; evidenceHits.push(`${kw}(${count})`); }
+        }
+        if (hits === 0) continue;
+        const density = hits / totalWords;
+        const relevanceScore = Math.min(density * 500, 1.0);
+        const isRelevant = relevanceScore >= 0.05 || hits >= 2;
+        const rawScore = Math.min(Math.round((hits / 50) * 100), 100);
+        const uniqueMatched = new Set(evidenceHits.map(e => e.split('(')[0]));
+        const confidence = Math.min(uniqueMatched.size / keywords.length, 1.0);
+        results.push({ pillar, relevanceScore: +relevanceScore.toFixed(3), isRelevant, rawScore, effectiveScore: isRelevant ? rawScore : 0, confidence: +confidence.toFixed(3), evidence: evidenceHits.slice(0, 8).join(', ') });
+    }
+    return results;
+}
+
+// POST /api/nri/score-file
+app.post('/api/nri/score-file', async (req, res) => {
+    const { fileId } = req.body;
+    if (!fileId) return res.status(400).json({ error: 'fileId required' });
+    try {
+        const files = await db.nriGetFiles('all');
+        const file = files.find(f => f.id === parseInt(fileId));
+        if (!file) return res.status(404).json({ error: `File #${fileId} not found` });
+        if (!fs.existsSync(file.filepath)) {
+            await db.nriUpdateFile(file.id, { processing_state: 'failed', error_msg: 'File not found on disk' });
+            return res.status(404).json({ error: 'File not found on disk: ' + file.filepath });
+        }
+        await db.nriUpdateFile(file.id, { processing_state: 'processing', started_at: new Date().toISOString() });
+        await db.nriUpdateQueue(file.id, { status: 'processing', startedAt: new Date().toISOString() }).catch(() => {});
+        const text = fs.readFileSync(file.filepath, 'utf8');
+        const scores = scoreTextAgainstPillars(text);
+        for (const ps of scores) {
+            await db.nriSaveScore({ fileId: file.id, filepath: file.filepath, pillar: ps.pillar, relevanceScore: ps.relevanceScore, isRelevant: ps.isRelevant, rawScore: ps.rawScore, effectiveScore: ps.effectiveScore, confidence: ps.confidence, evidence: ps.evidence });
+        }
+        const relevant = scores.filter(p => p.isRelevant);
+        const avgScore = relevant.length ? +(relevant.reduce((s, p) => s + p.effectiveScore, 0) / relevant.length).toFixed(1) : 0;
+        await db.nriUpdateFile(file.id, { processing_state: 'done', pillars_scored: scores.length, pillars_relevant: relevant.length, avg_score: avgScore, completed_at: new Date().toISOString() });
+        await db.nriUpdateQueue(file.id, { status: 'done', completedAt: new Date().toISOString() }).catch(() => {});
+        await db.appendLog('info', `[NRI] Scored file #${fileId}: ${relevant.length} relevant pillars`);
+        res.json({ success: true, fileId, pillarsScored: scores.length, relevantPillars: relevant.length, avgScore, scores });
+    } catch (e) {
+        console.error('[NRI Score]', e.message);
+        await db.nriUpdateFile(parseInt(fileId), { processing_state: 'failed', error_msg: e.message }).catch(() => {});
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // ═══════════════════════════════════════════════════════════════

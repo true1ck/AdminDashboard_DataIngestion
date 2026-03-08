@@ -1994,9 +1994,11 @@ function renderNriFiles() {
           <td onclick="event.stopPropagation()">
             ${f.processing_state === 'pending' || f.processing_state === 'failed'
             ? `<button class="btn btn-xs btn-primary" onclick="nriQueueOne(${f.id}, '${f.filepath}')">▶</button>`
-            : f.in_queue
-                ? `<button class="btn btn-xs btn-danger" onclick="nriRemoveFromQueue(${f.id})">✕</button>`
-                : ''}
+            : f.processing_state === 'done' || f.processing_state === 'processing'
+                ? `<button class="btn btn-xs btn-outline" style="border-color:var(--red);color:var(--red);" onclick="nriResetScores(${f.id})" title="Delete Scores & Reset">🗑</button>`
+                : f.in_queue
+                    ? `<button class="btn btn-xs btn-danger" onclick="nriRemoveFromQueue(${f.id})">✕</button>`
+                    : ''}
           </td>
         </tr>`
     ).join('');
@@ -2057,12 +2059,15 @@ async function nriShowScoreDetail(fileId) {
     try {
         const scores = await fetch(`/api/nri/scores?fileId=${fileId}`).then(r => r.json());
 
+        const msFileIdEarly = document.getElementById('ms-file-id');
+        if (msFileIdEarly) msFileIdEarly.value = fileId;
+
         if (!scores.length) {
             panel.innerHTML = `
               <div style="font-size:0.62rem;font-weight:600;color:var(--text);margin-bottom:0.5rem;">${file?.filename || 'File #' + fileId}</div>
               <div class="nri-state-badge nri-state-${file?.processing_state || 'pending'}" style="margin-bottom:0.75rem;">${file?.processing_state || 'pending'}</div>
               <div style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;margin-top:1rem;text-align:center;">
-                No scores yet. Queue this file and run the scoring pipeline.
+                No scores yet. Queue this file and run the scoring pipeline, or enter scores manually below.
               </div>`;
             return;
         }
@@ -2229,6 +2234,20 @@ async function nriSubmitManualScore() {
         if (selectedNriFileId === fileId) await nriShowScoreDetail(fileId);
     } catch (e) {
         qLog('err', '[NRI] Score save failed: ' + e.message);
+    }
+}
+
+async function nriResetScores(fileId) {
+    if (!confirm('Are you sure you want to delete all scores and reset this file to pending state?')) return;
+    try {
+        await fetch(`/api/nri/scores/file/${fileId}`, { method: 'DELETE' });
+        qLog('ok', `[NRI] Reset scores for file #${fileId}`);
+        await nriLoadAll();
+        if (selectedNriFileId === fileId) {
+            await nriShowScoreDetail(fileId);
+        }
+    } catch (e) {
+        qLog('err', '[NRI] Failed to reset scores: ' + e.message);
     }
 }
 

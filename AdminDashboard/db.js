@@ -391,6 +391,12 @@ async function nriRemoveFromQueue(fileId) {
     await run(`DELETE FROM nri_queue WHERE file_id=?`, [fileId]);
 }
 
+async function nriRemoveScores(fileId) {
+    await run(`DELETE FROM nri_file_scores WHERE file_id=?`, [fileId]);
+    await run(`UPDATE nri_files SET processing_state='pending', relevance_scored=0, pillar_scored=0, pillars_relevant=0, pillars_scored=0, avg_relevance=0, avg_score=0 WHERE id=?`, [fileId]);
+    await run(`DELETE FROM nri_queue WHERE file_id=?`, [fileId]);
+}
+
 async function nriGetStats() {
     const total = await get(`SELECT COUNT(*) as cnt FROM nri_files`);
     const pending = await get(`SELECT COUNT(*) as cnt FROM nri_files WHERE processing_state='pending'`);
@@ -421,6 +427,6 @@ module.exports = {
     // NRI Pre-Processing Pipeline
     nriDiscoverFile, nriGetFiles, nriUpdateFile,
     nriSaveScore, nriGetScores, nriGetAllScores,
-    nriEnqueue, nriGetQueue, nriUpdateQueue, nriRemoveFromQueue, nriGetStats,
+    nriEnqueue, nriGetQueue, nriUpdateQueue, nriRemoveFromQueue, nriGetStats, nriRemoveScores,
     fpHash,
 };

@@ -140,7 +140,7 @@
     .shell {
       display: grid;
       grid-template-rows: var(--top-h) 1fr;
-      grid-template-columns: var(--sidebar-w) 1fr var(--panel-w);
+      grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--panel-w);
       grid-template-areas: "top top top" "nav main queue";
       height: 100vh;
     }
@@ -371,6 +371,7 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      min-height: 0;
     }
 
     .view {
@@ -378,6 +379,7 @@
       flex: 1;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
     }
 
     .view.active {
@@ -434,10 +436,11 @@
       overflow-y: auto;
       overflow-x: hidden;
       padding: 1.1rem 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
       min-height: 0;
+    }
+
+    .vscroll > * + * {
+      margin-top: 1rem;
     }
 
     /* ── PIPELINE VIEW LAYOUT ── */
@@ -2332,6 +2335,37 @@
       font-size: 0.4rem;
       color: var(--text4);
     }
+
+    /* ── SCROLLBAR STYLING (global thin scrollbars) ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text4); }
+    * { scrollbar-width: thin; scrollbar-color: var(--border2) var(--bg); }
+
+    /* NRI scrollable wrappers */
+    .nri-table-wrap {
+      overflow-y: auto;
+      overflow-x: auto;
+      max-height: 300px;
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+
+    .nri-queue-wrap {
+      overflow-y: auto;
+      max-height: 220px;
+    }
+
+    .nri-score-panel-wrap {
+      overflow-y: auto;
+      max-height: 480px;
+      padding-right: 2px;
+    }
+
+    .nri-heatmap-wrap {
+      overflow: auto;
+      max-height: 350px;
+    }
   </style>
 </head>
 
@@ -3993,59 +4027,52 @@
             <button class="btn btn-outline btn-sm" onclick="nriLoadAll()">⟲ Refresh</button>
             <button class="btn btn-primary btn-sm" id="btn-nri-queue-all" onclick="nriQueueAll(this)">▶ Queue All
               Pending</button>
+            <button class="btn btn-sm" style="background:var(--green);color:#000;" id="btn-nri-process-all" onclick="nriProcessAllQueued(this)">⚡ Process All Queued</button>
           </div>
         </div>
         <div class="vscroll">
 
           <!-- ─── Stats Row ─── -->
-          <div class="nri-stat-grid">
-            <div class="nri-stat-card accent-cyan">
-              <div class="nri-stat-label">Total Files</div>
-              <div class="nri-stat-value" id="nri-total">0</div>
-              <div class="nri-stat-sub">discovered</div>
+          <div class="nri-stat-grid" style="grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.5rem;">
+            <div class="nri-stat-card accent-cyan" style="padding: 0.4rem 0.6rem;">
+              <div class="nri-stat-label" style="font-size: 0.45rem;">Total Files</div>
+              <div class="nri-stat-value" id="nri-total" style="font-size: 0.7rem;">0</div>
             </div>
-            <div class="nri-stat-card accent-amber">
-              <div class="nri-stat-label">Queued</div>
-              <div class="nri-stat-value" id="nri-queued">0</div>
-              <div class="nri-stat-sub">waiting to score</div>
+            <div class="nri-stat-card accent-amber" style="padding: 0.4rem 0.6rem;">
+              <div class="nri-stat-label" style="font-size: 0.45rem;">Queued</div>
+              <div class="nri-stat-value" id="nri-queued" style="font-size: 0.7rem;">0</div>
             </div>
-            <div class="nri-stat-card accent-blue">
-              <div class="nri-stat-label">Processing</div>
-              <div class="nri-stat-value" id="nri-processing">0</div>
-              <div class="nri-stat-sub">scoring now</div>
+            <div class="nri-stat-card accent-blue" style="padding: 0.4rem 0.6rem;">
+              <div class="nri-stat-label" style="font-size: 0.45rem;">Processing</div>
+              <div class="nri-stat-value" id="nri-processing" style="font-size: 0.7rem;">0</div>
             </div>
-            <div class="nri-stat-card accent-green">
-              <div class="nri-stat-label">Done</div>
-              <div class="nri-stat-value" id="nri-done">0</div>
-              <div class="nri-stat-sub">scored successfully</div>
+            <div class="nri-stat-card accent-green" style="padding: 0.4rem 0.6rem;">
+              <div class="nri-stat-label" style="font-size: 0.45rem;">Done</div>
+              <div class="nri-stat-value" id="nri-done" style="font-size: 0.7rem;">0</div>
             </div>
-            <div class="nri-stat-card accent-red">
-              <div class="nri-stat-label">Failed</div>
-              <div class="nri-stat-value" id="nri-failed">0</div>
-              <div class="nri-stat-sub">errors</div>
+            <div class="nri-stat-card accent-red" style="padding: 0.4rem 0.6rem;">
+              <div class="nri-stat-label" style="font-size: 0.45rem;">Failed</div>
+              <div class="nri-stat-value" id="nri-failed" style="font-size: 0.7rem;">0</div>
             </div>
-            <div class="nri-stat-card accent-purple">
-              <div class="nri-stat-label">Total Scores</div>
-              <div class="nri-stat-value" id="nri-scores-cnt">0</div>
-              <div class="nri-stat-sub">pillar hits stored</div>
+            <div class="nri-stat-card accent-purple" style="padding: 0.4rem 0.6rem;">
+              <div class="nri-stat-label" style="font-size: 0.45rem;">Hits</div>
+              <div class="nri-stat-value" id="nri-scores-cnt" style="font-size: 0.7rem;">0</div>
             </div>
-            <div class="nri-stat-card accent-green">
-              <div class="nri-stat-label">Avg Score</div>
-              <div class="nri-stat-value" id="nri-avg-score">—</div>
-              <div class="nri-stat-sub">across relevant pillars</div>
+            <div class="nri-stat-card accent-green" style="padding: 0.4rem 0.6rem;">
+              <div class="nri-stat-label" style="font-size: 0.45rem;">Avg</div>
+              <div class="nri-stat-value" id="nri-avg-score" style="font-size: 0.7rem;">—</div>
             </div>
-            <div class="nri-stat-card accent-blue">
-              <div class="nri-stat-label">Pending</div>
-              <div class="nri-stat-value" id="nri-pending">0</div>
-              <div class="nri-stat-sub">not yet queued</div>
+            <div class="nri-stat-card accent-blue" style="padding: 0.4rem 0.6rem;">
+              <div class="nri-stat-label" style="font-size: 0.45rem;">Pending</div>
+              <div class="nri-stat-value" id="nri-pending" style="font-size: 0.7rem;">0</div>
             </div>
           </div>
 
           <!-- ─── Main layout: Files + Detail ─── -->
-          <div style="display:grid;grid-template-columns:1fr 360px;gap:1rem;">
+          <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;">
 
             <!-- Left: Files + Queue -->
-            <div style="display:flex;flex-direction:column;gap:1rem;min-height:0;">
+            <div style="flex:1 1 500px;display:flex;flex-direction:column;gap:1rem;min-width:0;">
 
               <!-- Queue Panel -->
               <div class="card">
@@ -4055,11 +4082,11 @@
                   </div>
                   <div style="display:flex;gap:0.4rem;align-items:center;">
                     <button class="btn btn-xs btn-outline" onclick="nriLoadQueue()">⟲</button>
-                    <button class="btn btn-xs btn-danger" onclick="nriClearQueue()"
-                      title="Clear completed queue items">✕ Clear Done</button>
+                    <button class="btn btn-xs" style="background:var(--green);color:#000;" id="btn-nri-q-process" onclick="nriProcessAllQueued(this)">⚡ Process All Queued</button>
+                    <button class="btn btn-xs btn-danger" onclick="nriClearQueue()" title="Remove all completed items">✕ Clear Done</button>
                   </div>
                 </div>
-                <div class="card-body p0" style="max-height:240px;overflow-y:auto;">
+                <div class="card-body p0" style="max-height:160px;overflow-y:auto;">
                   <table class="nri-file-table" id="nri-queue-table">
                     <thead>
                       <tr>
@@ -4070,12 +4097,13 @@
                         <th>Priority</th>
                         <th>Status</th>
                         <th>Queued</th>
-                        <th></th>
+                        <th>Score</th>
+                        <th>Remove</th>
                       </tr>
                     </thead>
                     <tbody id="nri-queue-body">
                       <tr>
-                        <td colspan="8" style="text-align:center;color:var(--text4);padding:1rem;">Click Refresh to load
+                        <td colspan="9" style="text-align:center;color:var(--text4);padding:1rem;">Click Refresh to load
                           queue</td>
                       </tr>
                     </tbody>
@@ -4084,7 +4112,7 @@
               </div>
 
               <!-- File Registry Panel -->
-              <div class="card" style="flex:1;">
+              <div class="card">
                 <div class="card-hdr">
                   <div class="card-title"><span class="icon">📁</span> File Registry
                     <span class="tag tag-b" id="nri-files-count" style="margin-left:0.5rem;">0 files</span>
@@ -4105,7 +4133,7 @@
                     <button class="btn btn-xs btn-primary" onclick="nriQueueSelected()">▶ Queue Selected</button>
                   </div>
                 </div>
-                <div class="card-body p0" style="overflow-y:auto;max-height:400px;">
+                <div class="card-body p0 nri-table-wrap" style="max-height:160px;">
                   <table class="nri-file-table" id="nri-files-table">
                     <thead>
                       <tr>
@@ -4134,12 +4162,12 @@
             </div><!-- /Left -->
 
             <!-- Right: Score Detail Panel -->
-            <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div style="flex:1 1 340px;display:flex;flex-direction:column;gap:1rem;min-width:0;">
               <div class="card" style="flex:1;">
                 <div class="card-hdr">
                   <div class="card-title"><span class="icon">📊</span> Score Detail</div>
                 </div>
-                <div class="card-body" id="nri-score-panel" style="overflow-y:auto;max-height:calc(100vh-280px);">
+                <div class="card-body nri-score-panel-wrap" id="nri-score-panel">
                   <div
                     style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:2rem 1rem;">
                     Click a file row to view its pillar scores
@@ -4229,15 +4257,15 @@
                 <button class="btn btn-xs btn-outline" onclick="nriLoadHeatmap()">⟲ Load Heatmap</button>
               </div>
             </div>
-            <div class="card-body p0" style="overflow:auto;max-height:350px;">
+            <div class="card-body p0" style="overflow:auto;min-height:120px;max-height:380px;">
               <div id="nri-heatmap-container">
-                <div
-                  style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:1.5rem;">
-                  Click "Load Heatmap" to render File × Pillar relevance matrix
+                <div style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:1.5rem;">
+                  ⏳ Loading heatmap&hellip;
                 </div>
               </div>
             </div>
           </div>
+          <div style="height: 120px;"></div> <!-- Bottom spacer for outer vscroll area -->
 
         </div><!-- /vscroll -->
       </div><!-- /v-preproving -->
@@ -6578,8 +6606,377 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
         if (item.dataset.view === 'preprocessing') loadDataCollectedFolder();
         if (item.dataset.view === 'servers') loadServersHealth();
         if (item.dataset.view === 'mydb') { mydbCheckStatus(); mydbLoadTables(); }
+        if (item.dataset.view === 'preproving') {
+          nriLoadAll().then(() => nriLoadHeatmap());
+          if (!nriTabVisited) { nriTabVisited = true; setTimeout(() => nriScanFiles(null), 400); }
+        }
       });
     });
+
+    /* ═══════════════════════════════════════════════
+       PREPROVING — NRI SCORING PIPELINE
+    ═══════════════════════════════════════════════ */
+    let nriAllFiles = [];
+    let nriFilterState = 'all';
+    let nriSearch = '';
+    let nriPollerActive = false;
+
+    const PILLAR_LABELS = {
+      electoral_strength: 'Electoral Strength',
+      legislative_performance: 'Legislative Performance',
+      constituency_development: 'Constituency Development',
+      public_accessibility: 'Public Accessibility',
+      communication: 'Communication',
+      party_standing: 'Party Standing',
+      media_coverage: 'Media Coverage',
+      digital_influence: 'Digital Influence',
+      financial_muscle: 'Financial Muscle',
+      alliance_intel: 'Alliance Intel',
+      caste_equation: 'Caste Equation',
+      anti_incumbency: 'Anti-Incumbency',
+      grassroots_network: 'Grassroots Network',
+      ideology_consistency: 'Ideology Consistency',
+      scandal_index: 'Scandal Index'
+    };
+
+    const PILLAR_COLORS = {
+      electoral_strength: '#22c55e', legislative_performance: '#3b82f6',
+      constituency_development: '#f59e0b', public_accessibility: '#06b6d4',
+      communication: '#a78bfa', party_standing: '#ec4899',
+      media_coverage: '#f97316', digital_influence: '#00d9ff',
+      financial_muscle: '#84cc16', alliance_intel: '#14b8a6',
+      caste_equation: '#e879f9', anti_incumbency: '#ef4444',
+      grassroots_network: '#22d3ee', ideology_consistency: '#6366f1',
+      scandal_index: '#f43f5e'
+    };
+
+    let nriTabVisited = false;
+
+    async function nriLoadAll() {
+      await Promise.all([ nriLoadStats(), nriLoadFiles(), nriLoadQueue() ]);
+    }
+
+    async function nriLoadStats() {
+      try {
+        const data = await fetch('/api/nri/stats').then(r => r.json());
+        document.getElementById('nri-total').textContent = data.total || 0;
+        document.getElementById('nri-queued').textContent = data.queued || 0;
+        document.getElementById('nri-processing').textContent = data.processing || 0;
+        document.getElementById('nri-done').textContent = data.done || 0;
+        document.getElementById('nri-failed').textContent = data.failed || 0;
+        document.getElementById('nri-pending').textContent = data.pending || 0;
+        document.getElementById('nri-scores-cnt').textContent = data.totalScores || 0;
+        document.getElementById('nri-avg-score').textContent = data.avgScore ? data.avgScore.toFixed(1) : '—';
+        const badge = document.getElementById('nb-nri');
+        if (badge && (data.queued + data.processing) > 0) {
+          badge.style.display = 'block';
+          badge.textContent = data.queued + data.processing;
+        } else if (badge) badge.style.display = 'none';
+      } catch (e) { console.error('[NRI Stats]', e.message); }
+    }
+
+    async function nriLoadFiles() {
+      try {
+        const files = await fetch('/api/nri/files').then(r => r.json());
+        nriAllFiles = files;
+        nriRenderFiles();
+        const cnt = document.getElementById('nri-files-count');
+        if (cnt) cnt.textContent = `${files.length} files`;
+      } catch (e) { console.error('[NRI Files]', e.message); }
+    }
+
+    function nriRenderFiles() {
+      const tbody = document.getElementById('nri-files-body');
+      if (!tbody) return;
+      let rows = nriAllFiles;
+      if (nriFilterState !== 'all') rows = rows.filter(f => f.processing_state === nriFilterState);
+      if (nriSearch) rows = rows.filter(f => f.filename.toLowerCase().includes(nriSearch));
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text4);padding:1.5rem;">No files match filter — click Scan DataCollected to discover files</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(f => {
+        const stateClass = { pending: 'nri-state-pending', queued: 'nri-state-queued', processing: 'nri-state-processing', done: 'nri-state-done', failed: 'nri-state-failed' }[f.processing_state] || 'nri-state-pending';
+        const sizeKb = f.file_size_bytes ? (f.file_size_bytes / 1024).toFixed(1) + ' KB' : '—';
+        const avgScore = f.avg_score ? `<span style="color:var(--green);font-weight:600;">${f.avg_score}</span>` : '—';
+        const folder = f.folder.length > 28 ? '…/' + f.folder.split(/[/\\]/).pop() : f.folder;
+        const processBtn = f.processing_state === 'done'
+          ? `<button class="btn btn-xs btn-outline" onclick="nriViewScores(${f.id})" title="View Scores">📊</button> <button class="btn btn-xs btn-outline" style="border-color:var(--red);color:var(--red);" onclick="event.stopPropagation(); nriResetScores(${f.id})" title="Delete Scores & Reset">🗑</button>`
+          : `<button class="btn btn-xs btn-primary" onclick="nriProcessFile(${f.id}, this)" title="Score this file">▶ Score</button>`;
+        return `<tr class="nri-queue-row" onclick="nriViewScores(${f.id})" style="cursor:pointer;">
+          <td onclick="event.stopPropagation()"><input type="checkbox" class="nri-chk" value="${f.id}"></td>
+          <td style="font-family:var(--mono);font-size:0.48rem;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.filename}">${f.filename}</td>
+          <td style="font-family:var(--mono);font-size:0.44rem;color:var(--text4);">${folder}</td>
+          <td style="font-family:var(--mono);font-size:0.44rem;color:var(--text3);">${sizeKb}</td>
+          <td style="font-family:var(--mono);font-size:0.44rem;">${f.pillars_relevant ?? '—'}</td>
+          <td style="font-family:var(--mono);font-size:0.48rem;">${avgScore}</td>
+          <td><span class="nri-state-badge ${stateClass}">${f.processing_state}</span></td>
+          <td style="font-family:var(--mono);font-size:0.42rem;color:var(--text4);">${f.discovered_at ? f.discovered_at.slice(0, 10) : '—'}</td>
+          <td onclick="event.stopPropagation()">${processBtn}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function nriLoadQueue() {
+      try {
+        const items = await fetch('/api/nri/queue').then(r => r.json());
+        const tbody = document.getElementById('nri-queue-body');
+        const cnt = document.getElementById('nri-queue-count');
+        if (cnt) cnt.textContent = `${items.length} items`;
+        if (!tbody) return;
+        if (items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text4);padding:1rem;">Queue is empty</td></tr>';
+          return;
+        }
+        tbody.innerHTML = items.map(q => {
+          const stateClass = { queued: 'nri-state-queued', processing: 'nri-state-processing', done: 'nri-state-done', failed: 'nri-state-failed' }[q.status] || 'nri-state-queued';
+          const priClass = q.priority >= 8 ? 'nri-p-high' : q.priority >= 5 ? 'nri-p-normal' : 'nri-p-low';
+          const scoreBtn = q.status !== 'done'
+            ? `<button class="btn btn-xs btn-primary" onclick="nriProcessFile(${q.file_id}, this)" title="Score now">▶</button>`
+            : `<span style="color:var(--green);font-size:0.6rem;">✓ done</span>`;
+          const removeBtn = `<button class="btn btn-xs btn-danger" onclick="nriRemoveQueueItem(${q.file_id}, this)" title="Remove from queue">✕</button>`;
+          return `<tr class="nri-queue-row">
+            <td><span class="nri-priority-badge ${priClass}">${q.priority}</span></td>
+            <td style="font-family:var(--mono);font-size:0.48rem;color:var(--text2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.filename}">${q.filename}</td>
+            <td style="font-family:var(--mono);font-size:0.44rem;color:var(--text4);">${q.folder || '—'}</td>
+            <td style="font-family:var(--mono);font-size:0.44rem;color:var(--text3);">${q.platform || '—'}</td>
+            <td><span class="nri-priority-badge ${priClass}">${q.priority}</span></td>
+            <td><span class="nri-state-badge ${stateClass}">${q.status}</span></td>
+            <td style="font-family:var(--mono);font-size:0.42rem;color:var(--text4);">${q.enqueued_at ? q.enqueued_at.slice(0, 16) : '—'}</td>
+            <td>${scoreBtn}</td>
+            <td>${removeBtn}</td>
+          </tr>`;
+        }).join('');
+      } catch (e) { console.error('[NRI Queue]', e.message); }
+    }
+
+    async function nriRemoveQueueItem(fileId, btn) {
+      if (btn) { btn.disabled = true; btn.textContent = '⟲'; }
+      try {
+        await fetch(`/api/nri/queue/${fileId}`, { method: 'DELETE' });
+        qLog('info', `Removed file #${fileId} from queue`);
+        await nriLoadAll();
+      } catch(e) {
+        qLog('err', 'Remove from queue failed: ' + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = '✕'; }
+      }
+    }
+
+    async function nriScanFiles(btn) {
+      if (btn) { btn.disabled = true; btn.textContent = '⟲ Scanning...'; }
+      try {
+        const data = await fetch('/api/nri/files/scan', { method: 'POST' }).then(r => r.json());
+        qLog('ok', `✓ NRI Scan: ${data.discovered} files found, ${data.new} new registered`);
+        await nriLoadAll();
+      } catch (e) { qLog('err', 'NRI scan failed: ' + e.message); }
+      finally { if (btn) { btn.disabled = false; btn.textContent = '🔍 Scan DataCollected'; } }
+    }
+
+    async function nriQueueAll(btn) {
+      const pending = nriAllFiles.filter(f => f.processing_state === 'pending');
+      if (pending.length === 0) { qLog('info', 'No pending files to queue'); return; }
+      if (btn) { btn.disabled = true; btn.textContent = `⟲ Queuing ${pending.length}...`; }
+      try {
+        const ids = pending.map(f => f.id);
+        await fetch('/api/nri/queue/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileIds: ids }) });
+        qLog('ok', `✓ Queued ${ids.length} files for NRI scoring`);
+        await nriLoadAll();
+      } catch(e) { qLog('err', 'Queue all failed: ' + e.message); }
+      finally { if (btn) { btn.disabled = false; btn.textContent = '▶ Queue All Pending'; } }
+    }
+
+    async function nriQueueSelected() {
+      const checked = Array.from(document.querySelectorAll('.nri-chk:checked')).map(c => parseInt(c.value));
+      if (!checked.length) { alert('Select at least one file first.'); return; }
+      try {
+        await fetch('/api/nri/queue/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileIds: checked }) });
+        qLog('ok', `✓ Queued ${checked.length} selected files`);
+        await nriLoadAll();
+      } catch(e) { qLog('err', 'Queue selected failed: ' + e.message); }
+    }
+
+    async function nriProcessFile(fileId, btn) {
+      if (btn) { btn.disabled = true; btn.textContent = '⟲'; }
+      try {
+        // Enqueue first (idempotent)
+        await fetch('/api/nri/queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileId }) });
+        // Score immediately
+        const res = await fetch('/api/nri/score-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileId }) });
+        const data = await res.json();
+        if (data.success) {
+          qLog('ok', `✓ NRI Scored: ${data.relevantPillars} relevant pillars, avg ${data.avgScore} — ${nriAllFiles.find(f=>f.id===fileId)?.filename || 'file'}`);
+          await nriLoadAll();
+          nriViewScores(fileId);
+          // Live heatmap refresh if container is visible
+          const hc = document.getElementById('nri-heatmap-container');
+          if (hc && hc.children.length && !hc.querySelector('[style*="text-align:center"]')) nriLoadHeatmap();
+        } else {
+          qLog('err', 'NRI scoring failed: ' + (data.error || 'Unknown'));
+          if (btn) { btn.disabled = false; btn.textContent = '▶ Score'; }
+        }
+      } catch(e) {
+        qLog('err', 'NRI scoring error: ' + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = '▶ Score'; }
+      }
+    }
+
+    async function nriProcessAllQueued(btn) {
+      const queued = nriAllFiles.filter(f => f.processing_state === 'queued' || f.in_queue);
+      if (!queued.length) { qLog('info', 'No queued files to process. Queue some files first.'); return; }
+      if (btn) { btn.disabled = true; btn.textContent = `⟲ Processing 0/${queued.length}…`; }
+      let done = 0, failed = 0;
+      for (const f of queued) {
+        try {
+          await fetch('/api/nri/score-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileId: f.id }) });
+          done++;
+        } catch(e) { failed++; }
+        if (btn) btn.textContent = `⟲ Processing ${done + failed}/${queued.length}…`;
+        await nriLoadAll();
+        // Refresh heatmap live
+        const hc = document.getElementById('nri-heatmap-container');
+        if (hc && hc.children.length && !hc.querySelector('[style*="text-align:center"]')) nriLoadHeatmap();
+      }
+      qLog('ok', `✓ Batch scoring done: ${done} succeeded, ${failed} failed`);
+      if (btn) { btn.disabled = false; btn.textContent = '⚡ Process All Queued'; }
+      await nriLoadHeatmap();
+    }
+
+    async function nriViewScores(fileId) {
+      const panel = document.getElementById('nri-score-panel');
+      if (!panel) return;
+
+      const msFileIdEarly = document.getElementById('ms-file-id');
+      if (msFileIdEarly) msFileIdEarly.value = fileId;
+
+      panel.innerHTML = `<div style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:1rem;">⟲ Loading scores...</div>`;
+      try {
+        const scores = await fetch(`/api/nri/scores?fileId=${fileId}`).then(r => r.json());
+        const file = nriAllFiles.find(f => f.id === fileId);
+        if (!scores.length) {
+          panel.innerHTML = `<div style="color:var(--text4);font-family:var(--mono);font-size:0.52rem;text-align:center;padding:1.5rem;">No scores yet — click ▶ Score to process this file, or enter scores manually below.</div>`;
+          return;
+        }
+        const relevant = scores.filter(s => s.is_relevant);
+        const notRelevant = scores.filter(s => !s.is_relevant);
+        panel.innerHTML = `
+          <div style="margin-bottom:0.75rem;">
+            <div style="font-family:var(--mono);font-size:0.52rem;color:var(--text3);margin-bottom:0.25rem;word-break:break-all;">${file?.filename || 'File #' + fileId}</div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+              <span style="font-family:var(--mono);font-size:0.44rem;background:rgba(34,197,94,0.1);color:var(--green);padding:2px 6px;border-radius:3px;">${relevant.length} relevant pillars</span>
+              <span style="font-family:var(--mono);font-size:0.44rem;background:rgba(100,100,100,0.1);color:var(--text4);padding:2px 6px;border-radius:3px;">${notRelevant.length} skipped</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.45rem;">
+            ${relevant.map(s => `
+              <div class="pillar-bar-row">
+                <div class="pillar-bar-name" title="${s.evidence || ''}">${PILLAR_LABELS[s.pillar] || s.pillar}</div>
+                <div class="pillar-bar-track">
+                  <div class="pillar-bar-fill" style="width:${s.effective_score || 0}%;background:${PILLAR_COLORS[s.pillar] || 'var(--cyan)'}"></div>
+                </div>
+                <div class="pillar-bar-value" style="color:${PILLAR_COLORS[s.pillar] || 'var(--cyan)'}">${s.effective_score || 0}</div>
+              </div>
+            `).join('')}
+            ${notRelevant.length ? `
+            <div style="font-family:var(--mono);font-size:0.42rem;color:var(--text4);margin-top:0.5rem;margin-bottom:0.25rem;">NOT RELEVANT</div>
+            ${notRelevant.map(s => `
+              <div class="pillar-bar-row pillar-bar-skipped">
+                <div class="pillar-bar-name">${PILLAR_LABELS[s.pillar] || s.pillar}</div>
+                <div class="pillar-bar-track"><div class="pillar-bar-fill" style="width:${s.raw_score||0}%;background:var(--border2)"></div></div>
+                <div class="pillar-bar-value" style="color:var(--text4)">${s.raw_score || 0}</div>
+              </div>`).join('')}` : ''}
+          </div>
+        `;
+      } catch(e) {
+        panel.innerHTML = `<div style="color:var(--red);padding:1rem;font-size:0.52rem;">Error loading scores: ${e.message}</div>`;
+      }
+    }
+
+    function nriFilterFiles(state) { nriFilterState = state; nriRenderFiles(); }
+    function nriSearchFiles(q) { nriSearch = q.toLowerCase(); nriRenderFiles(); }
+    function nriSelectAll() { document.querySelectorAll('.nri-chk').forEach(c => c.checked = true); }
+    function nriCheckAll(checked) { document.querySelectorAll('.nri-chk').forEach(c => c.checked = checked); }
+
+    async function nriClearQueue() {
+      const done = (await fetch('/api/nri/queue').then(r => r.json())).filter(q => q.status === 'done');
+      for (const q of done) await fetch(`/api/nri/queue/${q.file_id}`, { method: 'DELETE' });
+      qLog('info', `Cleared ${done.length} completed queue items`);
+      await nriLoadAll();
+    }
+
+    async function nriSubmitManualScore() {
+      const msFileIdObj = document.getElementById('ms-file-id');
+      const fileId = parseInt(msFileIdObj ? msFileIdObj.value : "0");
+      const pillar = document.getElementById('ms-pillar').value;
+      const relevance = parseFloat(document.getElementById('ms-relevance').value);
+      const score = parseFloat(document.getElementById('ms-score').value);
+      const evidence = document.getElementById('ms-evidence').value;
+      if (!fileId || !pillar || isNaN(score)) { alert('Fill in File ID, pillar, and score.'); return; }
+      
+      const file = nriAllFiles.find(f => f.id === fileId);
+
+      try {
+        await fetch('/api/nri/scores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileId, pillar, relevanceScore: relevance || 0, isRelevant: score > 0, rawScore: score, effectiveScore: score, confidence: relevance || 0.5, evidence }) });
+        
+        if (file && (file.processing_state === 'pending' || file.processing_state === 'queued')) {
+            await fetch(`/api/nri/files/${fileId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ processing_state: 'done', pillar_scored: 1 })
+            });
+        }
+
+        qLog('ok', `✓ Manual score saved: ${PILLAR_LABELS[pillar] || pillar} = ${score}`);
+        nriViewScores(fileId);
+        await nriLoadAll();
+      } catch(e) { qLog('err', 'Manual score failed: ' + e.message); }
+    }
+
+    async function nriResetScores(fileId) {
+      if (!confirm('Are you sure you want to delete all scores and reset this file to pending state?')) return;
+      try {
+        await fetch(`/api/nri/scores/file/${fileId}`, { method: 'DELETE' });
+        qLog('ok', `✓ Reset scores for file #${fileId}`);
+        await nriLoadAll();
+        
+        const msFileIdEarly = document.getElementById('ms-file-id');
+        if (msFileIdEarly && msFileIdEarly.value == fileId) {
+            nriViewScores(fileId);
+        }
+      } catch(e) { qLog('err', 'Reset scores failed: ' + e.message); }
+    }
+
+    async function nriLoadHeatmap() {
+      const container = document.getElementById('nri-heatmap-container');
+      if (!container) return;
+      container.innerHTML = '<div style="color:var(--text4);padding:1rem;font-size:0.52rem;">⟲ Loading heatmap...</div>';
+      try {
+        const allScores = await fetch('/api/nri/scores?limit=200').then(r => r.json());
+        if (!allScores.length) { container.innerHTML = '<div style="color:var(--text4);padding:1rem;font-size:0.52rem;">No scores yet — process some files first.</div>'; return; }
+        const pillars = Object.keys(PILLAR_LABELS);
+        const byFile = {};
+        for (const s of allScores) {
+          if (!byFile[s.file_id]) byFile[s.file_id] = { name: s.filename, scores: {} };
+          byFile[s.file_id].scores[s.pillar] = s.effective_score || 0;
+        }
+        const fileIds = Object.keys(byFile);
+        let html = `<div class="nri-heatmap">
+          <div class="nri-hm-cell nri-hm-hdr" style="writing-mode:horizontal-tb;height:auto;">File</div>
+          ${pillars.map(p => `<div class="nri-hm-cell nri-hm-hdr" title="${PILLAR_LABELS[p]}">${PILLAR_LABELS[p].slice(0,3)}</div>`).join('')}
+          ${fileIds.map(fid => {
+            const f = byFile[fid];
+            return `<div class="nri-hm-cell nri-hm-file" title="${f.name}">${f.name.slice(0, 20)}</div>
+              ${pillars.map(p => {
+                const v = f.scores[p] || 0;
+                const alpha = v / 100;
+                const bg = v > 0 ? `rgba(0,217,255,${(alpha * 0.7 + 0.1).toFixed(2)})` : 'var(--bg3)';
+                return `<div class="nri-hm-cell" style="background:${bg};color:${v > 50 ? '#000' : 'var(--text3)'};" title="${PILLAR_LABELS[p]}: ${v}">${v > 0 ? v : ''}</div>`;
+              }).join('')}`;
+          }).join('')}
+        </div>`;
+        container.innerHTML = html;
+      } catch(e) { container.innerHTML = `<div style="color:var(--red);padding:1rem;">Error: ${e.message}</div>`; }
+    }
+
   </script>
 </body>
 
