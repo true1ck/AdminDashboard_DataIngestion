@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NetaBoard · Data Ingestion</title>
+  <title>Universal Admin Dashboard · Data Ingestion</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&family=Clash+Display:wght@400;500;600;700&display=swap"
     rel="stylesheet">
@@ -3076,7 +3076,7 @@
         <div class="vhdr">
           <div class="vhdr-left">
             <div class="vhdr-title"><span class="src-icon">🗄️</span> Database Import</div>
-            <div class="vhdr-sub">NetaBoardV5 · Prisma Studio · SQLite → Browse & Query</div>
+            <div class="vhdr-sub">PostgreSQL Database Tool · Browse, Query & Ingest</div>
           </div>
           <div class="vhdr-actions">
             <button class="btn btn-outline btn-sm" onclick="dbTest()">⟲ Test Connection</button>
@@ -3090,8 +3090,7 @@
             </div>
             <div class="card-body">
               <div class="dbtype-grid" id="db-type-grid">
-                <div class="dbtype-btn active" id="db-btn-pg"
-                  onclick="dbSelectType(this,'pg','5432','postgresql://user:pass@host:5432/dbname')">
+                <div class="dbtype-btn active" id="db-btn-pg">
                   <div class="dbtype-ico">🐘</div>
                   <div class="dbtype-lbl">PostgreSQL</div>
                 </div>
@@ -3099,7 +3098,8 @@
                   <div class="dbtype-ico">🔍</div>
                   <div class="dbtype-lbl">Elasticsearch</div>
                 </div>
-                <div class="dbtype-btn" onclick="dbSelectType(this,'redis','6379','redis://:password@localhost:6379/0')">
+                <div class="dbtype-btn"
+                  onclick="dbSelectType(this,'redis','6379','redis://:password@localhost:6379/0')">
                   <div class="dbtype-ico">🔴</div>
                   <div class="dbtype-lbl">Redis</div>
                 </div>
@@ -3118,8 +3118,7 @@
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:0.65rem;">
                 <div class="fg" style="display:none;">
-                  <input class="fi" id="db-uri" type="text"
-                    value="postgresql://postgres:1234@localhost:5432/netaboard?schema=public">
+                  <input class="fi" id="db-uri" type="text" value="">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
                   <div class="fg">
@@ -3142,13 +3141,26 @@
                       <input class="fi" id="db-pass" type="password" value="1234" style="padding-right:2.5rem;">
                       <button id="db-pass-toggle" type="button" title="Show password" onclick="dbTogglePassword()"
                         style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--text3);padding:0.2rem 0.3rem;line-height:1;border-radius:3px;transition:color 0.15s;"
-                        onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--text3)'">👁</button>
+                        onmouseover="this.style.color='var(--cyan)'"
+                        onmouseout="this.style.color='var(--text3)'">👁</button>
                     </div>
                   </div>
                 </div>
                 <div class="flex-row" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                   <button class="btn btn-outline btn-sm" onclick="dbTest()">⟲ Test Connection</button>
                   <span style="font-family:var(--mono);font-size:0.5rem;" id="db-test-status"></span>
+                </div>
+
+                <div
+                  style="margin-top:0.4rem;padding-top:0.4rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:0.4rem;">
+                  <div
+                    style="font-size:0.52rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">
+                    Advanced Settings</div>
+                  <div class="fg">
+                    <div class="fl">Ingest API URL</div>
+                    <input class="fi" id="db-ingest-url" value="http://localhost:3000/api/ingest"
+                      placeholder="http://target-backend/api/ingest">
+                  </div>
                 </div>
               </div>
             </div>
@@ -3163,56 +3175,64 @@
                 </div>
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:0.65rem;">
-                
-                <div style="display:flex;gap:1rem;margin-bottom:0.2rem;padding:0.4rem;background:var(--bg2);border-radius:var(--radius);border:1px dashed var(--border);">
-                   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.55rem;">
-                     <input type="checkbox" id="db-ingest-all" onchange="dbToggleIngestAll(this)"> Ingest All Tables
-                   </label>
-                   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.55rem;">
-                     <input type="checkbox" id="db-include-rows" checked> Include All Columns
-                   </label>
+
+                <div
+                  style="display:flex;gap:1rem;margin-bottom:0.2rem;padding:0.4rem;background:var(--bg2);border-radius:var(--radius);border:1px dashed var(--border);">
+                  <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.55rem;">
+                    <input type="checkbox" id="db-ingest-all" onchange="dbToggleIngestAll(this)"> Ingest All Tables
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.55rem;">
+                    <input type="checkbox" id="db-include-rows" checked> Include All Columns
+                  </label>
                 </div>
 
                 <!-- Table chips -->
                 <div class="fg" id="db-tables-container">
                   <div class="fl">Available Models / Tables</div>
-                  <div id="db-table-chips" class="db-table-chips" style="display:none;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.3rem;"></div>
+                  <div id="db-table-chips" class="db-table-chips"
+                    style="display:none;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.3rem;"></div>
                 </div>
                 <div class="fg" id="db-table-input-container">
                   <div class="fl">Table / Collection</div><input class="fi" id="db-table" type="text"
-                    placeholder="Select from above or type name" value="Archetype">
+                    placeholder="Select from above or type name" value="">
                 </div>
                 <div class="fg">
                   <div class="fl">Custom Query / Filter (SQL)</div><textarea class="fi" id="db-query" rows="2"
-                    placeholder='SELECT * FROM "Archetype" WHERE "archetypeKey" = &apos;example&apos; LIMIT 5'></textarea>
+                    placeholder='SELECT * FROM "TableName" WHERE "columnName" = &apos;value&apos; LIMIT 20'></textarea>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
                   <div class="fg">
-                    <div class="fl">Text field mapping</div><input class="fi" id="db-map-text" value="text" placeholder="content / body...">
+                    <div class="fl">Text field mapping</div><input class="fi" id="db-map-text" value="text"
+                      placeholder="content / body...">
                   </div>
                   <div class="fg">
                     <div class="fl">Timestamp mapping</div><input class="fi" id="db-map-time" value="created_at"
                       placeholder="date / time...">
                   </div>
                   <div class="fg">
-                    <div class="fl">Author mapping</div><input class="fi" id="db-map-author" value="author" placeholder="user / source...">
+                    <div class="fl">Author mapping</div><input class="fi" id="db-map-author" value="author"
+                      placeholder="user / source...">
                   </div>
                   <div class="fg">
-                    <div class="fl">ID mapping</div><input class="fi" id="db-map-id" value="id" placeholder="id / _id...">
+                    <div class="fl">ID mapping</div><input class="fi" id="db-map-id" value="id"
+                      placeholder="id / _id...">
                   </div>
                 </div>
-                
+
                 <div style="display:flex;justify-content:flex-end;margin-top:0.2rem;">
-                  <button class="btn btn-xs btn-outline" style="border-style:dashed;color:var(--amber)" onclick="dbSaveQuery()">+ Save Current Mapping</button>
+                  <button class="btn btn-xs btn-outline" style="border-style:dashed;color:var(--amber)"
+                    onclick="dbSaveQuery()">+ Save Current Mapping</button>
                 </div>
 
                 <!-- Query Results -->
                 <div id="db-query-results" style="display:none;">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
                     <div class="fl" style="margin:0;">Query Results</div>
-                    <span id="db-results-count" style="font-family:var(--mono);font-size:0.44rem;color:var(--text3);letter-spacing:0.08em;"></span>
+                    <span id="db-results-count"
+                      style="font-family:var(--mono);font-size:0.44rem;color:var(--text3);letter-spacing:0.08em;"></span>
                   </div>
-                  <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);max-height:300px;overflow-y:auto;">
+                  <div
+                    style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);max-height:300px;overflow-y:auto;">
                     <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:0.52rem;">
                       <thead>
                         <tr id="db-results-header" style="background:var(--bg3);position:sticky;top:0;"></tr>
@@ -3232,7 +3252,8 @@
               </div>
               <div class="card-body" style="padding:0;">
                 <div id="db-saved-list" style="max-height:300px;overflow-y:auto;">
-                  <div style="padding:1rem;text-align:center;color:var(--text4);font-size:0.55rem;">No saved queries yet.</div>
+                  <div style="padding:1rem;text-align:center;color:var(--text4);font-size:0.55rem;">No saved queries
+                    yet.</div>
                 </div>
               </div>
             </div>
@@ -3242,13 +3263,15 @@
               <div class="card-hdr">
                 <div class="card-title">
                   <span class="icon" style="display:inline-flex;align-items:center;gap:0.3rem;">
-                    <span style="width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);display:inline-block;"></span>
+                    <span
+                      style="width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);display:inline-block;"></span>
                   </span>
                   Prisma Studio
                   <span class="tag tag-g" style="margin-left:0.4rem;">LIVE</span>
                 </div>
                 <div style="display:flex;gap:0.4rem;align-items:center;">
-                  <a href="http://localhost:5555" target="_blank" class="btn btn-xs btn-outline" style="text-decoration:none;">↗ Open in Tab</a>
+                  <a href="http://localhost:5555" target="_blank" class="btn btn-xs btn-outline"
+                    style="text-decoration:none;">↗ Open in Tab</a>
                   <button class="btn btn-xs btn-danger" onclick="dbClosePrisma()">✕ Close</button>
                 </div>
               </div>
@@ -4589,25 +4612,7 @@
     /* ═══════════════════════════════════════════════
        DATABASE
     ═══════════════════════════════════════════════ */
-    let dbType = 'sqlite';
-    let dbPrismaStudioOpen = false;
-
-    function dbSelectType(el, type, port) {
-      document.querySelectorAll('.dbtype-btn').forEach(b => b.classList.remove('active'));
-      el.classList.add('active'); dbType = type;
-      document.getElementById('db-port').value = port;
-      document.getElementById('db-type-badge').textContent = el.querySelector('.dbtype-lbl').textContent;
-      document.getElementById('db-test-status').textContent = '';
-
-      const isSqlite = type === 'sqlite';
-      ['db-host', 'db-port', 'db-name', 'db-user', 'db-pass'].forEach(id => {
-          const input = document.getElementById(id);
-          if (input) {
-              input.disabled = isSqlite;
-              input.style.opacity = isSqlite ? '0.5' : '1';
-          }
-      });
-    }
+    let dbType = 'pg';
 
     function dbTogglePassword() {
       const inp = document.getElementById('db-pass');
@@ -4626,7 +4631,6 @@
 
     async function dbTest() {
       const el = document.getElementById('db-test-status');
-      const prismaSection = document.getElementById('db-prisma-section');
       if (el) { el.textContent = '⟲ Testing connection...'; el.style.color = 'var(--amber)'; }
 
       const host = document.getElementById('db-host').value;
@@ -4634,66 +4638,56 @@
       const dbName = document.getElementById('db-name').value;
       const user = document.getElementById('db-user').value;
       const pass = document.getElementById('db-pass').value;
-      
-      const uri = dbType === 'pg' ? `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public` : '';
 
       try {
         const res = await fetch('/api/db/test-connection', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ host, port, dbName, user, password: pass, uri, dbType })
+          body: JSON.stringify({ host, port, dbName, user, password: pass })
         });
         const data = await res.json();
         if (data.ok) {
-          el.textContent = '✓ Connected — Prisma Studio launching...'; el.style.color = 'var(--green)';
-          qLog('ok', `DB connection OK: NetaBoardV5 @ localhost:3000`);
-          if (prismaSection) {
-            prismaSection.style.display = 'block';
-            const iframe = document.getElementById('db-prisma-iframe');
-            if (iframe) iframe.src = data.prismaStudioUrl || 'http://localhost:5555';
-            dbPrismaStudioOpen = true;
-            setTimeout(() => { el.textContent = '✓ Connected — Prisma Studio ready'; }, 2000);
+          el.textContent = `✓ ${data.message || 'Connected successfully'}`; el.style.color = 'var(--green)';
+          qLog('ok', `DB connection OK: ${dbName} @ ${host}`);
+
+          // Update table list immediately
+          if (data.tables && data.tables.length) {
+            renderTableChips(data.tables);
           }
-          dbLoadTables();
         } else {
           el.textContent = '✕ ' + (data.error || 'Connection failed'); el.style.color = 'var(--red)';
           qLog('err', `DB connection failed: ${data.error || 'Unknown'}`);
-          if (prismaSection) prismaSection.style.display = 'none';
-          dbPrismaStudioOpen = false;
         }
       } catch (err) {
         el.textContent = '✕ Network error — is the server running?'; el.style.color = 'var(--red)';
         qLog('err', `DB test error: ${err.message}`);
-        if (prismaSection) prismaSection.style.display = 'none';
-        dbPrismaStudioOpen = false;
+      }
+    }
+
+    function renderTableChips(tables) {
+      const tableInput = document.getElementById('db-table');
+      const tableList = document.getElementById('db-table-chips');
+      if (tableList) {
+        tableList.innerHTML = tables.map(t =>
+          `<span class="db-table-chip" onclick="dbSelectTable('${t}')">${t}</span>`
+        ).join('');
+        tableList.style.display = 'flex';
+      }
+      if (tableInput && !tableInput.value && tables.length) {
+        dbSelectTable(tables[0]);
       }
     }
 
     async function dbLoadTables() {
-      const tableInput = document.getElementById('db-table');
-      const tableList = document.getElementById('db-table-chips');
       try {
         const res = await fetch('/api/db/tables');
         const data = await res.json();
         if (data.tables && data.tables.length) {
-          if (tableList) {
-            tableList.innerHTML = data.tables.map(t =>
-              `<span class="db-table-chip" onclick="dbSelectTable('${t}')">${t}</span>`
-            ).join('');
-            tableList.style.display = 'flex';
-          }
-          if (tableInput && !tableInput.value) tableInput.value = data.tables[0];
-          qLog('info', `Loaded ${data.tables.length} tables from Prisma schema`);
+          renderTableChips(data.tables);
+          qLog('info', `Fetched ${data.tables.length} tables from database`);
         }
       } catch (err) {
-        const fallback = ['Archetype','Constituency','PillarScore','SansadRecord','Feedback','SocialItem','Alert'];
-        if (tableList) {
-          tableList.innerHTML = fallback.map(t =>
-            `<span class="db-table-chip" onclick="dbSelectTable('${t}')">${t}</span>`
-          ).join('');
-          tableList.style.display = 'flex';
-        }
-        if (tableInput) tableInput.value = fallback[0];
+        qLog('err', `Failed to load tables: ${err.message}`);
       }
     }
 
@@ -4719,16 +4713,15 @@
       const dbName = document.getElementById('db-name').value;
       const user = document.getElementById('db-user').value;
       const pass = document.getElementById('db-pass').value;
-      const uri = dbType === 'pg' ? `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public` : '';
 
       try {
         const res = await fetch('/api/db/query', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            table, 
-            query: queryEl ? queryEl.value : '', 
+          body: JSON.stringify({
+            table,
+            query: queryEl ? queryEl.value : '',
             limit: 20,
-            host, port, dbName, user, password: pass, uri, dbType
+            host, port, dbName, user, password: pass
           })
         });
         const data = await res.json();
@@ -4747,8 +4740,8 @@
             '<tr>' + cols.map(c => {
               let v = row[c];
               if (v === null || v === undefined) v = '<span style="color:var(--text4)">null</span>';
-              else if (typeof v === 'object') v = '<span style="color:var(--purple);font-size:0.5rem">' + JSON.stringify(v).slice(0,60) + '</span>';
-              else if (String(v).length > 50) v = String(v).slice(0,50) + '…';
+              else if (typeof v === 'object') v = '<span style="color:var(--purple);font-size:0.5rem">' + JSON.stringify(v).slice(0, 60) + '</span>';
+              else if (String(v).length > 50) v = String(v).slice(0, 50) + '…';
               return `<td>${v}</td>`;
             }).join('') + '</tr>'
           ).join('');
@@ -4772,7 +4765,6 @@
       const iframe = document.getElementById('db-prisma-iframe');
       if (sec) sec.style.display = 'none';
       if (iframe) iframe.src = 'about:blank';
-      dbPrismaStudioOpen = false;
     }
 
     function dbToggleIngestAll(el) {
@@ -4791,7 +4783,7 @@
       const table = document.getElementById('db-table').value;
       const query = document.getElementById('db-query').value;
       const autoName = query ? `Query: ${query.substring(0, 20)}...` : `Table: ${table}`;
-      
+
       const payload = {
         name: autoName + " (" + new Date().toLocaleTimeString() + ")",
         query: query,
@@ -4818,8 +4810,8 @@
         } else {
           qLog('err', `Save failed: ${data.error || 'Unknown server error'}`);
         }
-      } catch (e) { 
-        qLog('err', `Save network error: ${e.message}`); 
+      } catch (e) {
+        qLog('err', `Save network error: ${e.message}`);
         console.error("Save Error:", e);
       }
     }
@@ -4852,14 +4844,14 @@
     }
 
     function dbApplySaved(id) {
-       const q = window._savedQueries.find(x => x.id === id);
-       if (!q) return;
-       document.getElementById('db-query').value = q.query || '';
-       document.getElementById('db-map-text').value = q.mapping.text || 'text';
-       document.getElementById('db-map-time').value = q.mapping.time || 'created_at';
-       document.getElementById('db-map-author').value = q.mapping.author || 'author';
-       document.getElementById('db-map-id').value = q.mapping.id || 'id';
-       qLog('info', `Applied mapping: ${q.name}`);
+      const q = window._savedQueries.find(x => x.id === id);
+      if (!q) return;
+      document.getElementById('db-query').value = q.query || '';
+      document.getElementById('db-map-text').value = q.mapping.text || 'text';
+      document.getElementById('db-map-time').value = q.mapping.time || 'created_at';
+      document.getElementById('db-map-author').value = q.mapping.author || 'author';
+      document.getElementById('db-map-id').value = q.mapping.id || 'id';
+      qLog('info', `Applied mapping: ${q.name}`);
     }
 
     async function dbDeleteSavedQuery(id) {
@@ -4884,13 +4876,13 @@
       const dbName = document.getElementById('db-name').value;
       const user = document.getElementById('db-user').value;
       const pass = document.getElementById('db-pass').value;
-      const uri = dbType === 'pg' ? `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public` : '';
 
       const config = {
-        dbType,
-        uri,
+        dbType: 'pg',
         batch: batchData,
-        includeAll: document.getElementById('db-include-rows').checked
+        host, port, dbName, user, pass,
+        includeAll: document.getElementById('db-include-rows').checked,
+        ingestUrl: document.getElementById('db-ingest-url').value
       };
 
       const j = createJob(`Batch Import: ${checked.length} Queries`, '🗂️', 'database-batch');
@@ -4900,17 +4892,16 @@
     async function dbQueue() {
       const isAll = document.getElementById('db-ingest-all').checked;
       const table = document.getElementById('db-table').value || 'table';
-      
+
       const host = document.getElementById('db-host').value;
       const port = document.getElementById('db-port').value;
       const dbName = document.getElementById('db-name').value;
       const user = document.getElementById('db-user').value;
       const pass = document.getElementById('db-pass').value;
-      const uri = dbType === 'pg' ? `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public` : '';
-      
+
       const config = {
-        host, port, dbName, user, pass, uri,
-        dbType: dbType,
+        host, port, dbName, user, pass,
+        dbType: 'pg',
         table: table,
         query: document.getElementById('db-query').value,
         tables: isAll ? 'all' : undefined,
@@ -4920,7 +4911,8 @@
           author: document.getElementById('db-map-author').value,
           id: document.getElementById('db-map-id').value
         },
-        includeAll: document.getElementById('db-include-rows').checked
+        includeAll: document.getElementById('db-include-rows').checked,
+        ingestUrl: document.getElementById('db-ingest-url').value
       };
 
       const name = isAll ? `Full DB Sync: ${dbType.toUpperCase()}` : `DB Import: ${table}`;
@@ -4941,28 +4933,28 @@
           qLog('ok', `Import task synchronized with background worker.`);
           // Status Poller
           const poller = setInterval(async () => {
-             const sRes = await fetch(`/api/db/import/status/${j.id}`);
-             const sData = await sRes.json();
-             if (sData.status === 'running' || sData.status === 'processing') {
-                j.status = 'processing';
-                j.progress = sData.progress;
-                j.itemsProcessed = sData.processed;
-                j.totalItems = sData.total;
-                renderQueue();
-             } else if (sData.status === 'done' || sData.status === 'completed') {
-                j.status = 'done';
-                j.progress = 100;
-                j.itemsProcessed = sData.total;
-                j.doneAt = new Date();
-                clearInterval(poller);
-                renderQueue(); updateStats();
-                qLog('ok', `✓ Job ${j.id} completed successfully.`);
-             } else if (sData.status === 'failed') {
-                j.status = 'failed';
-                clearInterval(poller);
-                qLog('err', `Import ${j.id} failed: ${sData.error}`);
-                renderQueue();
-             }
+            const sRes = await fetch(`/api/db/import/status/${j.id}`);
+            const sData = await sRes.json();
+            if (sData.status === 'running' || sData.status === 'processing') {
+              j.status = 'processing';
+              j.progress = sData.progress;
+              j.itemsProcessed = sData.processed;
+              j.totalItems = sData.total;
+              renderQueue();
+            } else if (sData.status === 'done' || sData.status === 'completed') {
+              j.status = 'done';
+              j.progress = 100;
+              j.itemsProcessed = sData.total;
+              j.doneAt = new Date();
+              clearInterval(poller);
+              renderQueue(); updateStats();
+              qLog('ok', `✓ Job ${j.id} completed successfully.`);
+            } else if (sData.status === 'failed') {
+              j.status = 'failed';
+              clearInterval(poller);
+              qLog('err', `Import ${j.id} failed: ${sData.error}`);
+              renderQueue();
+            }
           }, 1000);
         }
       } catch (err) {

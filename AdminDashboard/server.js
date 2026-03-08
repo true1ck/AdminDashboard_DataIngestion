@@ -473,215 +473,85 @@ app.all('/api/proxy/facebook-ingest', upload.single('file'), (req, res) => {
   proxyRequest(req, res, FACEBOOK_URL, '/api/process-facebook');
 });
 
-// ══════════════════════════════════════════════
-//  DATABASE IMPORT — NetaBoardV5 Prisma DB
-// ══════════════════════════════════════════════
-let prismaStudioProcess = null;
 
-// Test connection to NetaBoardV5 backend or custom DB
-app.post('/api/db/test-connection', async (req, res) => {
-    try {
-        const { uri, host, port, dbName, user, password, dbType } = req.body;
-        const dbUrl = uri || (dbType === 'pg' ? `postgresql://${user}:${password}@${host}:${port}/${dbName}` : '');
-
-        if (!dbUrl) {
-            return res.json({ ok: false, error: 'No connection URI or valid credentials provided' });
-        }
-
-        // Real connection test
-        if (dbUrl.startsWith('file:') || dbType === 'sqlite') {
-            const dbPath = dbUrl.replace('file:', '');
-            const fullPath = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', dbPath);
-            
-            if (!fs.existsSync(fullPath)) {
-                return res.json({ ok: false, error: `Database file not found at ${fullPath}` });
-            }
-
-            // Test SQLite connection directly
-            const sqlite3 = require('sqlite3').verbose();
-            await new Promise((resolve, reject) => {
-                const tempDb = new sqlite3.Database(fullPath, sqlite3.OPEN_READONLY, (err) => {
-                    if (err) return reject(new Error('Failed to open database file: ' + err.message));
-                });
-                
-                // Run a simple query to ensure the file is a valid readable SQLite database
-                tempDb.get('SELECT sqlite_version()', (err, row) => {
-                    tempDb.close();
-                    if (err) return reject(new Error('Failed to read from database: ' + err.message));
-                    resolve(true);
-                });
-            });
-            console.log(`[DB Test] Successfully connected to SQLite DB: ${dbPath}`);
-        } else {
-            // Test network connection (TCP) for PG, Redis, Elasticsearch, Qdrant
-            const net = require('net');
-            const targetHost = host || 'localhost';
-            const targetPort = parseInt(port) || (dbType === 'pg' ? 5432 : dbType === 'redis' ? 6379 : 80);
-            
-            await new Promise((resolve, reject) => {
-                const socket = new net.Socket();
-                socket.setTimeout(2500);
-                
-                socket.on('connect', () => {
-                    socket.destroy();
-                    console.log(`[DB Test] Successfully reached ${dbType.toUpperCase()} on ${targetHost}:${targetPort}`);
-                    resolve(true);
-                });
-                
-                socket.on('timeout', () => {
-                    socket.destroy();
-                    reject(new Error(`Connection to ${targetHost}:${targetPort} timed out`));
-                });
-                
-                socket.on('error', (err) => {
-                    socket.destroy();
-                    reject(new Error(`Connection refused to ${targetHost}:${targetPort} (${err.code})`));
-                });
-                
-                socket.connect(targetPort, targetHost);
-            });
-        }
-
-        // Restart Prisma Studio
-        if (prismaStudioProcess) {
-            try {
-                process.kill(-prismaStudioProcess.pid);
-            } catch (e) {
-                prismaStudioProcess.kill();
-            }
-            prismaStudioProcess = null;
-            await new Promise(resolve => setTimeout(resolve, 800));
-        }
-
-        // Spawn Prisma Studio
-        const { spawn } = require('child_process');
-        const prismaDir = path.join(__dirname, '..', 'NetaBoardV5', 'backend');
-        prismaStudioProcess = spawn('npx', ['prisma', 'studio', '--port', '5555', '--browser', 'none'], {
-            cwd: prismaDir,
-            shell: true,
-            stdio: 'ignore',
-            detached: false,
-            env: { ...process.env, DATABASE_URL: dbUrl }
-        });
-        prismaStudioProcess.on('exit', () => { prismaStudioProcess = null; });
-        prismaStudioProcess.on('error', () => { prismaStudioProcess = null; });
-
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        res.json({ ok: true, prismaStudioUrl: 'http://localhost:5555' });
-    } catch (err) {
-        res.json({ ok: false, error: `Connection failed: ${err.message}` });
-    }
-});
-
-// Check Prisma Studio status
-app.get('/api/db/prisma-status', async (req, res) => {
-    try {
-        const r = await fetch('http://localhost:5555', { signal: AbortSignal.timeout(2000) });
-        res.json({ running: true });
-    } catch (e) {
-        res.json({ running: false });
-    }
-});
-
-// List tables from Prisma schema
+// List discovered tables
 app.get('/api/db/tables', (req, res) => {
-    try {
-        const schemaPath = path.join(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', 'schema.prisma');
-        if (!fs.existsSync(schemaPath)) {
-            return res.status(404).json({ error: 'Prisma schema not found' });
-        }
-        const schema = fs.readFileSync(schemaPath, 'utf8');
-        const models = [];
-        const regex = /^model\s+(\w+)\s*\{/gm;
-        let m;
-        while ((m = regex.exec(schema)) !== null) {
-            models.push(m[1]);
-        }
-        res.json({ tables: models });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    res.json({ tables: knownTables });
 });
 
-const PRISMA_MODELS = [
-    'Archetype', 'Constituency', 'PillarScore', 'SansadRecord', 'Rival', 
-    'Feedback', 'SocialItem', 'Alert', 'IASCLAction', 'IASCLCriteria', 
-    'IASCLTransition', 'Channel', 'ChannelInstance'
-];
+let knownTables = [];
 
-function autoQuotePgQuery(sql) {
+function autoQuotePgQuery(sql, tables = []) {
     if (!sql) return sql;
     let modified = sql;
-    PRISMA_MODELS.forEach(model => {
-        // Match unquoted model names. 
-        // We look for word boundaries but avoid things already quoted.
-        // This is a heuristic but covers the most common "SELECT * FROM Archetype" cases.
-        const regex = new RegExp(`(?<!["'\\w])${model}(?!["'\\w])`, 'g');
-        modified = modified.replace(regex, `"${model}"`);
+    const targetList = tables.length > 0 ? tables : knownTables;
+    
+    targetList.forEach(tableName => {
+        const regex = new RegExp(`(?<!["'\\w])${tableName}(?!["'\\w])`, 'g');
+        modified = modified.replace(regex, `"${tableName}"`);
     });
     return modified;
 }
 
-// Query the DB directly using sqlite3
+// Query the DB directly
 app.post('/api/db/query', async (req, res) => {
-    const { table, query, limit, uri, host, port, dbName, user, password, dbType } = req.body;
-    if (!table) return res.status(400).json({ error: 'Table name required' });
+    const { table, query, limit, host, port, dbName, user, password } = req.body;
+    if (!table && !query) return res.status(400).json({ error: 'Table name or query required' });
 
-    const dbUrl = uri || (dbType === 'pg' ? `postgresql://${user}:${password}@${host}:${port}/${dbName}` : '');
+    const dbUrl = `postgresql://${user}:${password}@${host}:${port}/${dbName}`;
     const finalLimit = limit || 20;
-    const isSqlite = dbUrl.startsWith('file:') || dbType === 'sqlite';
 
-    if (isSqlite && dbUrl && dbType === 'sqlite') {
-        const dbPath = dbUrl.replace('file:', '');
-        const fullPath = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', dbPath);
-        
-        if (!fs.existsSync(fullPath)) {
-            return res.json({ ok: false, error: `Database file not found at ${fullPath}` });
-        }
+    const { Client } = require('pg');
+    const client = new Client({ connectionString: dbUrl });
+    
+    let sql = query && query.trim() !== '' ? query : `SELECT * FROM "${table}" LIMIT ${finalLimit}`;
+    if (query && query.trim() !== '') {
+        sql = autoQuotePgQuery(sql);
+    }
 
-        const sqlite3 = require('sqlite3').verbose();
-        const tempDb = new sqlite3.Database(fullPath, sqlite3.OPEN_READONLY, (err) => {
-            if (err) return res.json({ ok: false, error: 'Cannot open DB: ' + err.message });
+    console.log(`[DB Query] Executing Postgres: ${sql}`);
+
+    try {
+        await client.connect();
+        const dbRes = await client.query(sql);
+        await client.end();
+        res.json({ ok: true, rows: dbRes.rows, count: dbRes.rowCount });
+    } catch (err) {
+        console.error(`[DB Query] Error: ${err.message}`);
+        res.json({ ok: false, error: `Postgres query failed: ${err.message}` });
+        try { await client.end(); } catch (e) {}
+    }
+});
+
+// Test connection and introspect tables
+app.post('/api/db/test-connection', async (req, res) => {
+    const { host, port, dbName, user, password } = req.body;
+    const dbUrl = `postgresql://${user}:${password}@${host}:${port}/${dbName}`;
+    
+    const { Client } = require('pg');
+    const client = new Client({ connectionString: dbUrl });
+
+    try {
+        await client.connect();
+        const tableRes = await client.query(`
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_type = 'BASE TABLE'
+            ORDER BY table_name
+        `);
+        knownTables = tableRes.rows.map(r => r.table_name);
+        await client.end();
+
+        res.json({ 
+            ok: true, 
+            tables: knownTables,
+            message: `Connected successfully. Discovered ${knownTables.length} tables.`
         });
-
-        const sql = query && query.trim() !== '' ? query : `SELECT * FROM ${table} LIMIT ${finalLimit}`;
-        console.log(`[DB Query] Executing SQLite: ${sql}`);
-
-        tempDb.all(sql, [], (err, rows) => {
-            tempDb.close();
-            if (err) {
-                console.error(`[DB Query] Error: ${err.message}`);
-                return res.json({ ok: false, error: `Query failed: ${err.message}` });
-            }
-            res.json({ ok: true, rows: rows, count: rows.length });
-        });
-    } else if (dbType === 'pg') {
-        // Query PostgreSQL
-        const { Client } = require('pg');
-        const client = new Client({ connectionString: dbUrl });
-        
-        let sql = query && query.trim() !== '' ? query : `SELECT * FROM "${table}" LIMIT ${finalLimit}`;
-        
-        // Auto-quote if it's a custom query for Postgres
-        if (query && query.trim() !== '') {
-            sql = autoQuotePgQuery(sql);
-        }
-
-        console.log(`[DB Query] Executing Postgres: ${sql}`);
-
-        try {
-            await client.connect();
-            const result = await client.query(sql);
-            await client.end();
-            res.json({ ok: true, rows: result.rows, count: result.rowCount });
-        } catch (err) {
-            console.error(`[DB Query] PG Error: ${err.message}`);
-            try { await client.end(); } catch (e) {}
-            res.json({ ok: false, error: `Postgres query failed: ${err.message}` });
-        }
-    } else {
-        res.json({ ok: true, rows: [], count: 0, note: `Query engine not implemented for ${dbType}. Use Prisma Studio.` });
+    } catch (err) {
+        console.error(`[DB Test] Error: ${err.message}`);
+        res.json({ ok: false, error: err.message });
+        try { await client.end(); } catch (e) {}
     }
 });
 
@@ -776,31 +646,13 @@ async function runImport(jobId, config) {
     const logPrefix = `[Import ${jobId}]`;
 
     try {
-        let sourceDb;
         let pClient;
 
-        if (dbType === 'sqlite') {
-            let dbPath = uri.startsWith('file:') ? path.resolve(uri.replace('file:', '')) : path.resolve(uri);
-            if (!fs.existsSync(dbPath)) {
-                const relPath1 = path.resolve(__dirname, uri.replace('file:', ''));
-                const relPath2 = path.resolve(__dirname, '..', uri.replace('file:', ''));
-                const relPath3 = path.resolve(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', uri.replace('file:', ''));
-                if (fs.existsSync(relPath1)) dbPath = relPath1;
-                else if (fs.existsSync(relPath2)) dbPath = relPath2;
-                else if (fs.existsSync(relPath3)) dbPath = relPath3;
-                else throw new Error(`Database not found: ${dbPath}`);
-            }
-            console.log(`${logPrefix} Connecting to SQLite: ${dbPath}`);
-            sourceDb = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
-        } else if (dbType === 'pg') {
-            const { Client } = require('pg');
-            const connectionString = uri || `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public`;
-            console.log(`${logPrefix} Connecting to Postgres: ${connectionString.replace(/:([^@:]+)@/, ':****@')}`);
-            pClient = new Client({ connectionString });
-            await pClient.connect();
-        } else {
-            throw new Error(`Unsupported database type for ingestion: ${dbType}`);
-        }
+        const { Client } = require('pg');
+        const connectionString = `postgresql://${user}:${pass}@${host}:${port}/${dbName}?schema=public`;
+        console.log(`${logPrefix} Connecting to Postgres: ${connectionString.replace(/:([^@:]+)@/, ':****@')}`);
+        pClient = new Client({ connectionString });
+        await pClient.connect();
 
         // Descriptive filename generation
         let baseName = "db_import";
@@ -818,15 +670,8 @@ async function runImport(jobId, config) {
         if (batch && Array.isArray(batch)) {
             tasks = batch;
         } else if (tables === 'all') {
-            if (dbType === 'sqlite') {
-                const allTables = await new Promise((res, rej) => {
-                    sourceDb.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'prisma_%'", [], (err, rows) => err ? rej(err) : res(rows));
-                });
-                tasks = allTables.map(t => ({ name: t.name, table: t.name, mapping }));
-            } else {
-                const res = await pClient.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'");
-                tasks = res.rows.map(t => ({ name: t.table_name, table: t.table_name, mapping }));
-            }
+            const res = await pClient.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'");
+            tasks = res.rows.map(t => ({ name: t.table_name, table: t.table_name, mapping }));
         } else {
             tasks = [{ name: table || 'Custom Query', table, query, mapping }];
         }
@@ -834,24 +679,15 @@ async function runImport(jobId, config) {
         // 2. Count total rows
         let totalRows = 0;
         for (const t of tasks) {
-            const quot = dbType === 'pg' ? '"' : '';
-            const tableName = t.table ? (dbType === 'pg' ? `"${t.table}"` : t.table) : null;
+            const tableName = t.table ? `"${t.table}"` : null;
             let countSql = t.query ? `SELECT COUNT(*) as cnt FROM (${t.query}) as sub` : `SELECT COUNT(*) as cnt FROM ${tableName}`;
             
-            if (dbType === 'pg') {
-                countSql = autoQuotePgQuery(countSql);
-            }
+            countSql = autoQuotePgQuery(countSql);
 
-            if (dbType === 'sqlite') {
-                const count = await new Promise((res, rej) => sourceDb.get(countSql, [], (err, row) => err ? rej(err) : res(row.cnt)));
-                t.total = count;
-                totalRows += count;
-            } else {
-                const res = await pClient.query(countSql);
-                const count = parseInt(res.rows[0].cnt);
-                t.total = count;
-                totalRows += count;
-            }
+            const res = await pClient.query(countSql);
+            const count = parseInt(res.rows[0].cnt);
+            t.total = count;
+            totalRows += count;
         }
         state.total = totalRows;
         await db.updateJob(jobId, { status: 'processing', progress: 0 });
@@ -861,24 +697,17 @@ async function runImport(jobId, config) {
         fileStream.write(`# Consolidated DB Import Job #${jobId}\n# Date: ${new Date().toISOString()}\n# Source: ${dbType.toUpperCase()}\n\n`);
 
         for (const t of tasks) {
-            const tableName = t.table ? (dbType === 'pg' ? `"${t.table}"` : t.table) : null;
+            const tableName = t.table ? `"${t.table}"` : null;
             let sql = t.query || `SELECT * FROM ${tableName}`;
             
-            if (dbType === 'pg') {
-                sql = autoQuotePgQuery(sql);
-            }
+            sql = autoQuotePgQuery(sql);
 
             fileStream.write(`\n## SECTION: ${t.name}\n`);
             if (t.query) fileStream.write(`### SQL: ${t.query}\n`);
             fileStream.write(`${'='.repeat(20)}\n\n`);
             
-            let rows = [];
-            if (dbType === 'sqlite') {
-                rows = await new Promise((res, rej) => sourceDb.all(sql, [], (err, rows) => err ? rej(err) : res(rows)));
-            } else {
-                const res = await pClient.query(sql);
-                rows = res.rows;
-            }
+            const res = await pClient.query(sql);
+            const rows = res.rows;
 
             for (const row of rows) {
                 const contentBlock = Object.entries(row)
@@ -894,7 +723,8 @@ async function runImport(jobId, config) {
                 };
 
                 try {
-                    await fetch(`${BACKEND_URL}/api/ingest`, {
+                    const targetIngestUrl = config.ingestUrl || `${BACKEND_URL}/api/ingest`;
+                    await fetch(targetIngestUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ ...payload, skipFileSave: true })
@@ -914,7 +744,6 @@ async function runImport(jobId, config) {
         }
 
         fileStream.end();
-        if (sourceDb) sourceDb.close();
         if (pClient) await pClient.end();
         
         state.status = 'done';
