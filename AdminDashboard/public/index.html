@@ -136,6 +136,9 @@
       background: rgba(255, 255, 255, 0.4);
     }
 
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+
     /* ── LAYOUT ── */
     .shell {
       display: grid;
@@ -6697,12 +6700,13 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
       }
       tbody.innerHTML = rows.map(f => {
         const stateClass = { pending: 'nri-state-pending', queued: 'nri-state-queued', processing: 'nri-state-processing', done: 'nri-state-done', failed: 'nri-state-failed' }[f.processing_state] || 'nri-state-pending';
+        const isProc = f.processing_state === 'processing';
         const sizeKb = f.file_size_bytes ? (f.file_size_bytes / 1024).toFixed(1) + ' KB' : '—';
         const avgScore = f.avg_score ? `<span style="color:var(--green);font-weight:600;">${f.avg_score}</span>` : '—';
         const folder = f.folder.length > 28 ? '…/' + f.folder.split(/[/\\]/).pop() : f.folder;
         const processBtn = f.processing_state === 'done'
           ? `<button class="btn btn-xs btn-outline" onclick="nriViewScores(${f.id})" title="View Scores">📊</button> <button class="btn btn-xs btn-outline" style="border-color:var(--red);color:var(--red);" onclick="event.stopPropagation(); nriResetScores(${f.id})" title="Delete Scores & Reset">🗑</button>`
-          : `<button class="btn btn-xs btn-primary" onclick="nriProcessFile(${f.id}, this)" title="Score this file">▶ Score</button>`;
+          : `<button class="btn btn-xs btn-primary" ${isProc ? 'disabled' : ''} onclick="nriProcessFile(${f.id}, this)" title="Score this file">${isProc ? '<span class="spin">⟲</span>' : '▶'} Score</button>`;
         return `<tr class="nri-queue-row" onclick="nriViewScores(${f.id})" style="cursor:pointer;">
           <td onclick="event.stopPropagation()"><input type="checkbox" class="nri-chk" value="${f.id}"></td>
           <td style="font-family:var(--mono);font-size:0.48rem;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.filename}">${f.filename}</td>
@@ -6710,7 +6714,7 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
           <td style="font-family:var(--mono);font-size:0.44rem;color:var(--text3);">${sizeKb}</td>
           <td style="font-family:var(--mono);font-size:0.44rem;">${f.pillars_relevant ?? '—'}</td>
           <td style="font-family:var(--mono);font-size:0.48rem;">${avgScore}</td>
-          <td><span class="nri-state-badge ${stateClass}">${f.processing_state}</span></td>
+          <td><span class="nri-state-badge ${stateClass}">${isProc ? '<span class="spin" style="margin-right:4px;">⟲</span>' : ''}${f.processing_state}</span></td>
           <td style="font-family:var(--mono);font-size:0.42rem;color:var(--text4);">${f.discovered_at ? f.discovered_at.slice(0, 10) : '—'}</td>
           <td onclick="event.stopPropagation()">${processBtn}</td>
         </tr>`;
@@ -6730,9 +6734,10 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
         }
         tbody.innerHTML = items.map(q => {
           const stateClass = { queued: 'nri-state-queued', processing: 'nri-state-processing', done: 'nri-state-done', failed: 'nri-state-failed' }[q.status] || 'nri-state-queued';
+          const isProc = q.status === 'processing';
           const priClass = q.priority >= 8 ? 'nri-p-high' : q.priority >= 5 ? 'nri-p-normal' : 'nri-p-low';
           const scoreBtn = q.status !== 'done'
-            ? `<button class="btn btn-xs btn-primary" onclick="nriProcessFile(${q.file_id}, this)" title="Score now">▶</button>`
+            ? `<button class="btn btn-xs btn-primary" ${isProc ? 'disabled' : ''} onclick="nriProcessFile(${q.file_id}, this)" title="Score now">${isProc ? '<span class="spin">⟲</span>' : '▶'}</button>`
             : `<span style="color:var(--green);font-size:0.6rem;">✓ done</span>`;
           const removeBtn = `<button class="btn btn-xs btn-danger" onclick="nriRemoveQueueItem(${q.file_id}, this)" title="Remove from queue">✕</button>`;
           return `<tr class="nri-queue-row">
@@ -6741,7 +6746,7 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
             <td style="font-family:var(--mono);font-size:0.44rem;color:var(--text4);">${q.folder || '—'}</td>
             <td style="font-family:var(--mono);font-size:0.44rem;color:var(--text3);">${q.platform || '—'}</td>
             <td><span class="nri-priority-badge ${priClass}">${q.priority}</span></td>
-            <td><span class="nri-state-badge ${stateClass}">${q.status}</span></td>
+            <td><span class="nri-state-badge ${stateClass}">${isProc ? '<span class="spin" style="margin-right:4px;">⟲</span>' : ''}${q.status}</span></td>
             <td style="font-family:var(--mono);font-size:0.42rem;color:var(--text4);">${q.enqueued_at ? q.enqueued_at.slice(0, 16) : '—'}</td>
             <td>${scoreBtn}</td>
             <td>${removeBtn}</td>
@@ -6796,49 +6801,101 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
     }
 
     async function nriProcessFile(fileId, btn) {
-      if (btn) { btn.disabled = true; btn.textContent = '⟲'; }
+      const file = nriAllFiles.find(f => f.id === fileId);
+      const filename = file ? file.filename : `File #${fileId}`;
+      
+      // Create a visible job in the main ingestion queue
+      const j = createJob(`NRI Score: ${filename}`, '🎯', 'nri', fileId);
+      j.status = 'processing';
+      j.progress = 10;
+      renderQueue();
+
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin">⟲</span> Scoring...'; }
+      
+      nriStartAutoRefresh(); // Start polling UI while processing
+
       try {
         // Enqueue first (idempotent)
         await fetch('/api/nri/queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileId }) });
+        
+        j.progress = 30; renderQueue();
+
         // Score immediately
         const res = await fetch('/api/nri/score-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileId }) });
         const data = await res.json();
+        
         if (data.success) {
-          qLog('ok', `✓ NRI Scored: ${data.relevantPillars} relevant pillars, avg ${data.avgScore} — ${nriAllFiles.find(f=>f.id===fileId)?.filename || 'file'}`);
+          j.status = 'done'; j.progress = 100; j.doneAt = new Date();
+          qLog('ok', `✓ NRI Scored: ${data.relevantPillars} relevant pillars, avg ${data.avgScore} — ${filename}`);
           await nriLoadAll();
           nriViewScores(fileId);
           // Live heatmap refresh if container is visible
           const hc = document.getElementById('nri-heatmap-container');
           if (hc && hc.children.length && !hc.querySelector('[style*="text-align:center"]')) nriLoadHeatmap();
         } else {
+          j.status = 'failed';
           qLog('err', 'NRI scoring failed: ' + (data.error || 'Unknown'));
-          if (btn) { btn.disabled = false; btn.textContent = '▶ Score'; }
         }
       } catch(e) {
+        j.status = 'failed';
         qLog('err', 'NRI scoring error: ' + e.message);
-        if (btn) { btn.disabled = false; btn.textContent = '▶ Score'; }
+      } finally {
+        if (btn) { 
+          btn.disabled = false; 
+          btn.textContent = file && file.processing_state === 'done' ? '▶ Score' : '▶ Score'; 
+        }
+        renderQueue();
+        updateStats();
       }
     }
 
     async function nriProcessAllQueued(btn) {
       const queued = nriAllFiles.filter(f => f.processing_state === 'queued' || f.in_queue);
       if (!queued.length) { qLog('info', 'No queued files to process. Queue some files first.'); return; }
-      if (btn) { btn.disabled = true; btn.textContent = `⟲ Processing 0/${queued.length}…`; }
+      if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spin">⟲</span> Scoring 0/${queued.length}…`; }
+      
+      nriStartAutoRefresh();
+      
       let done = 0, failed = 0;
       for (const f of queued) {
+        const j = createJob(`Batch NRI: ${f.filename}`, '🎯', 'nri', f.id);
+        j.status = 'processing'; j.progress = 20; renderQueue();
+        
         try {
-          await fetch('/api/nri/score-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileId: f.id }) });
-          done++;
-        } catch(e) { failed++; }
-        if (btn) btn.textContent = `⟲ Processing ${done + failed}/${queued.length}…`;
+          const res = await fetch('/api/nri/score-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileId: f.id }) });
+          const data = await res.json();
+          if (data.success) {
+            j.status = 'done'; j.progress = 100; j.doneAt = new Date();
+            done++;
+          } else {
+             j.status = 'failed'; failed++;
+          }
+        } catch(e) { j.status = 'failed'; failed++; }
+        
+        if (btn) btn.innerHTML = `<span class="spin">⟲</span> Scoring ${done + failed}/${queued.length}…`;
         await nriLoadAll();
         // Refresh heatmap live
         const hc = document.getElementById('nri-heatmap-container');
         if (hc && hc.children.length && !hc.querySelector('[style*="text-align:center"]')) nriLoadHeatmap();
+        renderQueue(); updateStats();
       }
       qLog('ok', `✓ Batch scoring done: ${done} succeeded, ${failed} failed`);
       if (btn) { btn.disabled = false; btn.textContent = '⚡ Process All Queued'; }
       await nriLoadHeatmap();
+    }
+
+    let nriRefreshTimer = null;
+    function nriStartAutoRefresh() {
+      if (nriRefreshTimer) return;
+      nriRefreshTimer = setInterval(async () => {
+        const hasProcessing = nriAllFiles.some(f => f.processing_state === 'processing');
+        if (!hasProcessing) {
+          clearInterval(nriRefreshTimer);
+          nriRefreshTimer = null;
+          return;
+        }
+        await nriLoadAll();
+      }, 3000);
     }
 
     async function nriViewScores(fileId) {

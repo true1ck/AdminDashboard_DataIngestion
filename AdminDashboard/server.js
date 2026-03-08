@@ -1228,7 +1228,53 @@ app.post('/api/nri/score-file', async (req, res) => {
         await db.nriUpdateFile(file.id, { processing_state: 'processing', started_at: new Date().toISOString() });
         await db.nriUpdateQueue(file.id, { status: 'processing', startedAt: new Date().toISOString() }).catch(() => {});
         const text = fs.readFileSync(file.filepath, 'utf8');
-        const scores = scoreTextAgainstPillars(text);
+        
+        let scores = [];
+        try {
+            const pillarDescriptions = Object.entries(NRI_PILLARS).map(([p, kws]) => `- ${p}: Themes include ${kws.join(', ')}`).join('\n');
+            const prompt = `You are a sophisticated political analysis AI. Your task is to perform a SEMANTIC ANALYSIS of the provided text against 15 specific pillars of political performance.
+
+INSTRUCTIONS:
+1. Do not perform a simple keyword search. Instead, ANALYZE THE CONTEXT, INTENT, AND MEANING of the text.
+2. The provided keywords for each pillar are THEMATIC INDICATORS, not a strict checklist. Look for synonyms, related concepts, and contextual relevance.
+3. For each pillar, determine if the text contains meaningful information related to it.
+4. If relevant, provide a raw score (0-100) and a confidence score (0-1).
+5. Extract a short evidence snippet (max 100 chars) that demonstrates the SEMANTIC RELEVANCE.
+
+PILLAR THEMES:
+${pillarDescriptions}
+
+OUTPUT FORMAT:
+Return STRICTLY a JSON array of exactly 15 objects with these exact keys:
+"pillar" (the pillar name),
+"relevanceScore" (float 0-1),
+"isRelevant" (boolean),
+"rawScore" (integer 0-100),
+"effectiveScore" (integer 0-100, 0 if not relevant),
+"confidence" (float 0-1),
+"evidence" (string, snippet showing context)
+
+Do not include any text, markdown blocks, or explanations outside the JSON array.`;
+
+            // Truncate text to avoid token limits (approx 8000 chars)
+            const truncatedText = text.substring(0, 8000);
+
+            const qwenRes = await fetch('http://localhost:5001/api/analyze-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, text: truncatedText })
+            });
+            const qwenData = await qwenRes.json();
+            if(!qwenData.success) throw new Error(qwenData.error || 'Qwen API failed');
+            
+            let jsonString = qwenData.result;
+            const match = jsonString.match(/\[[\s\S]*\]/);
+            if (match) jsonString = match[0];
+            scores = JSON.parse(jsonString);
+        } catch(e) {
+            console.error('Qwen scoring failed:', e);
+            throw new Error('LLM Scoring failed: ' + e.message);
+        }
         for (const ps of scores) {
             await db.nriSaveScore({ fileId: file.id, filepath: file.filepath, pillar: ps.pillar, relevanceScore: ps.relevanceScore, isRelevant: ps.isRelevant, rawScore: ps.rawScore, effectiveScore: ps.effectiveScore, confidence: ps.confidence, evidence: ps.evidence });
         }
@@ -1305,6 +1351,16 @@ app.post('/api/mydb/query', (req, res) => {
     } catch (e) {
         db.close();
         res.status(400).json({ error: e.message });
+    }
+});
+
+// GET /api/nri/scores/averages
+app.get('/api/nri/scores/averages', async (req, res) => {
+    try {
+        const averages = await db.nriGetPillarAverages();
+        res.json(averages);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 

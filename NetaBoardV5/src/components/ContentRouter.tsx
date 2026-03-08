@@ -2,7 +2,7 @@
 // All module rendering extracted from App.tsx. 
 // Receives ModuleProps and returns JSX for current module/pill.
 
-import { Fragment, useRef } from 'react';
+import { Fragment, useRef, useState, useEffect } from 'react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import {
   PILLARS, ARC, FB_SRC, NOTIFS,
@@ -10,6 +10,7 @@ import {
   BO_MODULES, PP_MODULES, HERO_SLIDES,
   getNRI, computeFIS,
 } from '../data';
+import { fetchPillarAverages } from '../api/client';
 import {
   SHK, SHK_STATS, SHK_CATEGORIES, PROJ, VIDS, CLIPS, SPEECHES,
   EVENTS, POLLS, VOICES, PETITIONS, APP_SERVICES,
@@ -37,6 +38,40 @@ export default function ContentRouter(P: ModuleProps) {
 
   const { feedback: FEEDBACK, social: SOCIAL_FEED, alerts: ALERTS, channels: CHANNELS } = useNetaData();
   const activeAlerts = ALERTS.filter(x => !dispatched[x.id]);
+
+  const [pillarAverages, setPillarAverages] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (curMod === 'pillars' && curPill === 'deepdive') {
+      fetchPillarAverages()
+        .then(data => {
+          const map: Record<string, number> = {};
+          const dbToFe: Record<string, string> = {
+            electoral_strength: 'es',
+            legislative_performance: 'lp',
+            constituency_development: 'cd',
+            public_accessibility: 'pa',
+            communication: 'cc',
+            party_standing: 'ps',
+            media_coverage: 'mc',
+            digital_influence: 'di',
+            financial_muscle: 'fm',
+            alliance_intel: 'ai',
+            caste_equation: 'ce',
+            anti_incumbency: 'ac',
+            grassroots_network: 'gn',
+            ideology_consistency: 'ic',
+            scandal_index: 'sc'
+          };
+          data.forEach(item => {
+            const feKey = dbToFe[item.pillar];
+            if (feKey) map[feKey] = item.average;
+          });
+          setPillarAverages(map);
+        })
+        .catch(err => console.error('Failed to fetch averages:', err));
+    }
+  }, [curMod, curPill]);
 
   // Computed chart data (was useMemo in App.tsx)
   const radarData = PILLARS.map(p => ({ subject: p.l.split(' ').slice(0, 2).join(' '), score: a.dm[p.k] || 50 }));
@@ -166,6 +201,7 @@ export default function ContentRouter(P: ModuleProps) {
       <div className="grid grid-cols-3 gap-3 grid-responsive anim">
         {PILLARS.map(p => {
           const s = a.dm[p.k] || 50;
+          const avg = pillarAverages[p.k] ? Math.round(pillarAverages[p.k]) : null;
           const col = s >= 70 ? 'var(--em)' : s >= 40 ? 'var(--gd)' : 'var(--rd)';
           return (
             <div key={p.k} className="nb-card">
@@ -174,7 +210,10 @@ export default function ContentRouter(P: ModuleProps) {
                 <span className="font-mono text-sm font-bold" style={{ color: col }}>{s}</span>
               </div>
               <ProgressBar pct={s} color={col} />
-              <div className="text-[9px] mt-1" style={{ color: 'var(--mn)' }}>Weight: {p.w}%{p.inv ? ' · Inverted' : ''}</div>
+              <div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--mn)' }}>
+                <span>Weight: {p.w}%{p.inv ? ' · Inverted' : ''}</span>
+                {avg !== null && <span>Avg. File Score: <span className="font-bold" style={{ color: 'var(--am)' }}>{avg}</span></span>}
+              </div>
             </div>
           );
         })}
