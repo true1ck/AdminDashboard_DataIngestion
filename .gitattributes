@@ -1,0 +1,17 @@
+# Ensure shell scripts always use LF line endings on checkout
+*.sh text eol=lf
+
+# Python files
+*.py text eol=lf
+
+# JS/TS/JSON
+*.js text eol=auto
+*.ts text eol=auto
+*.json text eol=auto
+
+# HTML/CSS
+*.html text eol=auto
+*.css text eol=auto
+
+# Markdown
+*.md text eol=auto
