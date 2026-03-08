@@ -417,6 +417,46 @@ def analyze_pdf():
         traceback.print_exc()
         return jsonify({'error': f'Failed to parse PDF: {str(e)}'}), 500
 
+@app.route('/api/analyze-text', methods=['POST'])
+def analyze_text():
+    """Analyze pure text using Qwen2.5-VL using text-to-text generation."""
+    if not HF_API_TOKEN or HF_API_TOKEN == 'your_huggingface_token_here':
+        return jsonify({
+            'error': 'HuggingFace API token not configured.',
+        }), 401
+
+    data = request.json or {}
+    text_content = data.get('text', '')
+    prompt = data.get('prompt', '')
+
+    if not text_content and not prompt:
+        return jsonify({'error': 'No text or prompt provided.'}), 400
+
+    combined_text = prompt + "\n\n" + text_content if prompt and text_content else prompt or text_content
+
+    try:
+        client = InferenceClient(api_key=HF_API_TOKEN)
+        messages = [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": combined_text}]
+            }
+        ]
+        completion = client.chat.completions.create(
+            model=MODEL_ID,
+            messages=messages,
+            max_tokens=4096
+        )
+        result_text = completion.choices[0].message.content
+        return jsonify({
+            'success': True,
+            'result': result_text,
+            'model': MODEL_ID
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': f'Failed to analyze text: {str(e)}'}), 500
+
 
 if __name__ == '__main__':
     print("\n" + "=" * 60)
