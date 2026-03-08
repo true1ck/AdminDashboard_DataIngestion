@@ -1,696 +1,1624 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NetaBoard — Full Infrastructure Architecture</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=Syne:wght@700;800&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #080b0f;
-    --amber: #e8a020;
-    --teal: #1ec9b0;
-    --red: #e8452a;
-    --blue: #4a9eff;
-    --purple: #a064f0;
-    --green: #28c840;
-    --muted: rgba(255,255,255,0.22);
-    --line: rgba(255,255,255,0.07);
-    --paper: #d8e0e8;
-  }
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);color:var(--paper);font-family:'DM Mono',monospace;padding:2rem 1.5rem 4rem;overflow-x:hidden;}
-  body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);}
-  body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.018) 1px,transparent 1px);background-size:40px 40px;}
-  .wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetaBoard — NRI Political Intelligence Architecture</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=Syne:wght@700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #080b0f;
+      --amber: #e8a020;
+      --teal: #1ec9b0;
+      --red: #e8452a;
+      --blue: #4a9eff;
+      --purple: #a064f0;
+      --green: #28c840;
+      --muted: rgba(255, 255, 255, 0.22);
+      --line: rgba(255, 255, 255, 0.07);
+      --paper: #d8e0e8;
+    }
 
-  /* HEADER */
-  .hdr{text-align:center;margin-bottom:2.5rem;animation:fadeDown 0.7s both;}
-  .hdr-eye{font-size:0.58rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--teal);margin-bottom:0.5rem;}
-  .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-right:0.4rem;animation:livePulse 1.8s ease-in-out infinite;}
-  .hdr-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(2rem,5vw,4rem);letter-spacing:0.08em;line-height:1;}
-  .hdr-title span{color:var(--amber);}
-  .hdr-sub{font-size:0.6rem;color:rgba(255,255,255,0.3);letter-spacing:0.12em;margin-top:0.4rem;}
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-  /* SHARED BOX */
-  .box{border:1px solid;position:relative;transition:box-shadow 0.3s;}
+    body {
+      background: var(--bg);
+      color: var(--paper);
+      font-family: 'DM Mono', monospace;
+      padding: 2rem 1.5rem 4rem;
+      overflow-x: hidden;
+    }
 
-  /* SECTION DIVIDER */
-  .sec-label{font-size:0.5rem;letter-spacing:0.22em;text-transform:uppercase;color:rgba(255,255,255,0.2);padding:1.2rem 0 0.5rem;border-top:1px solid var(--line);margin-top:0.8rem;}
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px);
+    }
 
-  /* ── LAYER A: SOURCES ── */
-  .sources-row{display:grid;grid-template-columns:repeat(6,1fr);gap:0.5rem;margin-bottom:0.3rem;}
-  .src{border:1px solid rgba(232,160,32,0.3);background:rgba(232,160,32,0.04);padding:0.7rem 0.4rem;text-align:center;transition:background 0.2s,border-color 0.2s,transform 0.2s;cursor:default;}
-  .src:hover{background:rgba(232,160,32,0.1);border-color:var(--amber);transform:translateY(-2px);}
-  .src-ico{font-size:1.1rem;display:block;margin-bottom:0.25rem;}
-  .src-name{font-size:0.52rem;color:var(--amber);font-weight:500;line-height:1.3;}
-  .src-tech{font-size:0.44rem;color:rgba(255,255,255,0.3);margin-top:0.15rem;line-height:1.4;}
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
 
-  /* ── CONNECTOR ARROWS ── */
-  .v-arr{display:flex;flex-direction:column;align-items:center;padding:0.1rem 0;}
-  .v-line{width:1px;}
-  .v-tip{font-size:0.6rem;line-height:1;margin-top:-2px;}
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
 
-  /* ── SERVER NODES ── */
-  .server-zone{border:1px solid var(--line);padding:0.8rem;position:relative;transition:border-color 0.3s,box-shadow 0.3s;}
-  .server-zone:hover{border-color:rgba(255,255,255,0.15);box-shadow:0 0 20px rgba(0,0,0,0.3);}
-  .sz-label{font-size:0.5rem;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:1px solid var(--line);}
-  .sz-id{font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:0.1em;margin-right:0.4rem;}
-  .sz-badge{font-size:0.44rem;padding:0.1rem 0.35rem;border:1px solid;vertical-align:middle;}
-  .badge-gpu{border-color:rgba(232,69,42,0.5);color:var(--red);}
-  .badge-cpu{border-color:rgba(74,158,255,0.5);color:var(--blue);}
-  .badge-stor{border-color:rgba(30,201,176,0.5);color:var(--teal);}
-  .sz-name{font-size:0.62rem;color:var(--paper);margin-bottom:0.3rem;font-weight:500;}
-  .sz-svc{display:flex;flex-wrap:wrap;gap:0.2rem;}
-  .svc{font-size:0.46rem;padding:0.1rem 0.3rem;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.03);}
-  .svc.amber{border-color:rgba(232,160,32,0.25);color:rgba(232,160,32,0.7);background:rgba(232,160,32,0.04);}
-  .svc.teal{border-color:rgba(30,201,176,0.25);color:rgba(30,201,176,0.7);background:rgba(30,201,176,0.03);}
-  .svc.red{border-color:rgba(232,69,42,0.3);color:rgba(232,69,42,0.8);background:rgba(232,69,42,0.04);}
-  .svc.purple{border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.8);background:rgba(160,100,240,0.04);}
-  .svc.blue{border-color:rgba(74,158,255,0.3);color:rgba(74,158,255,0.8);background:rgba(74,158,255,0.04);}
+    /* HEADER */
+    .hdr {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      animation: fadeDown 0.7s both;
+    }
 
-  /* ── KAFKA BUS ── */
-  .kafka-bus{border:1px solid rgba(232,160,32,0.5);background:rgba(232,160,32,0.03);padding:0.8rem 1rem;position:relative;}
-  .kafka-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.7rem;}
-  .kafka-title{font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);}
-  .kafka-subtitle{font-size:0.48rem;color:rgba(255,255,255,0.3);letter-spacing:0.1em;}
-  .kafka-topics{display:grid;grid-template-columns:repeat(4,1fr);gap:0.4rem;}
-  .k-topic{border:1px solid rgba(232,160,32,0.2);background:rgba(232,160,32,0.03);padding:0.5rem 0.6rem;transition:background 0.2s;}
-  .k-topic:hover{background:rgba(232,160,32,0.08);}
-  .k-name{font-size:0.55rem;color:var(--amber);font-weight:500;margin-bottom:0.15rem;}
-  .k-partitions{font-size:0.42rem;color:rgba(255,255,255,0.25);margin-bottom:0.1rem;}
-  .k-desc{font-size:0.44rem;color:rgba(255,255,255,0.35);line-height:1.4;}
+    .hdr-eye {
+      font-size: 0.58rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 0.5rem;
+    }
 
-  /* ── PROCESSING ROW ── */
-  .proc-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;}
-  .proc-box{border:1px solid rgba(30,201,176,0.3);background:rgba(30,201,176,0.03);padding:0.8rem;transition:background 0.2s,border-color 0.2s;}
-  .proc-box:hover{background:rgba(30,201,176,0.07);border-color:var(--teal);}
-  .proc-step{font-size:0.48rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--teal);margin-bottom:0.3rem;}
-  .proc-name{font-size:0.64rem;color:var(--paper);font-weight:500;margin-bottom:0.3rem;line-height:1.3;}
-  .proc-svc{font-size:0.46rem;color:rgba(255,255,255,0.3);line-height:1.5;}
-  .proc-kafka{font-size:0.43rem;color:var(--amber);margin-top:0.3rem;border-top:1px solid rgba(232,160,32,0.15);padding-top:0.25rem;}
+    .live-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--teal);
+      margin-right: 0.4rem;
+      animation: livePulse 1.8s ease-in-out infinite;
+    }
 
-  /* ── DB ROW ── */
-  .db-row{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;}
-  .db-box{border:1px solid rgba(74,158,255,0.3);background:rgba(74,158,255,0.03);padding:0.8rem;transition:background 0.2s;}
-  .db-box:hover{background:rgba(74,158,255,0.07);}
-  .db-head{font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--blue);margin-bottom:0.3rem;}
-  .db-name{font-size:0.64rem;color:var(--paper);font-weight:500;margin-bottom:0.2rem;}
-  .db-item{font-size:0.47rem;color:rgba(255,255,255,0.35);padding:0.1rem 0;padding-left:0.5rem;position:relative;line-height:1.4;}
-  .db-item::before{content:'▸';position:absolute;left:0;color:var(--blue);font-size:0.35rem;top:0.18rem;}
+    .hdr-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(2rem, 5vw, 4rem);
+      letter-spacing: 0.08em;
+      line-height: 1;
+    }
 
-  /* ── LLM SERVERS ── */
-  .llm-row{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;}
-  .llm-box{border:1px solid rgba(160,100,240,0.35);background:rgba(160,100,240,0.03);padding:0.8rem;transition:background 0.2s;}
-  .llm-box:hover{background:rgba(160,100,240,0.07);}
-  .llm-head{font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--purple);margin-bottom:0.3rem;}
-  .llm-name{font-size:0.64rem;color:var(--paper);font-weight:500;margin-bottom:0.15rem;}
-  .llm-hw{font-size:0.48rem;color:var(--red);margin-bottom:0.3rem;}
-  .llm-model{font-size:0.47rem;color:rgba(255,255,255,0.38);padding:0.1rem 0;padding-left:0.5rem;position:relative;line-height:1.5;}
-  .llm-model::before{content:'◈';position:absolute;left:0;color:var(--purple);font-size:0.35rem;top:0.18rem;}
+    .hdr-title span {
+      color: var(--amber);
+    }
 
-  /* ── COMMS PROTOCOL LEGEND ── */
-  .comm-legend{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-top:0.6rem;}
-  .comm-item{border:1px solid var(--line);padding:0.7rem;transition:background 0.2s;}
-  .comm-item:hover{background:rgba(255,255,255,0.03);}
-  .comm-proto{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.08em;margin-bottom:0.2rem;}
-  .comm-use{font-size:0.48rem;letter-spacing:0.1em;margin-bottom:0.4rem;}
-  .comm-pair{font-size:0.44rem;color:rgba(255,255,255,0.3);padding:0.12rem 0;border-left:2px solid;padding-left:0.4rem;margin-bottom:0.1rem;line-height:1.4;}
+    .hdr-sub {
+      font-size: 0.6rem;
+      color: rgba(255, 255, 255, 0.3);
+      letter-spacing: 0.12em;
+      margin-top: 0.4rem;
+    }
 
-  /* ── API / GATEWAY ── */
-  .api-box{border:1px solid rgba(232,160,32,0.4);background:rgba(232,160,32,0.03);padding:0.8rem 1rem;}
-  .api-inner{display:grid;grid-template-columns:repeat(5,1fr);gap:0.4rem;margin-top:0.6rem;}
-  .api-badge{border:1px solid rgba(232,160,32,0.2);background:rgba(232,160,32,0.05);padding:0.4rem;text-align:center;font-size:0.46rem;color:rgba(232,160,32,0.8);transition:background 0.2s;}
-  .api-badge:hover{background:rgba(232,160,32,0.13);}
+    /* SHARED BOX */
+    .box {
+      border: 1px solid;
+      position: relative;
+      transition: box-shadow 0.3s;
+    }
 
-  /* ── FRONTEND ── */
-  .fe-box{border:1px solid rgba(30,201,176,0.4);background:rgba(30,201,176,0.02);padding:0.8rem 1rem;max-width:700px;margin:0 auto;}
-  .term-bar{display:flex;align-items:center;gap:0.3rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:1px solid rgba(30,201,176,0.15);}
-  .td{width:7px;height:7px;border-radius:50%;}
-  .td-r{background:#ff5f57;}.td-y{background:#febc2e;}.td-g{background:#28c840;}
-  .t-url{margin-left:auto;font-size:0.48rem;color:var(--teal);}
-  .t-line{font-size:0.52rem;color:rgba(255,255,255,0.35);padding:0.12rem 0;line-height:1.5;}
-  .t-green{color:var(--teal);}.t-amber{color:var(--amber);}
-  .blink{display:inline-block;width:5px;height:0.7em;background:var(--teal);vertical-align:text-bottom;animation:blink 1.2s step-end infinite;}
+    /* SECTION DIVIDER */
+    .sec-label {
+      font-size: 0.5rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.2);
+      padding: 1.2rem 0 0.5rem;
+      border-top: 1px solid var(--line);
+      margin-top: 0.8rem;
+    }
 
-  /* ── CONNECTOR LINE ── */
-  .h-split{width:100%;display:flex;flex-direction:column;align-items:center;padding:0.12rem 0;}
-  .hs-top{width:1px;height:12px;}
-  .hs-bar{height:1px;width:70%;}
-  .hs-legs{width:70%;display:flex;justify-content:space-between;}
-  .hs-leg{width:1px;height:12px;}
-  .hs-arrs{width:70%;display:flex;justify-content:space-between;}
-  .hs-arr{font-size:0.55rem;}
+    /* ── LAYER A: SOURCES ── */
+    .sources-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 0.3rem;
+    }
 
-  /* ── RESILIENCE ROW ── */
-  .res-row{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;}
-  .res-box{padding:0.7rem 0.8rem;border:1px solid;transition:background 0.2s;}
-  .res-critical{border-color:rgba(232,69,42,0.35);background:rgba(232,69,42,0.03);}
-  .res-critical:hover{background:rgba(232,69,42,0.08);}
-  .res-high{border-color:rgba(232,160,32,0.3);background:rgba(232,160,32,0.03);}
-  .res-high:hover{background:rgba(232,160,32,0.07);}
-  .res-opt{border-color:rgba(30,201,176,0.25);background:rgba(30,201,176,0.02);}
-  .res-opt:hover{background:rgba(30,201,176,0.06);}
-  .res-pri{font-size:0.44rem;letter-spacing:0.15em;text-transform:uppercase;padding:0.1rem 0.3rem;border:1px solid;display:inline-block;margin-bottom:0.3rem;}
-  .pri-c{color:var(--red);border-color:rgba(232,69,42,0.4);}
-  .pri-h{color:var(--amber);border-color:rgba(232,160,32,0.35);}
-  .pri-o{color:var(--teal);border-color:rgba(30,201,176,0.35);}
-  .res-name{font-size:0.6rem;color:var(--paper);font-weight:500;margin-bottom:0.2rem;line-height:1.3;}
-  .res-fix{font-size:0.46rem;color:rgba(255,255,255,0.32);line-height:1.5;border-top:1px solid rgba(255,255,255,0.06);padding-top:0.3rem;margin-top:0.3rem;}
-  .res-fix span{color:var(--teal);}
-  /* ── OBS ROW ── */
-  .obs-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;}
-  .obs-box{border:1px solid rgba(30,201,176,0.2);background:rgba(30,201,176,0.02);padding:0.7rem 0.8rem;transition:background 0.2s;}
-  .obs-box:hover{background:rgba(30,201,176,0.07);}
-  .obs-name{font-size:0.6rem;color:var(--paper);font-weight:500;margin-bottom:0.15rem;}
-  .obs-tool-sm{font-size:0.46rem;color:var(--teal);margin-bottom:0.3rem;}
-  .obs-item{font-size:0.44rem;color:rgba(255,255,255,0.3);padding:0.1rem 0 0.1rem 0.5rem;position:relative;line-height:1.4;}
-  .obs-item::before{content:'›';position:absolute;left:0;color:var(--teal);}
-  /* ── CONSUL/VAULT ROW ── */
-  .infra-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;}
-  .infra-box{border:1px solid rgba(160,100,240,0.25);background:rgba(160,100,240,0.02);padding:0.7rem 0.8rem;transition:background 0.2s;}
-  .infra-box:hover{background:rgba(160,100,240,0.07);}
-  .infra-head{font-size:0.48rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--purple);margin-bottom:0.3rem;}
-  .infra-name{font-size:0.62rem;color:var(--paper);font-weight:500;margin-bottom:0.2rem;}
-  .infra-item{font-size:0.45rem;color:rgba(255,255,255,0.3);padding:0.1rem 0 0.1rem 0.5rem;position:relative;line-height:1.4;}
-  .infra-item::before{content:'◈';position:absolute;left:0;color:rgba(160,100,240,0.6);font-size:0.35rem;top:0.18rem;}
+    .src {
+      border: 1px solid rgba(232, 160, 32, 0.3);
+      background: rgba(232, 160, 32, 0.04);
+      padding: 0.7rem 0.4rem;
+      text-align: center;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+      cursor: default;
+    }
 
-  /* ── LEGEND ── */
-  .legend{display:flex;gap:1.2rem;justify-content:center;flex-wrap:wrap;margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid var(--line);animation:fadeUp 0.8s 1.2s both;}
-  .leg-item{display:flex;align-items:center;gap:0.35rem;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.3);}
-  .leg-dot{width:8px;height:8px;border-radius:1px;border:1px solid;}
+    .src:hover {
+      background: rgba(232, 160, 32, 0.1);
+      border-color: var(--amber);
+      transform: translateY(-2px);
+    }
 
-  /* ANIMATIONS */
-  @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
-  @keyframes fadeDown{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
-  @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
-  @keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(30,201,176,0.4);}50%{opacity:0.7;box-shadow:0 0 0 4px rgba(30,201,176,0);}}
+    .src-ico {
+      font-size: 1.1rem;
+      display: block;
+      margin-bottom: 0.25rem;
+    }
 
-  .layer{animation:fadeUp 0.5s both;}
-  .layer:nth-child(1){animation-delay:0.05s;}.layer:nth-child(2){animation-delay:0.1s;}
-  .layer:nth-child(3){animation-delay:0.15s;}.layer:nth-child(4){animation-delay:0.2s;}
-  .layer:nth-child(5){animation-delay:0.25s;}.layer:nth-child(6){animation-delay:0.3s;}
-  .layer:nth-child(7){animation-delay:0.35s;}.layer:nth-child(8){animation-delay:0.4s;}
-  .layer:nth-child(9){animation-delay:0.45s;}.layer:nth-child(10){animation-delay:0.5s;}
-  .layer:nth-child(11){animation-delay:0.55s;}.layer:nth-child(12){animation-delay:0.6s;}
-  .layer:nth-child(13){animation-delay:0.65s;}.layer:nth-child(14){animation-delay:0.7s;}
-  .layer:nth-child(15){animation-delay:0.75s;}.layer:nth-child(16){animation-delay:0.8s;}
-</style>
+    .src-name {
+      font-size: 0.52rem;
+      color: var(--amber);
+      font-weight: 500;
+      line-height: 1.3;
+    }
+
+    .src-tech {
+      font-size: 0.44rem;
+      color: rgba(255, 255, 255, 0.3);
+      margin-top: 0.15rem;
+      line-height: 1.4;
+    }
+
+    /* ── CONNECTOR ARROWS ── */
+    .v-arr {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.1rem 0;
+    }
+
+    .v-line {
+      width: 1px;
+    }
+
+    .v-tip {
+      font-size: 0.6rem;
+      line-height: 1;
+      margin-top: -2px;
+    }
+
+    /* ── SERVER NODES ── */
+    .server-zone {
+      border: 1px solid var(--line);
+      padding: 0.8rem;
+      position: relative;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .server-zone:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .sz-label {
+      font-size: 0.5rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .sz-id {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 0.9rem;
+      letter-spacing: 0.1em;
+      margin-right: 0.4rem;
+    }
+
+    .sz-badge {
+      font-size: 0.44rem;
+      padding: 0.1rem 0.35rem;
+      border: 1px solid;
+      vertical-align: middle;
+    }
+
+    .badge-gpu {
+      border-color: rgba(232, 69, 42, 0.5);
+      color: var(--red);
+    }
+
+    .badge-cpu {
+      border-color: rgba(74, 158, 255, 0.5);
+      color: var(--blue);
+    }
+
+    .badge-stor {
+      border-color: rgba(30, 201, 176, 0.5);
+      color: var(--teal);
+    }
+
+    .sz-name {
+      font-size: 0.62rem;
+      color: var(--paper);
+      margin-bottom: 0.3rem;
+      font-weight: 500;
+    }
+
+    .sz-svc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.2rem;
+    }
+
+    .svc {
+      font-size: 0.46rem;
+      padding: 0.1rem 0.3rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .svc.amber {
+      border-color: rgba(232, 160, 32, 0.25);
+      color: rgba(232, 160, 32, 0.7);
+      background: rgba(232, 160, 32, 0.04);
+    }
+
+    .svc.teal {
+      border-color: rgba(30, 201, 176, 0.25);
+      color: rgba(30, 201, 176, 0.7);
+      background: rgba(30, 201, 176, 0.03);
+    }
+
+    .svc.red {
+      border-color: rgba(232, 69, 42, 0.3);
+      color: rgba(232, 69, 42, 0.8);
+      background: rgba(232, 69, 42, 0.04);
+    }
+
+    .svc.purple {
+      border-color: rgba(160, 100, 240, 0.3);
+      color: rgba(160, 100, 240, 0.8);
+      background: rgba(160, 100, 240, 0.04);
+    }
+
+    .svc.blue {
+      border-color: rgba(74, 158, 255, 0.3);
+      color: rgba(74, 158, 255, 0.8);
+      background: rgba(74, 158, 255, 0.04);
+    }
+
+    /* ── KAFKA BUS ── */
+    .kafka-bus {
+      border: 1px solid rgba(232, 160, 32, 0.5);
+      background: rgba(232, 160, 32, 0.03);
+      padding: 0.8rem 1rem;
+      position: relative;
+    }
+
+    .kafka-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.7rem;
+    }
+
+    .kafka-title {
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--amber);
+    }
+
+    .kafka-subtitle {
+      font-size: 0.48rem;
+      color: rgba(255, 255, 255, 0.3);
+      letter-spacing: 0.1em;
+    }
+
+    .kafka-topics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.4rem;
+    }
+
+    .k-topic {
+      border: 1px solid rgba(232, 160, 32, 0.2);
+      background: rgba(232, 160, 32, 0.03);
+      padding: 0.5rem 0.6rem;
+      transition: background 0.2s;
+    }
+
+    .k-topic:hover {
+      background: rgba(232, 160, 32, 0.08);
+    }
+
+    .k-name {
+      font-size: 0.55rem;
+      color: var(--amber);
+      font-weight: 500;
+      margin-bottom: 0.15rem;
+    }
+
+    .k-partitions {
+      font-size: 0.42rem;
+      color: rgba(255, 255, 255, 0.25);
+      margin-bottom: 0.1rem;
+    }
+
+    .k-desc {
+      font-size: 0.44rem;
+      color: rgba(255, 255, 255, 0.35);
+      line-height: 1.4;
+    }
+
+    /* ── PROCESSING ROW ── */
+    .proc-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+    }
+
+    .proc-box {
+      border: 1px solid rgba(30, 201, 176, 0.3);
+      background: rgba(30, 201, 176, 0.03);
+      padding: 0.8rem;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .proc-box:hover {
+      background: rgba(30, 201, 176, 0.07);
+      border-color: var(--teal);
+    }
+
+    .proc-step {
+      font-size: 0.48rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 0.3rem;
+    }
+
+    .proc-name {
+      font-size: 0.64rem;
+      color: var(--paper);
+      font-weight: 500;
+      margin-bottom: 0.3rem;
+      line-height: 1.3;
+    }
+
+    .proc-svc {
+      font-size: 0.46rem;
+      color: rgba(255, 255, 255, 0.3);
+      line-height: 1.5;
+    }
+
+    .proc-kafka {
+      font-size: 0.43rem;
+      color: var(--amber);
+      margin-top: 0.3rem;
+      border-top: 1px solid rgba(232, 160, 32, 0.15);
+      padding-top: 0.25rem;
+    }
+
+    /* ── DB ROW ── */
+    .db-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+
+    .db-box {
+      border: 1px solid rgba(74, 158, 255, 0.3);
+      background: rgba(74, 158, 255, 0.03);
+      padding: 0.8rem;
+      transition: background 0.2s;
+    }
+
+    .db-box:hover {
+      background: rgba(74, 158, 255, 0.07);
+    }
+
+    .db-head {
+      font-size: 0.5rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 0.3rem;
+    }
+
+    .db-name {
+      font-size: 0.64rem;
+      color: var(--paper);
+      font-weight: 500;
+      margin-bottom: 0.2rem;
+    }
+
+    .db-item {
+      font-size: 0.47rem;
+      color: rgba(255, 255, 255, 0.35);
+      padding: 0.1rem 0;
+      padding-left: 0.5rem;
+      position: relative;
+      line-height: 1.4;
+    }
+
+    .db-item::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: var(--blue);
+      font-size: 0.35rem;
+      top: 0.18rem;
+    }
+
+    /* ── LLM SERVERS ── */
+    .llm-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .llm-box {
+      border: 1px solid rgba(160, 100, 240, 0.35);
+      background: rgba(160, 100, 240, 0.03);
+      padding: 0.8rem;
+      transition: background 0.2s;
+    }
+
+    .llm-box:hover {
+      background: rgba(160, 100, 240, 0.07);
+    }
+
+    .llm-head {
+      font-size: 0.5rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--purple);
+      margin-bottom: 0.3rem;
+    }
+
+    .llm-name {
+      font-size: 0.64rem;
+      color: var(--paper);
+      font-weight: 500;
+      margin-bottom: 0.15rem;
+    }
+
+    .llm-hw {
+      font-size: 0.48rem;
+      color: var(--red);
+      margin-bottom: 0.3rem;
+    }
+
+    .llm-model {
+      font-size: 0.47rem;
+      color: rgba(255, 255, 255, 0.38);
+      padding: 0.1rem 0;
+      padding-left: 0.5rem;
+      position: relative;
+      line-height: 1.5;
+    }
+
+    .llm-model::before {
+      content: '◈';
+      position: absolute;
+      left: 0;
+      color: var(--purple);
+      font-size: 0.35rem;
+      top: 0.18rem;
+    }
+
+    /* ── COMMS PROTOCOL LEGEND ── */
+    .comm-legend {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      margin-top: 0.6rem;
+    }
+
+    .comm-item {
+      border: 1px solid var(--line);
+      padding: 0.7rem;
+      transition: background 0.2s;
+    }
+
+    .comm-item:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .comm-proto {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.2rem;
+    }
+
+    .comm-use {
+      font-size: 0.48rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.4rem;
+    }
+
+    .comm-pair {
+      font-size: 0.44rem;
+      color: rgba(255, 255, 255, 0.3);
+      padding: 0.12rem 0;
+      border-left: 2px solid;
+      padding-left: 0.4rem;
+      margin-bottom: 0.1rem;
+      line-height: 1.4;
+    }
+
+    /* ── API / GATEWAY ── */
+    .api-box {
+      border: 1px solid rgba(232, 160, 32, 0.4);
+      background: rgba(232, 160, 32, 0.03);
+      padding: 0.8rem 1rem;
+    }
+
+    .api-inner {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.4rem;
+      margin-top: 0.6rem;
+    }
+
+    .api-badge {
+      border: 1px solid rgba(232, 160, 32, 0.2);
+      background: rgba(232, 160, 32, 0.05);
+      padding: 0.4rem;
+      text-align: center;
+      font-size: 0.46rem;
+      color: rgba(232, 160, 32, 0.8);
+      transition: background 0.2s;
+    }
+
+    .api-badge:hover {
+      background: rgba(232, 160, 32, 0.13);
+    }
+
+    /* ── FRONTEND ── */
+    .fe-box {
+      border: 1px solid rgba(30, 201, 176, 0.4);
+      background: rgba(30, 201, 176, 0.02);
+      padding: 0.8rem 1rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .term-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid rgba(30, 201, 176, 0.15);
+    }
+
+    .td {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .td-r {
+      background: #ff5f57;
+    }
+
+    .td-y {
+      background: #febc2e;
+    }
+
+    .td-g {
+      background: #28c840;
+    }
+
+    .t-url {
+      margin-left: auto;
+      font-size: 0.48rem;
+      color: var(--teal);
+    }
+
+    .t-line {
+      font-size: 0.52rem;
+      color: rgba(255, 255, 255, 0.35);
+      padding: 0.12rem 0;
+      line-height: 1.5;
+    }
+
+    .t-green {
+      color: var(--teal);
+    }
+
+    .t-amber {
+      color: var(--amber);
+    }
+
+    .blink {
+      display: inline-block;
+      width: 5px;
+      height: 0.7em;
+      background: var(--teal);
+      vertical-align: text-bottom;
+      animation: blink 1.2s step-end infinite;
+    }
+
+    /* ── CONNECTOR LINE ── */
+    .h-split {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.12rem 0;
+    }
+
+    .hs-top {
+      width: 1px;
+      height: 12px;
+    }
+
+    .hs-bar {
+      height: 1px;
+      width: 70%;
+    }
+
+    .hs-legs {
+      width: 70%;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .hs-leg {
+      width: 1px;
+      height: 12px;
+    }
+
+    .hs-arrs {
+      width: 70%;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .hs-arr {
+      font-size: 0.55rem;
+    }
+
+    /* ── RESILIENCE ROW ── */
+    .res-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+
+    .res-box {
+      padding: 0.7rem 0.8rem;
+      border: 1px solid;
+      transition: background 0.2s;
+    }
+
+    .res-critical {
+      border-color: rgba(232, 69, 42, 0.35);
+      background: rgba(232, 69, 42, 0.03);
+    }
+
+    .res-critical:hover {
+      background: rgba(232, 69, 42, 0.08);
+    }
+
+    .res-high {
+      border-color: rgba(232, 160, 32, 0.3);
+      background: rgba(232, 160, 32, 0.03);
+    }
+
+    .res-high:hover {
+      background: rgba(232, 160, 32, 0.07);
+    }
+
+    .res-opt {
+      border-color: rgba(30, 201, 176, 0.25);
+      background: rgba(30, 201, 176, 0.02);
+    }
+
+    .res-opt:hover {
+      background: rgba(30, 201, 176, 0.06);
+    }
+
+    .res-pri {
+      font-size: 0.44rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.1rem 0.3rem;
+      border: 1px solid;
+      display: inline-block;
+      margin-bottom: 0.3rem;
+    }
+
+    .pri-c {
+      color: var(--red);
+      border-color: rgba(232, 69, 42, 0.4);
+    }
+
+    .pri-h {
+      color: var(--amber);
+      border-color: rgba(232, 160, 32, 0.35);
+    }
+
+    .pri-o {
+      color: var(--teal);
+      border-color: rgba(30, 201, 176, 0.35);
+    }
+
+    .res-name {
+      font-size: 0.6rem;
+      color: var(--paper);
+      font-weight: 500;
+      margin-bottom: 0.2rem;
+      line-height: 1.3;
+    }
+
+    .res-fix {
+      font-size: 0.46rem;
+      color: rgba(255, 255, 255, 0.32);
+      line-height: 1.5;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 0.3rem;
+      margin-top: 0.3rem;
+    }
+
+    .res-fix span {
+      color: var(--teal);
+    }
+
+    /* ── OBS ROW ── */
+    .obs-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+    }
+
+    .obs-box {
+      border: 1px solid rgba(30, 201, 176, 0.2);
+      background: rgba(30, 201, 176, 0.02);
+      padding: 0.7rem 0.8rem;
+      transition: background 0.2s;
+    }
+
+    .obs-box:hover {
+      background: rgba(30, 201, 176, 0.07);
+    }
+
+    .obs-name {
+      font-size: 0.6rem;
+      color: var(--paper);
+      font-weight: 500;
+      margin-bottom: 0.15rem;
+    }
+
+    .obs-tool-sm {
+      font-size: 0.46rem;
+      color: var(--teal);
+      margin-bottom: 0.3rem;
+    }
+
+    .obs-item {
+      font-size: 0.44rem;
+      color: rgba(255, 255, 255, 0.3);
+      padding: 0.1rem 0 0.1rem 0.5rem;
+      position: relative;
+      line-height: 1.4;
+    }
+
+    .obs-item::before {
+      content: '›';
+      position: absolute;
+      left: 0;
+      color: var(--teal);
+    }
+
+    /* ── CONSUL/VAULT ROW ── */
+    .infra-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .infra-box {
+      border: 1px solid rgba(160, 100, 240, 0.25);
+      background: rgba(160, 100, 240, 0.02);
+      padding: 0.7rem 0.8rem;
+      transition: background 0.2s;
+    }
+
+    .infra-box:hover {
+      background: rgba(160, 100, 240, 0.07);
+    }
+
+    .infra-head {
+      font-size: 0.48rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--purple);
+      margin-bottom: 0.3rem;
+    }
+
+    .infra-name {
+      font-size: 0.62rem;
+      color: var(--paper);
+      font-weight: 500;
+      margin-bottom: 0.2rem;
+    }
+
+    .infra-item {
+      font-size: 0.45rem;
+      color: rgba(255, 255, 255, 0.3);
+      padding: 0.1rem 0 0.1rem 0.5rem;
+      position: relative;
+      line-height: 1.4;
+    }
+
+    .infra-item::before {
+      content: '◈';
+      position: absolute;
+      left: 0;
+      color: rgba(160, 100, 240, 0.6);
+      font-size: 0.35rem;
+      top: 0.18rem;
+    }
+
+    /* ── LEGEND ── */
+    .legend {
+      display: flex;
+      gap: 1.2rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 1.5rem;
+      padding-top: 1.2rem;
+      border-top: 1px solid var(--line);
+      animation: fadeUp 0.8s 1.2s both;
+    }
+
+    .leg-item {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.5rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .leg-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 1px;
+      border: 1px solid;
+    }
+
+    /* ANIMATIONS */
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(14px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes livePulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(30, 201, 176, 0.4);
+      }
+
+      50% {
+        opacity: 0.7;
+        box-shadow: 0 0 0 4px rgba(30, 201, 176, 0);
+      }
+    }
+
+    .layer {
+      animation: fadeUp 0.5s both;
+    }
+
+    .layer:nth-child(1) {
+      animation-delay: 0.05s;
+    }
+
+    .layer:nth-child(2) {
+      animation-delay: 0.1s;
+    }
+
+    .layer:nth-child(3) {
+      animation-delay: 0.15s;
+    }
+
+    .layer:nth-child(4) {
+      animation-delay: 0.2s;
+    }
+
+    .layer:nth-child(5) {
+      animation-delay: 0.25s;
+    }
+
+    .layer:nth-child(6) {
+      animation-delay: 0.3s;
+    }
+
+    .layer:nth-child(7) {
+      animation-delay: 0.35s;
+    }
+
+    .layer:nth-child(8) {
+      animation-delay: 0.4s;
+    }
+
+    .layer:nth-child(9) {
+      animation-delay: 0.45s;
+    }
+
+    .layer:nth-child(10) {
+      animation-delay: 0.5s;
+    }
+
+    .layer:nth-child(11) {
+      animation-delay: 0.55s;
+    }
+
+    .layer:nth-child(12) {
+      animation-delay: 0.6s;
+    }
+
+    .layer:nth-child(13) {
+      animation-delay: 0.65s;
+    }
+
+    .layer:nth-child(14) {
+      animation-delay: 0.7s;
+    }
+
+    .layer:nth-child(15) {
+      animation-delay: 0.75s;
+    }
+
+    .layer:nth-child(16) {
+      animation-delay: 0.8s;
+    }
+  </style>
 </head>
+
 <body>
-<div class="wrap">
+  <div class="wrap">
 
-  <!-- HEADER -->
-  <div class="hdr">
-    <div class="hdr-eye"><span class="live-dot"></span>NetaBoard v2.0 · Full Infrastructure Architecture · In-House · Self-Hosted</div>
-    <div class="hdr-title">Backend <span>Infrastructure</span> Diagram</div>
-    <div class="hdr-sub">8 Servers · Apache Kafka · In-House LLMs · gRPC + WebSocket · Private VLAN</div>
+    <!-- HEADER -->
+    <div class="hdr">
+      <div class="hdr-eye"><span class="live-dot"></span>NetaBoard V5 · NRI Political Intelligence Pipeline · Fully
+        In-House</div>
+      <div class="hdr-title">End-to-End <span>Political Intelligence</span> Pipeline</div>
+      <div class="hdr-sub">Relevance Gate · 15 Pillar Scoring · Data Registration · SQLite/PostgreSQL · PreProving Tab
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:0;">
+
+      <!-- ── LAYER 1: SOURCES ── -->
+      <div class="layer">
+        <div class="sec-label">◈ DATA INGESTION LAYER — Sources publish to Kafka topic: raw.content</div>
+        <div class="sources-row">
+          <div class="src"><span class="src-ico">📺</span>
+            <div class="src-name">YouTube</div>
+            <div class="src-tech">YT Data API v3</div>
+          </div>
+          <div class="src"><span class="src-ico">💬</span>
+            <div class="src-name">WhatsApp</div>
+            <div class="src-tech">Business API Webhook</div>
+          </div>
+          <div class="src"><span class="src-ico">📘</span>
+            <div class="src-name">Facebook</div>
+            <div class="src-tech">Meta Graph API</div>
+          </div>
+          <div class="src"><span class="src-ico">𝕏</span>
+            <div class="src-name">Twitter/X</div>
+            <div class="src-tech">X API v2 Stream</div>
+          </div>
+          <div class="src"><span class="src-ico">📄</span>
+            <div class="src-name">PDFs / Docs</div>
+            <div class="src-tech">Upload Handler</div>
+          </div>
+          <div class="src"><span class="src-ico">📰</span>
+            <div class="src-name">Images / Clippings</div>
+            <div class="src-tech">Vision + OCR</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── LAYER 2: SERVER 07 — Workers ── -->
+      <div class="layer">
+        <div class="v-arr">
+          <div class="v-line"
+            style="height:14px;background:linear-gradient(to bottom,rgba(232,160,32,0.4),rgba(30,201,176,0.4));"></div>
+          <div class="v-tip" style="color:rgba(74,158,255,0.6);">▼</div>
+        </div>
+        <div class="server-zone" style="border-color:rgba(74,158,255,0.25);">
+          <div class="sz-label"><span class="sz-id" style="color:var(--blue);">SRV-07</span><span
+              class="sz-badge badge-cpu">CPU · 32 vCPU · 64 GB RAM</span> — Worker & Connector Services</div>
+          <div class="sz-name">Ingestion Connectors + Celery Workers + Pre-processing</div>
+          <div class="sz-svc">
+            <span class="svc amber">YT Connector</span>
+            <span class="svc amber">WhatsApp Webhook Handler</span>
+            <span class="svc amber">Facebook Connector</span>
+            <span class="svc amber">X/Twitter Connector</span>
+            <span class="svc amber">PDF/Image Handler</span>
+            <span class="svc teal">Celery Workers (×8)</span>
+            <span class="svc teal">In-House ASR (client)</span>
+            <span class="svc teal">Pre-processor Service</span>
+            <span class="svc">Language Detect</span>
+            <span class="svc">Dedup (MinHash)</span>
+            <span class="svc">Translate Service</span>
+            <span class="svc blue">Kafka Producer Client</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW to KAFKA ── -->
+      <div class="layer">
+        <div class="v-arr">
+          <div class="v-line"
+            style="height:14px;background:linear-gradient(to bottom,rgba(74,158,255,0.4),rgba(232,160,32,0.6));"></div>
+          <div class="v-tip" style="color:var(--amber);">▼</div>
+        </div>
+      </div>
+
+      <!-- ── LAYER 3: KAFKA BUS ── -->
+      <div class="layer">
+        <div class="kafka-bus">
+          <div class="kafka-header">
+            <div class="kafka-title">◈ &nbsp; APACHE KAFKA — Event Streaming Bus &nbsp; ◈</div>
+            <div class="kafka-subtitle">SRV-02 · 3-Broker Cluster · Zookeeper · Schema Registry · 2 TB NVMe Log
+              Retention</div>
+          </div>
+          <div class="kafka-topics">
+            <div class="k-topic">
+              <div class="k-name">raw.content</div>
+              <div class="k-partitions">12 partitions · replication 3</div>
+              <div class="k-desc">All freshly ingested items from every source connector</div>
+            </div>
+            <div class="k-topic">
+              <div class="k-name">clean.content</div>
+              <div class="k-partitions">12 partitions · replication 3</div>
+              <div class="k-desc">Deduplicated, language-detected, translated content</div>
+            </div>
+            <div class="k-topic">
+              <div class="k-name">enriched.content</div>
+              <div class="k-partitions">12 partitions · replication 3</div>
+              <div class="k-desc">NER-tagged, summarized, sentiment-scored items</div>
+            </div>
+            <div class="k-topic">
+              <div class="k-name">embed.requests</div>
+              <div class="k-partitions">8 partitions · replication 2</div>
+              <div class="k-desc">Items queued for in-house embedding model</div>
+            </div>
+            <div class="k-topic">
+              <div class="k-name">index.ready</div>
+              <div class="k-partitions">8 partitions · replication 2</div>
+              <div class="k-desc">Items ready to write into Qdrant + Elasticsearch</div>
+            </div>
+            <div class="k-topic">
+              <div class="k-name">alerts.triggered</div>
+              <div class="k-partitions">4 partitions · replication 2</div>
+              <div class="k-desc">Alert events for notification + WebSocket push</div>
+            </div>
+            <div class="k-topic">
+              <div class="k-name">reports.queue</div>
+              <div class="k-partitions">4 partitions · replication 2</div>
+              <div class="k-desc">Scheduled and on-demand report generation jobs</div>
+            </div>
+            <div class="k-topic">
+              <div class="k-name">model.feedback</div>
+              <div class="k-partitions">4 partitions · replication 2</div>
+              <div class="k-desc">Analyst corrections fed back to fine-tuning pipeline</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW from Kafka to processing ── -->
+      <div class="layer">
+        <div class="h-split">
+          <div class="hs-top" style="background:rgba(232,160,32,0.5);"></div>
+          <div class="hs-bar"
+            style="background:linear-gradient(to right,rgba(160,100,240,0.4),rgba(30,201,176,0.5),rgba(74,158,255,0.4),rgba(232,160,32,0.4));">
+          </div>
+          <div class="hs-legs">
+            <div class="hs-leg" style="background:rgba(160,100,240,0.4);"></div>
+            <div class="hs-leg" style="background:rgba(30,201,176,0.4);"></div>
+            <div class="hs-leg" style="background:rgba(74,158,255,0.4);"></div>
+            <div class="hs-leg" style="background:rgba(232,160,32,0.4);"></div>
+          </div>
+          <div class="hs-arrs">
+            <span class="hs-arr" style="color:rgba(160,100,240,0.7);">▼</span>
+            <span class="hs-arr" style="color:rgba(30,201,176,0.7);">▼</span>
+            <span class="hs-arr" style="color:rgba(74,158,255,0.7);">▼</span>
+            <span class="hs-arr" style="color:rgba(232,160,32,0.7);">▼</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── LAYER 4: AI ENRICHMENT + DB + ALERT + EMBED (side by side) ── -->
+      <div class="layer">
+        <div class="proc-row">
+          <div class="proc-box">
+            <div class="proc-step">Step 1 · File Discovery</div>
+            <div class="proc-name">Registry & Dedup Queue</div>
+            <div class="proc-svc">Scans DataCollected/<br>djb2 Hash Fingerprints<br>Queues New Files Only</div>
+            <div class="proc-kafka">→ Writes: nri_queue (DB)</div>
+          </div>
+          <div class="proc-box">
+            <div class="proc-step">Step 2 · AI Processing</div>
+            <div class="proc-name">15-Pillar Detection & Filter</div>
+            <div class="proc-svc">Reads DB Queue<br>15-Pillar Detection check<br>Gate Threshold: 0.3</div>
+            <div class="proc-kafka">→ Drops irrelevant content</div>
+          </div>
+          <div class="proc-box">
+            <div class="proc-step">Step 3 · Priority Scoring</div>
+            <div class="proc-name">In-House LLM Scoring</div>
+            <div class="proc-svc">0-100 logic + Evidences<br>Applied Inverse Logic<br>(Anti-Incumbency, etc)</div>
+            <div class="proc-kafka">→ Writes: nri_file_scores</div>
+          </div>
+          <div class="proc-box">
+            <div class="proc-step">Parallel · Admin UI</div>
+            <div class="proc-name">PreProving Dashboard</div>
+            <div class="proc-svc">Polls /api/nri/queue<br>Renders Political Heatmap<br>File State vs Total Pillars</div>
+            <div class="proc-kafka">→ Immediate UI Push</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW ── -->
+      <div class="layer">
+        <div class="v-arr">
+          <div class="v-line"
+            style="height:14px;background:linear-gradient(to bottom,rgba(74,158,255,0.5),rgba(74,158,255,0.3));"></div>
+          <div class="v-tip" style="color:var(--blue);">▼</div>
+        </div>
+      </div>
+
+      <!-- ── LAYER 5: GPU SERVERS ── -->
+      <div class="layer">
+        <div class="llm-row">
+          <div class="llm-box">
+            <div class="llm-head">🔴 SRV-05 · Context Inference Server · Llama/Qwen</div>
+            <div class="llm-name">LLM Inference — Relevance Gate + Pillar Scoring</div>
+            <div class="llm-hw">Core text intelligence over 15 specific Indian political pillars</div>
+            <div class="llm-model">Relevance Gate: JSON classification (0.0 to 1.0) on 15 pillars simultaneously</div>
+            <div class="llm-model">Pillar Scorer: Target single pillar (0-100 score + detailed quotes)</div>
+            <div class="llm-model">Dynamically scales contexts up to 32k for long reports</div>
+            <div class="llm-model">Anti-Incumbency Inversion applied smoothly during batch inferencing</div>
+          </div>
+          <div class="llm-box">
+            <div class="llm-head">🔴 SRV-06 · Multimedia Server · Whisper/Qwen Vision</div>
+            <div class="llm-name">Media Inference — ASR + Vision Extraction</div>
+            <div class="llm-hw">Ollama + custom serving · processes raw DataCollected streams</div>
+            <div class="llm-model">In-House Whisper ASR (Fine-tuned on Hindi/English political speeches)</div>
+            <div class="llm-model">In-house Vision Model (Extracts text/numbers from party posters, charts)</div>
+            <div class="llm-model">Multi-lingual translations mapping directly to expected pipeline schema</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── LAYER 5b: TRAINING SERVER ── -->
+      <div class="layer" style="margin-top:0.5rem;">
+        <div class="server-zone" style="border-color:rgba(232,69,42,0.25);border-style:dashed;">
+          <div class="sz-label"><span class="sz-id" style="color:var(--red);">SRV-08</span><span
+              class="sz-badge badge-gpu">GPU · 4× H100 80GB · 512 GB RAM · OFFLINE ONLY</span> — Model Training &
+            Fine-Tuning Server</div>
+          <div class="sz-name">Offline fine-tuning, prompt engineering, model evaluation — consumes model.feedback from
+            Kafka</div>
+          <div class="sz-svc">
+            <span class="svc red">PyTorch + HuggingFace</span>
+            <span class="svc red">LoRA / QLoRA Fine-tuning</span>
+            <span class="svc red">RLHF Pipeline</span>
+            <span class="svc amber">MLflow Experiment Tracking</span>
+            <span class="svc amber">Weights &amp; Biases</span>
+            <span class="svc amber">Prompt Registry &amp; Versioning</span>
+            <span class="svc purple">Model Eval Harness</span>
+            <span class="svc purple">A/B Model Testing</span>
+            <span class="svc teal">Model Export → SRV-05/06</span>
+            <span class="svc">Kafka Consumer: model.feedback</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW ── -->
+      <div class="layer">
+        <div class="v-arr">
+          <div class="v-line"
+            style="height:14px;background:linear-gradient(to bottom,rgba(74,158,255,0.4),rgba(74,158,255,0.3));"></div>
+          <div class="v-tip" style="color:var(--blue);">▼</div>
+        </div>
+      </div>
+
+      <!-- ── LAYER 6: DB + STORAGE ── -->
+      <div class="layer">
+        <div class="db-row">
+          <div class="db-box">
+            <div class="db-head">🗂 SRV-03 · 16 vCPU · 128 GB RAM · 4 TB NVMe</div>
+            <div class="db-name">PostgreSQL 16 + Qdrant + Redis</div>
+            <div class="db-item">PostgreSQL: users, orgs, tags, alerts, workflow, audit log</div>
+            <div class="db-item">pgBouncer: connection pooling for high concurrency</div>
+            <div class="db-item">Qdrant: vector collections (news_embeddings, image_embeddings)</div>
+            <div class="db-item">Redis: sessions, cache, Celery broker, pub/sub for WS</div>
+          </div>
+          <div class="db-box">
+            <div class="db-head">🔎 SRV-04 · 16 vCPU · 64 GB RAM · 8 TB HDD + 1 TB NVMe</div>
+            <div class="db-name">Elasticsearch + MinIO</div>
+            <div class="db-item">Elasticsearch: full-text BM25, faceted filters, aggregations</div>
+            <div class="db-item">Kibana: internal log visualization and analytics</div>
+            <div class="db-item">MinIO: S3-compatible storage for PDFs, images, audio, reports</div>
+            <div class="db-item">Logstash: structured log ingestion from all services</div>
+          </div>
+          <div class="db-box" style="border-color:rgba(232,69,42,0.3);background:rgba(232,69,42,0.03);">
+            <div class="db-head" style="color:var(--red);">⚙ SRV-02 · 16 vCPU · 64 GB RAM · 2 TB NVMe</div>
+            <div class="db-name">Kafka Cluster + Zookeeper</div>
+            <div class="db-item">3 Kafka brokers (broker-1, broker-2, broker-3)</div>
+            <div class="db-item">Zookeeper ensemble for broker coordination</div>
+            <div class="db-item">Schema Registry for Avro/Protobuf schemas</div>
+            <div class="db-item">Kafka UI: topic inspection, consumer lag monitoring</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW ── -->
+      <div class="layer">
+        <div class="v-arr">
+          <div class="v-line"
+            style="height:14px;background:linear-gradient(to bottom,rgba(232,160,32,0.4),rgba(232,160,32,0.6));"></div>
+          <div class="v-tip" style="color:var(--amber);">▼</div>
+        </div>
+      </div>
+
+      <!-- ── LAYER 7: API GATEWAY ── -->
+      <div class="layer">
+        <div style="display:flex;justify-content:center;">
+          <div style="width:100%;">
+            <div class="api-box">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">⚡
+                  &nbsp; SRV-01 · API GATEWAY — FastAPI ×2 + HAProxy + Vault + Nginx · Public + Private VLAN &nbsp; ⚡
+                </div>
+                <div style="font-size:0.48rem;color:rgba(255,255,255,0.3);">Only server on public IP · HAProxy
+                  active/passive · Keepalived VIP · Vault secrets runtime injection</div>
+              </div>
+              <div class="api-inner">
+                <div class="api-badge">REST API<br>Endpoints</div>
+                <div class="api-badge">WebSocket<br>Live Push</div>
+                <div class="api-badge">JWT + OAuth2<br>Auth</div>
+                <div class="api-badge">Rate<br>Limiting</div>
+                <div class="api-badge">Multi-Tenant<br>Routing</div>
+              </div>
+              <div style="margin-top:0.6rem;display:grid;grid-template-columns:repeat(4,1fr);gap:0.4rem;">
+                <div
+                  style="font-size:0.46rem;color:rgba(255,255,255,0.3);border-left:2px solid rgba(232,160,32,0.3);padding-left:0.4rem;line-height:1.5;">
+                  → gRPC to SRV-05/06 for real-time inference (search query, on-demand summarize)</div>
+                <div
+                  style="font-size:0.46rem;color:rgba(255,255,255,0.3);border-left:2px solid rgba(74,158,255,0.3);padding-left:0.4rem;line-height:1.5;">
+                  → gRPC to SRV-03 (Qdrant) for vector search queries</div>
+                <div
+                  style="font-size:0.46rem;color:rgba(255,255,255,0.3);border-left:2px solid rgba(30,201,176,0.3);padding-left:0.4rem;line-height:1.5;">
+                  → HTTP to SRV-04 (Elasticsearch) for full-text + faceted search</div>
+                <div
+                  style="font-size:0.46rem;color:rgba(255,255,255,0.3);border-left:2px solid rgba(160,100,240,0.3);padding-left:0.4rem;line-height:1.5;">
+                  → Redis pub/sub for WebSocket relay of Kafka alerts.triggered events</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RESILIENCE & GAPS ── -->
+      <div class="layer">
+        <div class="sec-label">◈ RESILIENCE LAYER — 9 GAPS IDENTIFIED & FIXED</div>
+        <div class="res-row">
+          <div class="res-box res-critical">
+            <span class="res-pri pri-c">Critical</span>
+            <div class="res-name">Single Point of Failure — API</div>
+            <div class="res-fix"><span>Fix:</span> HAProxy + 2× FastAPI instances + Keepalived VIP. Auto-failover
+              &lt;5s. Nginx SSL termination on SRV-01.</div>
+          </div>
+          <div class="res-box res-critical">
+            <span class="res-pri pri-c">Critical</span>
+            <div class="res-name">No Secrets Management</div>
+            <div class="res-fix"><span>Fix:</span> HashiCorp Vault on SRV-01. All API keys / passwords fetched at
+              runtime. Never stored on disk. Auto-rotation.</div>
+          </div>
+          <div class="res-box res-critical">
+            <span class="res-pri pri-c">Critical</span>
+            <div class="res-name">No Dead Letter Queue (DLQ)</div>
+            <div class="res-fix"><span>Fix:</span> DLQ topic per pipeline stage (enrichment.dlq, embed.dlq). Failed
+              messages after 3 retries → DLQ → ops alert → manual review.</div>
+          </div>
+          <div class="res-box res-high">
+            <span class="res-pri pri-h">High</span>
+            <div class="res-name">No Circuit Breaker</div>
+            <div class="res-fix"><span>Fix:</span> Tenacity circuit breaker on all gRPC calls to GPU servers. Opens
+              after 5 fails → falls back to rule-based summariser.</div>
+          </div>
+          <div class="res-box res-high">
+            <span class="res-pri pri-h">High</span>
+            <div class="res-name">No Service Discovery</div>
+            <div class="res-fix"><span>Fix:</span> Consul on all servers. Services register on start. gRPC resolves via
+              DNS (llm-a.service.consul:50051). Health-aware routing.</div>
+          </div>
+          <div class="res-box res-high">
+            <span class="res-pri pri-h">High</span>
+            <div class="res-name">No Backup / DR Strategy</div>
+            <div class="res-fix"><span>Fix:</span> pg_dump → MinIO daily. Qdrant snapshots weekly. ES ILM snapshots.
+              rclone off-site nightly. RTO &lt;4h, RPO &lt;24h.</div>
+          </div>
+          <div class="res-box res-opt">
+            <span class="res-pri pri-o">Optimise</span>
+            <div class="res-name">Late Deduplication</div>
+            <div class="res-fix"><span>Fix:</span> Redis Bloom Filter at connector level. Content hash checked before
+              Kafka publish. 99.9% of duplicates blocked before pipeline entry.</div>
+          </div>
+          <div class="res-box res-opt">
+            <span class="res-pri pri-o">Optimise</span>
+            <div class="res-name">No Data Validation Gate</div>
+            <div class="res-fix"><span>Fix:</span> Pydantic v2 on every Kafka message deserialization. Avro schema via
+              Schema Registry. Invalid records → validation.errors topic.</div>
+          </div>
+          <div class="res-box res-opt">
+            <span class="res-pri pri-o">Optimise</span>
+            <div class="res-name">Unsafe Model Deployment</div>
+            <div class="res-fix"><span>Fix:</span> MLflow Model Registry: Staging → Production promotion. Canary: 10%
+              traffic to new model. Rollback in &lt;60s if quality drops.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CONSUL + VAULT + HAPROXY ── -->
+      <div class="layer" style="margin-top:0.5rem;">
+        <div class="sec-label">◈ CROSS-CUTTING INFRASTRUCTURE — runs on / alongside all servers</div>
+        <div class="infra-row">
+          <div class="infra-box">
+            <div class="infra-head">🔐 Secrets — HashiCorp Vault (SRV-01)</div>
+            <div class="infra-name">Vault Agent Sidecar on every service</div>
+            <div class="infra-item">WhatsApp / Facebook / X API keys</div>
+            <div class="infra-item">PostgreSQL / Redis / MinIO credentials</div>
+            <div class="infra-item">JWT signing keys + OAuth2 secrets</div>
+            <div class="infra-item">Kafka TLS certificates</div>
+            <div class="infra-item">Auto-rotation every 24h</div>
+          </div>
+          <div class="infra-box">
+            <div class="infra-head">🌐 Service Discovery — Consul (all servers)</div>
+            <div class="infra-name">Service registry + DNS + health checks</div>
+            <div class="infra-item">All 15+ services self-register on start</div>
+            <div class="infra-item">gRPC resolves via consul DNS internally</div>
+            <div class="infra-item">Health check: HTTP /health every 10s</div>
+            <div class="infra-item">Unhealthy services deregistered automatically</div>
+            <div class="infra-item">Used by HAProxy for backend pool</div>
+          </div>
+          <div class="infra-box">
+            <div class="infra-head">⚖ Load Balancer — HAProxy + Keepalived (SRV-01)</div>
+            <div class="infra-name">Active/passive HA for API gateway</div>
+            <div class="infra-item">2× FastAPI instances behind HAProxy</div>
+            <div class="infra-item">Keepalived VIP: automatic failover &lt;5s</div>
+            <div class="infra-item">Health-check removes unhealthy backend</div>
+            <div class="infra-item">Nginx handles SSL termination upstream</div>
+            <div class="infra-item">Rate limiting at HAProxy layer</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── OBSERVABILITY ── -->
+      <div class="layer" style="margin-top:0.5rem;">
+        <div class="sec-label">◈ OBSERVABILITY STACK — Prometheus scrapes all 8 servers every 15s</div>
+        <div class="obs-row">
+          <div class="obs-box">
+            <div class="obs-name">📈 Prometheus + Grafana</div>
+            <div class="obs-tool-sm">Metrics · SRV-01 monitoring namespace</div>
+            <div class="obs-item">Kafka consumer lag per topic/group</div>
+            <div class="obs-item">GPU utilisation % per model (SRV-05/06)</div>
+            <div class="obs-item">Model inference latency p50/p95/p99</div>
+            <div class="obs-item">Pipeline throughput: items/sec per stage</div>
+            <div class="obs-item">API 5xx rate + response time SLA</div>
+            <div class="obs-item">Alert: lag &gt;10k → PagerDuty</div>
+          </div>
+          <div class="obs-box">
+            <div class="obs-name">🔭 Jaeger + OpenTelemetry</div>
+            <div class="obs-tool-sm">Distributed tracing · trace per article</div>
+            <div class="obs-item">Trace ID injected at API gateway</div>
+            <div class="obs-item">Carried via Kafka message headers</div>
+            <div class="obs-item">Per-span: OCR time, LLM call, Kafka publish</div>
+            <div class="obs-item">End-to-end latency: ingest → indexed</div>
+            <div class="obs-item">Alert: trace &gt;30s end-to-end</div>
+            <div class="obs-item">Error traces auto-captured</div>
+          </div>
+          <div class="obs-box">
+            <div class="obs-name">📋 ELK Structured Logs</div>
+            <div class="obs-tool-sm">Elasticsearch + Logstash + Kibana · SRV-04</div>
+            <div class="obs-item">All services emit JSON structured logs</div>
+            <div class="obs-item">Logstash enriches: service/host/trace ID</div>
+            <div class="obs-item">Kibana: error dashboards + anomaly detect</div>
+            <div class="obs-item">30 day hot retention · 1 year cold (MinIO)</div>
+            <div class="obs-item">Correlated with Jaeger trace IDs</div>
+            <div class="obs-item">Model inference errors logged with input</div>
+          </div>
+          <div class="obs-box">
+            <div class="obs-name">🧬 Model Quality Monitor</div>
+            <div class="obs-tool-sm">MLflow + W&B · SRV-08</div>
+            <div class="obs-item">5% of enriched articles sampled for eval</div>
+            <div class="obs-item">NER F1 score tracked over time</div>
+            <div class="obs-item">Summarization ROUGE score monitoring</div>
+            <div class="obs-item">Sentiment accuracy drift detection</div>
+            <div class="obs-item">Embedding space cosine drift alert</div>
+            <div class="obs-item">Auto-trigger fine-tuning on degradation</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── COMMS LEGEND ── -->
+      <div class="layer">
+        <div class="sec-label">◈ INTER-SERVICE COMMUNICATION PROTOCOLS</div>
+        <div class="comm-legend">
+          <div class="comm-item">
+            <div class="comm-proto" style="color:var(--amber);">Kafka</div>
+            <div class="comm-use" style="color:var(--amber);">Async Event Bus</div>
+            <div class="comm-pair" style="border-color:rgba(232,160,32,0.4);">All pipeline stage-to-stage data flow
+            </div>
+            <div class="comm-pair" style="border-color:rgba(232,160,32,0.4);">Connectors → Pre-proc → Enrich → Embed
+            </div>
+            <div class="comm-pair" style="border-color:rgba(232,160,32,0.4);">Alert Engine → Notification Service</div>
+            <div class="comm-pair" style="border-color:rgba(232,160,32,0.4);">Feedback loop → Training server</div>
+          </div>
+          <div class="comm-item">
+            <div class="comm-proto" style="color:var(--teal);">gRPC</div>
+            <div class="comm-use" style="color:var(--teal);">Sync Low-Latency RPC</div>
+            <div class="comm-pair" style="border-color:rgba(30,201,176,0.4);">API Server → LLM Server A (port 50051)
+            </div>
+            <div class="comm-pair" style="border-color:rgba(30,201,176,0.4);">API Server → LLM Server B (port 50052)
+            </div>
+            <div class="comm-pair" style="border-color:rgba(30,201,176,0.4);">API Server → Qdrant (vector search)</div>
+            <div class="comm-pair" style="border-color:rgba(30,201,176,0.4);">Protobuf payloads, TLS on private VLAN
+            </div>
+          </div>
+          <div class="comm-item">
+            <div class="comm-proto" style="color:var(--blue);">REST / HTTP</div>
+            <div class="comm-use" style="color:var(--blue);">Internal Management</div>
+            <div class="comm-pair" style="border-color:rgba(74,158,255,0.4);">Celery Workers → Social API connectors
+            </div>
+            <div class="comm-pair" style="border-color:rgba(74,158,255,0.4);">API → Elasticsearch (search queries)</div>
+            <div class="comm-pair" style="border-color:rgba(74,158,255,0.4);">Monitoring → /health endpoints all servers
+            </div>
+            <div class="comm-pair" style="border-color:rgba(74,158,255,0.4);">MLflow / Kibana / Kafka UI (management)
+            </div>
+          </div>
+          <div class="comm-item">
+            <div class="comm-proto" style="color:var(--purple);">WebSocket</div>
+            <div class="comm-use" style="color:var(--purple);">Real-time Frontend Push</div>
+            <div class="comm-pair" style="border-color:rgba(160,100,240,0.4);">Kafka alerts.triggered → Redis pub/sub
+            </div>
+            <div class="comm-pair" style="border-color:rgba(160,100,240,0.4);">Redis → API Server WebSocket relay</div>
+            <div class="comm-pair" style="border-color:rgba(160,100,240,0.4);">API Server → Browser (persistent conn)
+            </div>
+            <div class="comm-pair" style="border-color:rgba(160,100,240,0.4);">Live volume counts, new article events
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW ── -->
+      <div class="layer">
+        <div class="v-arr" style="margin-top:0.3rem;">
+          <div class="v-line"
+            style="height:14px;background:linear-gradient(to bottom,rgba(30,201,176,0.4),rgba(30,201,176,0.7));"></div>
+          <div class="v-tip" style="color:var(--teal);">▼</div>
+        </div>
+      </div>
+
+      <!-- ── LAYER 8: FRONTEND ── -->
+      <div class="layer">
+        <div style="display:flex;justify-content:center;">
+          <div class="fe-box" style="width:100%;max-width:100%;">
+            <div class="term-bar">
+              <div class="td td-r"></div>
+              <div class="td td-y"></div>
+              <div class="td td-g"></div>
+              <div class="t-url">netaboard.mediastack.live — Static Frontend</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;">
+              <div>
+                <div class="t-line"><span class="t-green">◈</span> <span class="t-amber">REST API</span> — All data
+                  fetch, search, analytics, reports</div>
+                <div class="t-line"><span class="t-green">›</span> HTTPS → SRV-01 Nginx → FastAPI</div>
+                <div class="t-line"><span class="t-green">›</span> JWT token in Authorization header</div>
+              </div>
+              <div>
+                <div class="t-line"><span class="t-green">◈</span> <span class="t-amber">WebSocket</span> — Live alerts,
+                  counters, new articles</div>
+                <div class="t-line"><span class="t-green">›</span> wss:// persistent connection to SRV-01</div>
+                <div class="t-line"><span class="t-green">›</span> No polling — Kafka → Redis → WS push</div>
+              </div>
+              <div>
+                <div class="t-line"><span class="t-green">◈</span> <span class="t-amber">MinIO presigned URLs</span> —
+                  File downloads</div>
+                <div class="t-line"><span class="t-green">›</span> API generates presigned URL for SRV-04</div>
+                <div class="t-line"><span class="t-green">›</span> Reports, PDFs, images served directly <span
+                    class="blink"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /diagram -->
+
+    <!-- LEGEND -->
+    <div class="legend">
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:var(--amber);background:rgba(232,160,32,0.15);"></div>Ingestion / API
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:var(--teal);background:rgba(30,201,176,0.15);"></div>Processing
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:var(--amber);background:rgba(232,160,32,0.08);"></div>Kafka Topics
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:var(--blue);background:rgba(74,158,255,0.15);"></div>Databases
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:var(--red);background:rgba(232,69,42,0.1);"></div>GPU / AI Servers
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:var(--purple);background:rgba(160,100,240,0.1);"></div>In-House LLMs
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:rgba(255,255,255,0.3);background:rgba(255,255,255,0.05);"></div>CPU
+        Workers
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:var(--red);background:rgba(232,69,42,0.15);border-style:dashed;"></div>
+        Critical Fix
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:var(--teal);background:rgba(30,201,176,0.1);border-style:dashed;">
+        </div>Observability
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="border-color:var(--purple);background:rgba(160,100,240,0.08);border-style:dashed;">
+        </div>Cross-Cutting Infra
+      </div>
+    </div>
+
   </div>
-
-  <div style="display:flex;flex-direction:column;gap:0;">
-
-    <!-- ── LAYER 1: SOURCES ── -->
-    <div class="layer">
-      <div class="sec-label">◈ DATA INGESTION LAYER — Sources publish to Kafka topic: raw.content</div>
-      <div class="sources-row">
-        <div class="src"><span class="src-ico">📺</span><div class="src-name">YouTube</div><div class="src-tech">YT Data API v3</div></div>
-        <div class="src"><span class="src-ico">💬</span><div class="src-name">WhatsApp</div><div class="src-tech">Business API Webhook</div></div>
-        <div class="src"><span class="src-ico">📘</span><div class="src-name">Facebook</div><div class="src-tech">Meta Graph API</div></div>
-        <div class="src"><span class="src-ico">𝕏</span><div class="src-name">Twitter/X</div><div class="src-tech">X API v2 Stream</div></div>
-        <div class="src"><span class="src-ico">📄</span><div class="src-name">PDFs / Docs</div><div class="src-tech">Upload Handler</div></div>
-        <div class="src"><span class="src-ico">📰</span><div class="src-name">Images / Clippings</div><div class="src-tech">Vision + OCR</div></div>
-      </div>
-    </div>
-
-    <!-- ── LAYER 2: SERVER 07 — Workers ── -->
-    <div class="layer">
-      <div class="v-arr"><div class="v-line" style="height:14px;background:linear-gradient(to bottom,rgba(232,160,32,0.4),rgba(30,201,176,0.4));"></div><div class="v-tip" style="color:rgba(74,158,255,0.6);">▼</div></div>
-      <div class="server-zone" style="border-color:rgba(74,158,255,0.25);">
-        <div class="sz-label"><span class="sz-id" style="color:var(--blue);">SRV-07</span><span class="sz-badge badge-cpu">CPU · 32 vCPU · 64 GB RAM</span> — Worker & Connector Services</div>
-        <div class="sz-name">Ingestion Connectors + Celery Workers + Pre-processing</div>
-        <div class="sz-svc">
-          <span class="svc amber">YT Connector</span>
-          <span class="svc amber">WhatsApp Webhook Handler</span>
-          <span class="svc amber">Facebook Connector</span>
-          <span class="svc amber">X/Twitter Connector</span>
-          <span class="svc amber">PDF/Image Handler</span>
-          <span class="svc teal">Celery Workers (×8)</span>
-          <span class="svc teal">In-House ASR (client)</span>
-          <span class="svc teal">Pre-processor Service</span>
-          <span class="svc">Language Detect</span>
-          <span class="svc">Dedup (MinHash)</span>
-          <span class="svc">Translate Service</span>
-          <span class="svc blue">Kafka Producer Client</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ARROW to KAFKA ── -->
-    <div class="layer">
-      <div class="v-arr"><div class="v-line" style="height:14px;background:linear-gradient(to bottom,rgba(74,158,255,0.4),rgba(232,160,32,0.6));"></div><div class="v-tip" style="color:var(--amber);">▼</div></div>
-    </div>
-
-    <!-- ── LAYER 3: KAFKA BUS ── -->
-    <div class="layer">
-      <div class="kafka-bus">
-        <div class="kafka-header">
-          <div class="kafka-title">◈ &nbsp; APACHE KAFKA — Event Streaming Bus &nbsp; ◈</div>
-          <div class="kafka-subtitle">SRV-02 · 3-Broker Cluster · Zookeeper · Schema Registry · 2 TB NVMe Log Retention</div>
-        </div>
-        <div class="kafka-topics">
-          <div class="k-topic">
-            <div class="k-name">raw.content</div>
-            <div class="k-partitions">12 partitions · replication 3</div>
-            <div class="k-desc">All freshly ingested items from every source connector</div>
-          </div>
-          <div class="k-topic">
-            <div class="k-name">clean.content</div>
-            <div class="k-partitions">12 partitions · replication 3</div>
-            <div class="k-desc">Deduplicated, language-detected, translated content</div>
-          </div>
-          <div class="k-topic">
-            <div class="k-name">enriched.content</div>
-            <div class="k-partitions">12 partitions · replication 3</div>
-            <div class="k-desc">NER-tagged, summarized, sentiment-scored items</div>
-          </div>
-          <div class="k-topic">
-            <div class="k-name">embed.requests</div>
-            <div class="k-partitions">8 partitions · replication 2</div>
-            <div class="k-desc">Items queued for in-house embedding model</div>
-          </div>
-          <div class="k-topic">
-            <div class="k-name">index.ready</div>
-            <div class="k-partitions">8 partitions · replication 2</div>
-            <div class="k-desc">Items ready to write into Qdrant + Elasticsearch</div>
-          </div>
-          <div class="k-topic">
-            <div class="k-name">alerts.triggered</div>
-            <div class="k-partitions">4 partitions · replication 2</div>
-            <div class="k-desc">Alert events for notification + WebSocket push</div>
-          </div>
-          <div class="k-topic">
-            <div class="k-name">reports.queue</div>
-            <div class="k-partitions">4 partitions · replication 2</div>
-            <div class="k-desc">Scheduled and on-demand report generation jobs</div>
-          </div>
-          <div class="k-topic">
-            <div class="k-name">model.feedback</div>
-            <div class="k-partitions">4 partitions · replication 2</div>
-            <div class="k-desc">Analyst corrections fed back to fine-tuning pipeline</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ARROW from Kafka to processing ── -->
-    <div class="layer">
-      <div class="h-split">
-        <div class="hs-top" style="background:rgba(232,160,32,0.5);"></div>
-        <div class="hs-bar" style="background:linear-gradient(to right,rgba(160,100,240,0.4),rgba(30,201,176,0.5),rgba(74,158,255,0.4),rgba(232,160,32,0.4));"></div>
-        <div class="hs-legs">
-          <div class="hs-leg" style="background:rgba(160,100,240,0.4);"></div>
-          <div class="hs-leg" style="background:rgba(30,201,176,0.4);"></div>
-          <div class="hs-leg" style="background:rgba(74,158,255,0.4);"></div>
-          <div class="hs-leg" style="background:rgba(232,160,32,0.4);"></div>
-        </div>
-        <div class="hs-arrs">
-          <span class="hs-arr" style="color:rgba(160,100,240,0.7);">▼</span>
-          <span class="hs-arr" style="color:rgba(30,201,176,0.7);">▼</span>
-          <span class="hs-arr" style="color:rgba(74,158,255,0.7);">▼</span>
-          <span class="hs-arr" style="color:rgba(232,160,32,0.7);">▼</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── LAYER 4: AI ENRICHMENT + DB + ALERT + EMBED (side by side) ── -->
-    <div class="layer">
-      <div class="proc-row">
-        <div class="proc-box">
-          <div class="proc-step">Step 1 · SRV-07</div>
-          <div class="proc-name">Pre-Processing Service</div>
-          <div class="proc-svc">Consumes: raw.content<br>Language detect · Dedup<br>Translate · Clean noise</div>
-          <div class="proc-kafka">→ Publishes: clean.content</div>
-        </div>
-        <div class="proc-box">
-          <div class="proc-step">Step 2 · SRV-05 via gRPC</div>
-          <div class="proc-name">AI Enrichment Service</div>
-          <div class="proc-svc">Consumes: clean.content<br>Routes to LLM Router<br>NER · Summarize · Classify</div>
-          <div class="proc-kafka">→ Publishes: enriched.content</div>
-        </div>
-        <div class="proc-box">
-          <div class="proc-step">Step 3 · SRV-06 via gRPC</div>
-          <div class="proc-name">Embedding Service</div>
-          <div class="proc-svc">Consumes: enriched.content<br>In-House Embedding Model<br>Generates 768/1024-dim vectors</div>
-          <div class="proc-kafka">→ Publishes: index.ready</div>
-        </div>
-        <div class="proc-box">
-          <div class="proc-step">Parallel · SRV-07</div>
-          <div class="proc-name">Alert Engine</div>
-          <div class="proc-svc">Consumes: enriched.content<br>Eval keyword / volume rules<br>Sentiment spike detection</div>
-          <div class="proc-kafka">→ Publishes: alerts.triggered</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ARROW ── -->
-    <div class="layer">
-      <div class="v-arr"><div class="v-line" style="height:14px;background:linear-gradient(to bottom,rgba(74,158,255,0.5),rgba(74,158,255,0.3));"></div><div class="v-tip" style="color:var(--blue);">▼</div></div>
-    </div>
-
-    <!-- ── LAYER 5: GPU SERVERS ── -->
-    <div class="layer">
-      <div class="llm-row">
-        <div class="llm-box">
-          <div class="llm-head">🔴 SRV-05 · GPU Server A · 2× A100 80GB · 256 GB RAM</div>
-          <div class="llm-name">LLM Inference — Summarization + NER + Classification</div>
-          <div class="llm-hw">vLLM inference engine · exposed via gRPC on private VLAN port 50051</div>
-          <div class="llm-model">In-House Summarizer Model (LoRA fine-tuned, 7B params, news domain)</div>
-          <div class="llm-model">In-House NER Model (fine-tuned BERT-class, entities: person/org/place/date)</div>
-          <div class="llm-model">In-House Sentiment Classifier (fine-tuned, 3-class: pos/neg/neutral)</div>
-          <div class="llm-model">In-House Topic Tagger (fine-tuned, 24 news topic categories)</div>
-          <div class="llm-model">In-House Long-Context Report Writer (13B params, prompt-engineered)</div>
-        </div>
-        <div class="llm-box">
-          <div class="llm-head">🔴 SRV-06 · GPU Server B · 2× A100 80GB · 256 GB RAM</div>
-          <div class="llm-name">LLM Inference — ASR + Vision + Embeddings</div>
-          <div class="llm-hw">Ollama + custom serving · exposed via gRPC on private VLAN port 50052</div>
-          <div class="llm-model">In-House ASR Model (Whisper-based, fine-tuned on Hindi/English news audio)</div>
-          <div class="llm-model">In-House Vision Model (fine-tuned on newspaper clippings, invoice-style OCR)</div>
-          <div class="llm-model">In-House Embedding Model (768-dim, trained on news corpus, domain-specific)</div>
-          <div class="llm-model">In-House Translation Model (multilingual seq2seq, fine-tuned)</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── LAYER 5b: TRAINING SERVER ── -->
-    <div class="layer" style="margin-top:0.5rem;">
-      <div class="server-zone" style="border-color:rgba(232,69,42,0.25);border-style:dashed;">
-        <div class="sz-label"><span class="sz-id" style="color:var(--red);">SRV-08</span><span class="sz-badge badge-gpu">GPU · 4× H100 80GB · 512 GB RAM · OFFLINE ONLY</span> — Model Training & Fine-Tuning Server</div>
-        <div class="sz-name">Offline fine-tuning, prompt engineering, model evaluation — consumes model.feedback from Kafka</div>
-        <div class="sz-svc">
-          <span class="svc red">PyTorch + HuggingFace</span>
-          <span class="svc red">LoRA / QLoRA Fine-tuning</span>
-          <span class="svc red">RLHF Pipeline</span>
-          <span class="svc amber">MLflow Experiment Tracking</span>
-          <span class="svc amber">Weights &amp; Biases</span>
-          <span class="svc amber">Prompt Registry &amp; Versioning</span>
-          <span class="svc purple">Model Eval Harness</span>
-          <span class="svc purple">A/B Model Testing</span>
-          <span class="svc teal">Model Export → SRV-05/06</span>
-          <span class="svc">Kafka Consumer: model.feedback</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ARROW ── -->
-    <div class="layer">
-      <div class="v-arr"><div class="v-line" style="height:14px;background:linear-gradient(to bottom,rgba(74,158,255,0.4),rgba(74,158,255,0.3));"></div><div class="v-tip" style="color:var(--blue);">▼</div></div>
-    </div>
-
-    <!-- ── LAYER 6: DB + STORAGE ── -->
-    <div class="layer">
-      <div class="db-row">
-        <div class="db-box">
-          <div class="db-head">🗂 SRV-03 · 16 vCPU · 128 GB RAM · 4 TB NVMe</div>
-          <div class="db-name">PostgreSQL 16 + Qdrant + Redis</div>
-          <div class="db-item">PostgreSQL: users, orgs, tags, alerts, workflow, audit log</div>
-          <div class="db-item">pgBouncer: connection pooling for high concurrency</div>
-          <div class="db-item">Qdrant: vector collections (news_embeddings, image_embeddings)</div>
-          <div class="db-item">Redis: sessions, cache, Celery broker, pub/sub for WS</div>
-        </div>
-        <div class="db-box">
-          <div class="db-head">🔎 SRV-04 · 16 vCPU · 64 GB RAM · 8 TB HDD + 1 TB NVMe</div>
-          <div class="db-name">Elasticsearch + MinIO</div>
-          <div class="db-item">Elasticsearch: full-text BM25, faceted filters, aggregations</div>
-          <div class="db-item">Kibana: internal log visualization and analytics</div>
-          <div class="db-item">MinIO: S3-compatible storage for PDFs, images, audio, reports</div>
-          <div class="db-item">Logstash: structured log ingestion from all services</div>
-        </div>
-        <div class="db-box" style="border-color:rgba(232,69,42,0.3);background:rgba(232,69,42,0.03);">
-          <div class="db-head" style="color:var(--red);">⚙ SRV-02 · 16 vCPU · 64 GB RAM · 2 TB NVMe</div>
-          <div class="db-name">Kafka Cluster + Zookeeper</div>
-          <div class="db-item">3 Kafka brokers (broker-1, broker-2, broker-3)</div>
-          <div class="db-item">Zookeeper ensemble for broker coordination</div>
-          <div class="db-item">Schema Registry for Avro/Protobuf schemas</div>
-          <div class="db-item">Kafka UI: topic inspection, consumer lag monitoring</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ARROW ── -->
-    <div class="layer">
-      <div class="v-arr"><div class="v-line" style="height:14px;background:linear-gradient(to bottom,rgba(232,160,32,0.4),rgba(232,160,32,0.6));"></div><div class="v-tip" style="color:var(--amber);">▼</div></div>
-    </div>
-
-    <!-- ── LAYER 7: API GATEWAY ── -->
-    <div class="layer">
-      <div style="display:flex;justify-content:center;">
-        <div style="width:100%;">
-          <div class="api-box">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <div style="font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);">⚡ &nbsp; SRV-01 · API GATEWAY — FastAPI ×2 + HAProxy + Vault + Nginx · Public + Private VLAN &nbsp; ⚡</div>
-              <div style="font-size:0.48rem;color:rgba(255,255,255,0.3);">Only server on public IP · HAProxy active/passive · Keepalived VIP · Vault secrets runtime injection</div>
-            </div>
-            <div class="api-inner">
-              <div class="api-badge">REST API<br>Endpoints</div>
-              <div class="api-badge">WebSocket<br>Live Push</div>
-              <div class="api-badge">JWT + OAuth2<br>Auth</div>
-              <div class="api-badge">Rate<br>Limiting</div>
-              <div class="api-badge">Multi-Tenant<br>Routing</div>
-            </div>
-            <div style="margin-top:0.6rem;display:grid;grid-template-columns:repeat(4,1fr);gap:0.4rem;">
-              <div style="font-size:0.46rem;color:rgba(255,255,255,0.3);border-left:2px solid rgba(232,160,32,0.3);padding-left:0.4rem;line-height:1.5;">→ gRPC to SRV-05/06 for real-time inference (search query, on-demand summarize)</div>
-              <div style="font-size:0.46rem;color:rgba(255,255,255,0.3);border-left:2px solid rgba(74,158,255,0.3);padding-left:0.4rem;line-height:1.5;">→ gRPC to SRV-03 (Qdrant) for vector search queries</div>
-              <div style="font-size:0.46rem;color:rgba(255,255,255,0.3);border-left:2px solid rgba(30,201,176,0.3);padding-left:0.4rem;line-height:1.5;">→ HTTP to SRV-04 (Elasticsearch) for full-text + faceted search</div>
-              <div style="font-size:0.46rem;color:rgba(255,255,255,0.3);border-left:2px solid rgba(160,100,240,0.3);padding-left:0.4rem;line-height:1.5;">→ Redis pub/sub for WebSocket relay of Kafka alerts.triggered events</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── RESILIENCE & GAPS ── -->
-    <div class="layer">
-      <div class="sec-label">◈ RESILIENCE LAYER — 9 GAPS IDENTIFIED & FIXED</div>
-      <div class="res-row">
-        <div class="res-box res-critical">
-          <span class="res-pri pri-c">Critical</span>
-          <div class="res-name">Single Point of Failure — API</div>
-          <div class="res-fix"><span>Fix:</span> HAProxy + 2× FastAPI instances + Keepalived VIP. Auto-failover &lt;5s. Nginx SSL termination on SRV-01.</div>
-        </div>
-        <div class="res-box res-critical">
-          <span class="res-pri pri-c">Critical</span>
-          <div class="res-name">No Secrets Management</div>
-          <div class="res-fix"><span>Fix:</span> HashiCorp Vault on SRV-01. All API keys / passwords fetched at runtime. Never stored on disk. Auto-rotation.</div>
-        </div>
-        <div class="res-box res-critical">
-          <span class="res-pri pri-c">Critical</span>
-          <div class="res-name">No Dead Letter Queue (DLQ)</div>
-          <div class="res-fix"><span>Fix:</span> DLQ topic per pipeline stage (enrichment.dlq, embed.dlq). Failed messages after 3 retries → DLQ → ops alert → manual review.</div>
-        </div>
-        <div class="res-box res-high">
-          <span class="res-pri pri-h">High</span>
-          <div class="res-name">No Circuit Breaker</div>
-          <div class="res-fix"><span>Fix:</span> Tenacity circuit breaker on all gRPC calls to GPU servers. Opens after 5 fails → falls back to rule-based summariser.</div>
-        </div>
-        <div class="res-box res-high">
-          <span class="res-pri pri-h">High</span>
-          <div class="res-name">No Service Discovery</div>
-          <div class="res-fix"><span>Fix:</span> Consul on all servers. Services register on start. gRPC resolves via DNS (llm-a.service.consul:50051). Health-aware routing.</div>
-        </div>
-        <div class="res-box res-high">
-          <span class="res-pri pri-h">High</span>
-          <div class="res-name">No Backup / DR Strategy</div>
-          <div class="res-fix"><span>Fix:</span> pg_dump → MinIO daily. Qdrant snapshots weekly. ES ILM snapshots. rclone off-site nightly. RTO &lt;4h, RPO &lt;24h.</div>
-        </div>
-        <div class="res-box res-opt">
-          <span class="res-pri pri-o">Optimise</span>
-          <div class="res-name">Late Deduplication</div>
-          <div class="res-fix"><span>Fix:</span> Redis Bloom Filter at connector level. Content hash checked before Kafka publish. 99.9% of duplicates blocked before pipeline entry.</div>
-        </div>
-        <div class="res-box res-opt">
-          <span class="res-pri pri-o">Optimise</span>
-          <div class="res-name">No Data Validation Gate</div>
-          <div class="res-fix"><span>Fix:</span> Pydantic v2 on every Kafka message deserialization. Avro schema via Schema Registry. Invalid records → validation.errors topic.</div>
-        </div>
-        <div class="res-box res-opt">
-          <span class="res-pri pri-o">Optimise</span>
-          <div class="res-name">Unsafe Model Deployment</div>
-          <div class="res-fix"><span>Fix:</span> MLflow Model Registry: Staging → Production promotion. Canary: 10% traffic to new model. Rollback in &lt;60s if quality drops.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── CONSUL + VAULT + HAPROXY ── -->
-    <div class="layer" style="margin-top:0.5rem;">
-      <div class="sec-label">◈ CROSS-CUTTING INFRASTRUCTURE — runs on / alongside all servers</div>
-      <div class="infra-row">
-        <div class="infra-box">
-          <div class="infra-head">🔐 Secrets — HashiCorp Vault (SRV-01)</div>
-          <div class="infra-name">Vault Agent Sidecar on every service</div>
-          <div class="infra-item">WhatsApp / Facebook / X API keys</div>
-          <div class="infra-item">PostgreSQL / Redis / MinIO credentials</div>
-          <div class="infra-item">JWT signing keys + OAuth2 secrets</div>
-          <div class="infra-item">Kafka TLS certificates</div>
-          <div class="infra-item">Auto-rotation every 24h</div>
-        </div>
-        <div class="infra-box">
-          <div class="infra-head">🌐 Service Discovery — Consul (all servers)</div>
-          <div class="infra-name">Service registry + DNS + health checks</div>
-          <div class="infra-item">All 15+ services self-register on start</div>
-          <div class="infra-item">gRPC resolves via consul DNS internally</div>
-          <div class="infra-item">Health check: HTTP /health every 10s</div>
-          <div class="infra-item">Unhealthy services deregistered automatically</div>
-          <div class="infra-item">Used by HAProxy for backend pool</div>
-        </div>
-        <div class="infra-box">
-          <div class="infra-head">⚖ Load Balancer — HAProxy + Keepalived (SRV-01)</div>
-          <div class="infra-name">Active/passive HA for API gateway</div>
-          <div class="infra-item">2× FastAPI instances behind HAProxy</div>
-          <div class="infra-item">Keepalived VIP: automatic failover &lt;5s</div>
-          <div class="infra-item">Health-check removes unhealthy backend</div>
-          <div class="infra-item">Nginx handles SSL termination upstream</div>
-          <div class="infra-item">Rate limiting at HAProxy layer</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── OBSERVABILITY ── -->
-    <div class="layer" style="margin-top:0.5rem;">
-      <div class="sec-label">◈ OBSERVABILITY STACK — Prometheus scrapes all 8 servers every 15s</div>
-      <div class="obs-row">
-        <div class="obs-box">
-          <div class="obs-name">📈 Prometheus + Grafana</div>
-          <div class="obs-tool-sm">Metrics · SRV-01 monitoring namespace</div>
-          <div class="obs-item">Kafka consumer lag per topic/group</div>
-          <div class="obs-item">GPU utilisation % per model (SRV-05/06)</div>
-          <div class="obs-item">Model inference latency p50/p95/p99</div>
-          <div class="obs-item">Pipeline throughput: items/sec per stage</div>
-          <div class="obs-item">API 5xx rate + response time SLA</div>
-          <div class="obs-item">Alert: lag &gt;10k → PagerDuty</div>
-        </div>
-        <div class="obs-box">
-          <div class="obs-name">🔭 Jaeger + OpenTelemetry</div>
-          <div class="obs-tool-sm">Distributed tracing · trace per article</div>
-          <div class="obs-item">Trace ID injected at API gateway</div>
-          <div class="obs-item">Carried via Kafka message headers</div>
-          <div class="obs-item">Per-span: OCR time, LLM call, Kafka publish</div>
-          <div class="obs-item">End-to-end latency: ingest → indexed</div>
-          <div class="obs-item">Alert: trace &gt;30s end-to-end</div>
-          <div class="obs-item">Error traces auto-captured</div>
-        </div>
-        <div class="obs-box">
-          <div class="obs-name">📋 ELK Structured Logs</div>
-          <div class="obs-tool-sm">Elasticsearch + Logstash + Kibana · SRV-04</div>
-          <div class="obs-item">All services emit JSON structured logs</div>
-          <div class="obs-item">Logstash enriches: service/host/trace ID</div>
-          <div class="obs-item">Kibana: error dashboards + anomaly detect</div>
-          <div class="obs-item">30 day hot retention · 1 year cold (MinIO)</div>
-          <div class="obs-item">Correlated with Jaeger trace IDs</div>
-          <div class="obs-item">Model inference errors logged with input</div>
-        </div>
-        <div class="obs-box">
-          <div class="obs-name">🧬 Model Quality Monitor</div>
-          <div class="obs-tool-sm">MLflow + W&B · SRV-08</div>
-          <div class="obs-item">5% of enriched articles sampled for eval</div>
-          <div class="obs-item">NER F1 score tracked over time</div>
-          <div class="obs-item">Summarization ROUGE score monitoring</div>
-          <div class="obs-item">Sentiment accuracy drift detection</div>
-          <div class="obs-item">Embedding space cosine drift alert</div>
-          <div class="obs-item">Auto-trigger fine-tuning on degradation</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── COMMS LEGEND ── -->
-    <div class="layer">
-      <div class="sec-label">◈ INTER-SERVICE COMMUNICATION PROTOCOLS</div>
-      <div class="comm-legend">
-        <div class="comm-item">
-          <div class="comm-proto" style="color:var(--amber);">Kafka</div>
-          <div class="comm-use" style="color:var(--amber);">Async Event Bus</div>
-          <div class="comm-pair" style="border-color:rgba(232,160,32,0.4);">All pipeline stage-to-stage data flow</div>
-          <div class="comm-pair" style="border-color:rgba(232,160,32,0.4);">Connectors → Pre-proc → Enrich → Embed</div>
-          <div class="comm-pair" style="border-color:rgba(232,160,32,0.4);">Alert Engine → Notification Service</div>
-          <div class="comm-pair" style="border-color:rgba(232,160,32,0.4);">Feedback loop → Training server</div>
-        </div>
-        <div class="comm-item">
-          <div class="comm-proto" style="color:var(--teal);">gRPC</div>
-          <div class="comm-use" style="color:var(--teal);">Sync Low-Latency RPC</div>
-          <div class="comm-pair" style="border-color:rgba(30,201,176,0.4);">API Server → LLM Server A (port 50051)</div>
-          <div class="comm-pair" style="border-color:rgba(30,201,176,0.4);">API Server → LLM Server B (port 50052)</div>
-          <div class="comm-pair" style="border-color:rgba(30,201,176,0.4);">API Server → Qdrant (vector search)</div>
-          <div class="comm-pair" style="border-color:rgba(30,201,176,0.4);">Protobuf payloads, TLS on private VLAN</div>
-        </div>
-        <div class="comm-item">
-          <div class="comm-proto" style="color:var(--blue);">REST / HTTP</div>
-          <div class="comm-use" style="color:var(--blue);">Internal Management</div>
-          <div class="comm-pair" style="border-color:rgba(74,158,255,0.4);">Celery Workers → Social API connectors</div>
-          <div class="comm-pair" style="border-color:rgba(74,158,255,0.4);">API → Elasticsearch (search queries)</div>
-          <div class="comm-pair" style="border-color:rgba(74,158,255,0.4);">Monitoring → /health endpoints all servers</div>
-          <div class="comm-pair" style="border-color:rgba(74,158,255,0.4);">MLflow / Kibana / Kafka UI (management)</div>
-        </div>
-        <div class="comm-item">
-          <div class="comm-proto" style="color:var(--purple);">WebSocket</div>
-          <div class="comm-use" style="color:var(--purple);">Real-time Frontend Push</div>
-          <div class="comm-pair" style="border-color:rgba(160,100,240,0.4);">Kafka alerts.triggered → Redis pub/sub</div>
-          <div class="comm-pair" style="border-color:rgba(160,100,240,0.4);">Redis → API Server WebSocket relay</div>
-          <div class="comm-pair" style="border-color:rgba(160,100,240,0.4);">API Server → Browser (persistent conn)</div>
-          <div class="comm-pair" style="border-color:rgba(160,100,240,0.4);">Live volume counts, new article events</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ARROW ── -->
-    <div class="layer">
-      <div class="v-arr" style="margin-top:0.3rem;"><div class="v-line" style="height:14px;background:linear-gradient(to bottom,rgba(30,201,176,0.4),rgba(30,201,176,0.7));"></div><div class="v-tip" style="color:var(--teal);">▼</div></div>
-    </div>
-
-    <!-- ── LAYER 8: FRONTEND ── -->
-    <div class="layer">
-      <div style="display:flex;justify-content:center;">
-        <div class="fe-box" style="width:100%;max-width:100%;">
-          <div class="term-bar">
-            <div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div>
-            <div class="t-url">netaboard.mediastack.live — Static Frontend</div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;">
-            <div>
-              <div class="t-line"><span class="t-green">◈</span> <span class="t-amber">REST API</span> — All data fetch, search, analytics, reports</div>
-              <div class="t-line"><span class="t-green">›</span> HTTPS → SRV-01 Nginx → FastAPI</div>
-              <div class="t-line"><span class="t-green">›</span> JWT token in Authorization header</div>
-            </div>
-            <div>
-              <div class="t-line"><span class="t-green">◈</span> <span class="t-amber">WebSocket</span> — Live alerts, counters, new articles</div>
-              <div class="t-line"><span class="t-green">›</span> wss:// persistent connection to SRV-01</div>
-              <div class="t-line"><span class="t-green">›</span> No polling — Kafka → Redis → WS push</div>
-            </div>
-            <div>
-              <div class="t-line"><span class="t-green">◈</span> <span class="t-amber">MinIO presigned URLs</span> — File downloads</div>
-              <div class="t-line"><span class="t-green">›</span> API generates presigned URL for SRV-04</div>
-              <div class="t-line"><span class="t-green">›</span> Reports, PDFs, images served directly <span class="blink"></span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /diagram -->
-
-  <!-- LEGEND -->
-  <div class="legend">
-    <div class="leg-item"><div class="leg-dot" style="border-color:var(--amber);background:rgba(232,160,32,0.15);"></div>Ingestion / API</div>
-    <div class="leg-item"><div class="leg-dot" style="border-color:var(--teal);background:rgba(30,201,176,0.15);"></div>Processing</div>
-    <div class="leg-item"><div class="leg-dot" style="border-color:var(--amber);background:rgba(232,160,32,0.08);"></div>Kafka Topics</div>
-    <div class="leg-item"><div class="leg-dot" style="border-color:var(--blue);background:rgba(74,158,255,0.15);"></div>Databases</div>
-    <div class="leg-item"><div class="leg-dot" style="border-color:var(--red);background:rgba(232,69,42,0.1);"></div>GPU / AI Servers</div>
-    <div class="leg-item"><div class="leg-dot" style="border-color:var(--purple);background:rgba(160,100,240,0.1);"></div>In-House LLMs</div>
-    <div class="leg-item"><div class="leg-dot" style="border-color:rgba(255,255,255,0.3);background:rgba(255,255,255,0.05);"></div>CPU Workers</div>
-    <div class="leg-item"><div class="leg-dot" style="border-color:var(--red);background:rgba(232,69,42,0.15);border-style:dashed;"></div>Critical Fix</div>
-    <div class="leg-item"><div class="leg-dot" style="border-color:var(--teal);background:rgba(30,201,176,0.1);border-style:dashed;"></div>Observability</div>
-    <div class="leg-item"><div class="leg-dot" style="border-color:var(--purple);background:rgba(160,100,240,0.08);border-style:dashed;"></div>Cross-Cutting Infra</div>
-  </div>
-
-</div>
 </body>
+
 </html>

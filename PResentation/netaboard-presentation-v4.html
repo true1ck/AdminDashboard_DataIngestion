@@ -1366,6 +1366,7 @@
     <div class="nav-links">
       <a href="#sources">Sources</a>
       <a href="#pipeline">Pipeline</a>
+      <a href="#pipeline-flow">Flow</a>
       <a href="#kafka">Kafka</a>
       <a href="#servers">Servers</a>
       <a href="#comms">Comms</a>
@@ -1577,6 +1578,294 @@
       </div>
     </div>
   </section>
+
+  <!-- ─── PIPELINE FLOWCHART ─── -->
+  <section id="pipeline-flow" style="min-height:100vh;scroll-snap-align:start;background:radial-gradient(ellipse 80% 60% at 20% 40%, rgba(26,122,110,0.05) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 70%, rgba(232,160,32,0.05) 0%, transparent 60%), var(--ink);">
+    <div style="padding:6rem 3rem;">
+      <div class="reveal">
+        <p class="section-num">02B — Intelligence Pipeline · Relevance-Gated Architecture</p>
+        <h2 class="section-title">From Raw Files<br>to <em>Pure Signal</em></h2>
+        <div class="h-line"></div>
+        <p style="font-family:'DM Mono',monospace;font-size:0.72rem;line-height:1.9;color:rgba(240,237,230,0.45);margin-top:1rem;max-width:680px;">
+          Every <code style="color:var(--amber);background:rgba(232,160,32,0.08);padding:0.1rem 0.4rem;">.txt</code> file passes through a two-prompt relevance gate before any pillar is scored — eliminating hallucinated scores on unrelated content. <strong style="color:var(--paper);">combinedWeight = platformWeight × relevanceScore</strong> ensures credible, proportional scoring across all 15 pillars.
+        </p>
+      </div>
+
+      <!-- FLOWCHART -->
+      <div class="reveal" style="margin-top:3rem;">
+
+        <!-- ROW: Source Folders -->
+        <div style="display:flex;gap:0.6rem;justify-content:center;flex-wrap:wrap;margin-bottom:0.5rem;">
+          <div style="font-family:'DM Mono',monospace;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(240,237,230,0.3);width:100%;text-align:center;margin-bottom:0.4rem;">● RAW DATA FOLDERS</div>
+          <div class="flow-source-pill" style="background:rgba(26,122,110,0.08);border:1px solid rgba(26,122,110,0.25);color:#1ec9b0;">📘 facebook/</div>
+          <div class="flow-source-pill" style="background:rgba(26,122,110,0.08);border:1px solid rgba(26,122,110,0.25);color:#1ec9b0;">𝕏 twitter/</div>
+          <div class="flow-source-pill" style="background:rgba(26,122,110,0.08);border:1px solid rgba(26,122,110,0.25);color:#1ec9b0;">▶ youtube_transcript/</div>
+          <div class="flow-source-pill" style="background:rgba(26,122,110,0.08);border:1px solid rgba(26,122,110,0.25);color:#1ec9b0;">📄 PDF_Documents/</div>
+          <div class="flow-source-pill" style="background:rgba(26,122,110,0.08);border:1px solid rgba(26,122,110,0.25);color:#1ec9b0;">🌐 Scraped_Simulations/</div>
+          <div class="flow-source-pill" style="background:rgba(26,122,110,0.08);border:1px solid rgba(26,122,110,0.25);color:#1ec9b0;">🖼 images_jpeg/</div>
+          <div class="flow-source-pill" style="background:rgba(26,122,110,0.08);border:1px solid rgba(26,122,110,0.25);color:#1ec9b0;">🗄 database/</div>
+        </div>
+
+        <!-- ARROW DOWN -->
+        <div style="text-align:center;color:rgba(232,160,32,0.5);font-size:1.4rem;line-height:1;margin:0.2rem 0;">↓</div>
+
+        <!-- STAGE 1: PREPROCESSING -->
+        <div class="flow-stage" style="border-color:rgba(232,160,32,0.35);background:rgba(232,160,32,0.04);">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+            <div>
+              <div class="flow-stage-label" style="color:var(--amber);">STAGE 1 — PREPROCESSING</div>
+              <div class="flow-stage-title">Entity Extraction · Chunk Tagging · Source Mapping</div>
+              <div class="flow-stage-desc">Each <code style="color:var(--amber);">.txt</code> file is registered in <code style="color:var(--teal);">RawFile</code> table. djb2 fingerprint prevents re-ingestion. Text is split into ~300-token chunks with 50-token overlap. LLM extracts entity name, type, constituency, state. Source weight assigned from SOURCE_MAP.</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.4rem;min-width:200px;">
+              <div class="flow-db-pill">🗄 RawFile (1 row / file)</div>
+              <div class="flow-db-pill">🗄 FileChunk (20–50 rows / file)</div>
+              <div class="flow-db-pill">🗄 Archetype (entity master)</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.8rem;">
+            <span class="flow-tag">djb2 Hash Dedup</span>
+            <span class="flow-tag">SpaCy NER</span>
+            <span class="flow-tag">Entity Extraction Prompt</span>
+            <span class="flow-tag">chunk_size=300 overlap=50</span>
+            <span class="flow-tag">platformWeight from SOURCE_MAP</span>
+          </div>
+        </div>
+
+        <!-- ARROW + weight callout -->
+        <div style="text-align:center;margin:0.2rem 0;">
+          <div style="color:rgba(232,160,32,0.5);font-size:1.4rem;line-height:1;">↓</div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.58rem;color:rgba(240,237,230,0.3);letter-spacing:0.1em;">platformWeight assigned · Twitter=1.2 · Document=1.5 · YouTube=0.9</div>
+        </div>
+
+        <!-- ★ STAGE 1.5: THE KEY FIX — RELEVANCE GATE -->
+        <div class="flow-stage" style="border-color:rgba(200,52,26,0.5);background:rgba(200,52,26,0.04);position:relative;overflow:hidden;">
+          <div style="position:absolute;top:0;right:0;background:var(--red);color:var(--paper);font-family:'DM Mono',monospace;font-size:0.5rem;letter-spacing:0.18em;text-transform:uppercase;padding:0.25rem 0.8rem;">★ KEY FIX</div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;">
+            <div style="flex:1;min-width:260px;">
+              <div class="flow-stage-label" style="color:#e8452a;">STAGE 1.5 — RELEVANCE GATE (2 Prompts)</div>
+              <div class="flow-stage-title">Hallucination Eliminated Before Scoring</div>
+              <div class="flow-stage-desc">
+                <strong style="color:var(--paper);">Prompt A</strong> — Scores relevance 0.0–1.0 for all 15 pillars at once using first 500 tokens of file.<br>
+                <strong style="color:var(--paper);">Prompt B</strong> — Only runs for pillars where relevanceScore ≥ 0.3.<br><br>
+                If a file says nothing about Legislative Performance → score is <code style="color:#e8452a;background:rgba(200,52,26,0.1);padding:0.1rem 0.3rem;">NULL</code> in DB. Never guessed. Never hallucinated.
+              </div>
+              <div style="margin-top:1rem;padding:0.8rem;background:rgba(200,52,26,0.06);border:1px solid rgba(200,52,26,0.2);font-family:'DM Mono',monospace;font-size:0.62rem;line-height:1.8;">
+                <span style="color:#e8452a;">combinedWeight</span> = <span style="color:var(--amber);">platformWeight</span> × <span style="color:var(--teal);">relevanceScore</span><br>
+                Twitter rally tweet → Electoral Strength: 1.2 × 0.92 = <strong style="color:var(--paper);">1.10</strong><br>
+                Twitter rally tweet → Legislative Perf: <strong style="color:#e8452a;">SKIPPED</strong> (0.04 &lt; 0.3 threshold)
+              </div>
+            </div>
+            <div style="min-width:200px;">
+              <div style="font-family:'DM Mono',monospace;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(240,237,230,0.35);margin-bottom:0.6rem;">Per file outcome</div>
+              <div style="display:flex;flex-direction:column;gap:0.3rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-family:'DM Mono',monospace;font-size:0.6rem;padding:0.3rem 0.6rem;border:1px solid rgba(26,122,110,0.3);background:rgba(26,122,110,0.04);">
+                  <span style="color:rgba(240,237,230,0.6);">🗳️ Electoral Strength</span><span style="color:var(--teal);">0.92 ✓ SCORE</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-family:'DM Mono',monospace;font-size:0.6rem;padding:0.3rem 0.6rem;border:1px solid rgba(26,122,110,0.3);background:rgba(26,122,110,0.04);">
+                  <span style="color:rgba(240,237,230,0.6);">🏗️ Constituency Dev</span><span style="color:var(--teal);">0.71 ✓ SCORE</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-family:'DM Mono',monospace;font-size:0.6rem;padding:0.3rem 0.6rem;border:1px solid rgba(200,52,26,0.3);background:rgba(200,52,26,0.04);">
+                  <span style="color:rgba(240,237,230,0.4);">🏛️ Legislative Perf</span><span style="color:#e8452a;">0.04 ✗ NULL</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-family:'DM Mono',monospace;font-size:0.6rem;padding:0.3rem 0.6rem;border:1px solid rgba(200,52,26,0.3);background:rgba(200,52,26,0.04);">
+                  <span style="color:rgba(240,237,230,0.4);">💰 Financial Muscle</span><span style="color:#e8452a;">0.06 ✗ NULL</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-family:'DM Mono',monospace;font-size:0.6rem;padding:0.3rem 0.6rem;border:1px solid rgba(200,52,26,0.3);background:rgba(200,52,26,0.04);">
+                  <span style="color:rgba(240,237,230,0.4);">🔗 Alliance Intel</span><span style="color:#e8452a;">0.02 ✗ NULL</span>
+                </div>
+                <div style="font-family:'DM Mono',monospace;font-size:0.55rem;color:rgba(240,237,230,0.3);padding-top:0.4rem;border-top:1px solid var(--line);">
+                  3 pillars scored · 12 skipped
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:0.4rem;margin-top:0.8rem;">
+                <div class="flow-db-pill" style="border-color:rgba(200,52,26,0.3);">🗄 FileRelevance (15 rows / file)</div>
+                <div class="flow-db-pill" style="border-color:rgba(26,122,110,0.3);">🗄 FilePillarScore (0–15 rows / file)</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.8rem;">
+            <span class="flow-tag" style="border-color:rgba(200,52,26,0.3);color:#e8452a;background:rgba(200,52,26,0.06);">Relevance Prompt A (all 15 at once)</span>
+            <span class="flow-tag" style="border-color:rgba(200,52,26,0.3);color:#e8452a;background:rgba(200,52,26,0.06);">Threshold 0.3 (tunable)</span>
+            <span class="flow-tag" style="border-color:rgba(200,52,26,0.3);color:#e8452a;background:rgba(200,52,26,0.06);">Pillar Scoring Prompt B (per relevant pillar)</span>
+            <span class="flow-tag" style="border-color:rgba(200,52,26,0.3);color:#e8452a;background:rgba(200,52,26,0.06);">NULL → never pollutes aggregation</span>
+          </div>
+        </div>
+
+        <!-- ARROW -->
+        <div style="text-align:center;margin:0.2rem 0;">
+          <div style="color:rgba(232,160,32,0.5);font-size:1.4rem;line-height:1;">↓</div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.58rem;color:rgba(240,237,230,0.3);letter-spacing:0.1em;">only relevant pillars proceed · hallucination blocked</div>
+        </div>
+
+        <!-- STAGE 2: LLM SCORING -->
+        <div class="flow-stage" style="border-color:rgba(74,158,255,0.3);background:rgba(74,158,255,0.03);">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+            <div>
+              <div class="flow-stage-label" style="color:#4a9eff;">STAGE 2 — LLM PILLAR SCORING</div>
+              <div class="flow-stage-title">Per-Pillar Sentiment + Weighted NRI Aggregation</div>
+              <div class="flow-stage-desc">Scores per file are aggregated across all files for the entity. <code style="color:#4a9eff;">EntityPillarScore</code> = weighted average of all <code style="color:#4a9eff;">FilePillarScores</code> using combinedWeight. Inverted pillars (Anti-Incumbency, Scandal Index): effectiveScore = 100 − rawScore. Final NRI = Σ(effectiveScore × pillarWeight).</div>
+            </div>
+            <div style="min-width:220px;">
+              <div style="font-family:'DM Mono',monospace;font-size:0.58rem;color:rgba(240,237,230,0.3);margin-bottom:0.5rem;">aggregation formula</div>
+              <div style="font-family:'DM Mono',monospace;font-size:0.6rem;line-height:1.9;padding:0.8rem;background:rgba(74,158,255,0.05);border:1px solid rgba(74,158,255,0.15);">
+                <span style="color:#4a9eff;">finalScore</span> = Σ(effectiveScore × <span style="color:var(--amber);">combinedWeight</span>) ÷ Σ(<span style="color:var(--amber);">combinedWeight</span>)<br>
+                <span style="color:#4a9eff;">nriTotal</span> = Σ(finalScore × <span style="color:var(--teal);">pillarWeight</span>)
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.8rem;">
+            <span class="flow-tag" style="color:#4a9eff;border-color:rgba(74,158,255,0.25);background:rgba(74,158,255,0.06);">EntityPillarScore (15 rows / snapshot)</span>
+            <span class="flow-tag" style="color:#4a9eff;border-color:rgba(74,158,255,0.25);background:rgba(74,158,255,0.06);">NriSnapshot</span>
+            <span class="flow-tag" style="color:#4a9eff;border-color:rgba(74,158,255,0.25);background:rgba(74,158,255,0.06);">Anti-Incumbency INVERTED</span>
+            <span class="flow-tag" style="color:#4a9eff;border-color:rgba(74,158,255,0.25);background:rgba(74,158,255,0.06);">Scandal Index INVERTED</span>
+          </div>
+        </div>
+
+        <!-- ARROW -->
+        <div style="text-align:center;color:rgba(232,160,32,0.5);font-size:1.4rem;line-height:1;margin:0.2rem 0;">↓</div>
+
+        <!-- STAGE 3: ALERT DETECTION -->
+        <div class="flow-stage" style="border-color:rgba(200,52,26,0.3);background:rgba(200,52,26,0.03);">
+          <div class="flow-stage-label" style="color:var(--red);">STAGE 3 — ALERT DETECTION · 72h Window Only</div>
+          <div class="flow-stage-title">Rule-Based + LLM Pattern Matching</div>
+          <div class="flow-stage-desc">Runs every 6h via cron on chunks where timestamp &gt; now − 72h. Detects: EC_NOTICE · VIRAL_NEGATIVE · ALLIANCE_STRESS · DEEPFAKE · COMPLAINT_SURGE · NRI_DROP · GROUND_SHIFT. Severity: CRISIS / HIGH / MEDIUM / LOW.</div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.8rem;">
+            <span class="flow-tag" style="color:var(--red);border-color:rgba(200,52,26,0.3);background:rgba(200,52,26,0.06);">Alert table</span>
+            <span class="flow-tag" style="color:var(--red);border-color:rgba(200,52,26,0.3);background:rgba(200,52,26,0.06);">72h timestamp filter</span>
+            <span class="flow-tag" style="color:var(--red);border-color:rgba(200,52,26,0.3);background:rgba(200,52,26,0.06);">Runs before DB load</span>
+            <span class="flow-tag" style="color:var(--red);border-color:rgba(200,52,26,0.3);background:rgba(200,52,26,0.06);">6h cron</span>
+          </div>
+        </div>
+
+        <!-- ARROW -->
+        <div style="text-align:center;color:rgba(232,160,32,0.5);font-size:1.4rem;line-height:1;margin:0.2rem 0;">↓</div>
+
+        <!-- STAGE 4: STORAGE -->
+        <div class="flow-stage" style="border-color:rgba(160,100,240,0.35);background:rgba(160,100,240,0.03);">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;">
+            <div style="flex:1;min-width:240px;">
+              <div class="flow-stage-label" style="color:rgba(160,100,240,0.9);">STAGE 4 — STORAGE · 10 Prisma Tables</div>
+              <div class="flow-stage-title">SQLite via Prisma — Full Traceability</div>
+              <div class="flow-stage-desc">Every file, every chunk, every relevance score, every pillar score, every gap, every alert — in a separate table. Full drill-down from final NRI total → individual .txt file that contributed.</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem;min-width:320px;">
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 Archetype</div>
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 RawFile</div>
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 FileChunk</div>
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 FileRelevance</div>
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 FilePillarScore</div>
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 EntityPillarScore</div>
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 NriSnapshot</div>
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 FeedbackScore</div>
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 PillarGap</div>
+              <div class="flow-db-pill" style="border-color:rgba(160,100,240,0.3);color:rgba(160,100,240,0.9);">🗄 Alert</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ARROW -->
+        <div style="text-align:center;color:rgba(232,160,32,0.5);font-size:1.4rem;line-height:1;margin:0.2rem 0;">↓</div>
+
+        <!-- STAGES 5 & 6 SIDE BY SIDE -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+
+          <!-- STAGE 5: QUERY + RETRIEVAL -->
+          <div class="flow-stage" style="border-color:rgba(26,122,110,0.35);background:rgba(26,122,110,0.04);margin-top:0;">
+            <div class="flow-stage-label" style="color:var(--teal);">STAGE 5 — QUERY + RETRIEVAL</div>
+            <div class="flow-stage-title">Semantic Search Per Pillar Per Entity</div>
+            <div class="flow-stage-desc">Prisma queries fetch all chunks for entity within time window. Filter public-only sources for Feedback overlay. Recent 72h chunks for Alert re-detection.</div>
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.7rem;">
+              <span class="flow-tag" style="color:var(--teal);border-color:rgba(26,122,110,0.3);background:rgba(26,122,110,0.06);">Prisma findMany</span>
+              <span class="flow-tag" style="color:var(--teal);border-color:rgba(26,122,110,0.3);background:rgba(26,122,110,0.06);">time-window filter</span>
+              <span class="flow-tag" style="color:var(--teal);border-color:rgba(26,122,110,0.3);background:rgba(26,122,110,0.06);">public source filter</span>
+            </div>
+          </div>
+
+          <!-- STAGE 6: FINAL ANALYSIS -->
+          <div class="flow-stage" style="border-color:rgba(232,160,32,0.4);background:rgba(232,160,32,0.04);margin-top:0;">
+            <div class="flow-stage-label" style="color:var(--amber);">STAGE 6 — FINAL ANALYSIS</div>
+            <div class="flow-stage-title">NRI Score → Feedback Overlay → Alerts</div>
+            <div class="flow-stage-desc">Gap = NRI − Feedback. Gap &gt; +20 → voter disillusionment risk. Gap &lt; −20 → unrealised opportunity. Divergence alerts surfaced on dashboard.</div>
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.7rem;">
+              <span class="flow-tag">PillarGap table</span>
+              <span class="flow-tag">Gap threshold ±20</span>
+              <span class="flow-tag">FeedbackScore (public only)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- OUTPUT ROW -->
+        <div style="text-align:center;margin-top:0.3rem;">
+          <div style="color:rgba(232,160,32,0.5);font-size:1.4rem;line-height:1;">↓</div>
+        </div>
+        <div style="display:flex;gap:0.8rem;justify-content:center;flex-wrap:wrap;margin-top:0.2rem;">
+          <div style="font-family:'DM Mono',monospace;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(240,237,230,0.3);width:100%;text-align:center;margin-bottom:0.3rem;">● OUTPUTS TO DASHBOARD</div>
+          <div class="flow-source-pill" style="background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.3);color:var(--amber);">📊 NRI Score</div>
+          <div class="flow-source-pill" style="background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.3);color:var(--amber);">📡 Feedback Overlay</div>
+          <div class="flow-source-pill" style="background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.3);color:var(--amber);">⚠ Gap Analysis</div>
+          <div class="flow-source-pill" style="background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.3);color:var(--amber);">⚡ Active Alerts</div>
+          <div class="flow-source-pill" style="background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.3);color:var(--amber);">🔥 File Heatmap</div>
+          <div class="flow-source-pill" style="background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.3);color:var(--amber);">⚖ Weight Drill-Down</div>
+        </div>
+
+      </div><!-- end flowchart -->
+    </div>
+  </section>
+
+  <style>
+    .flow-stage {
+      border: 1px solid var(--line);
+      padding: 1.5rem 2rem;
+      margin-bottom: 0;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .flow-stage:hover { background-color: rgba(240,237,230,0.02); }
+    .flow-stage-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+    .flow-stage-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 0.06em;
+      color: var(--paper);
+      margin-bottom: 0.5rem;
+    }
+    .flow-stage-desc {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.66rem;
+      line-height: 1.8;
+      color: rgba(240,237,230,0.45);
+    }
+    .flow-tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.56rem;
+      letter-spacing: 0.08em;
+      padding: 0.2rem 0.55rem;
+      background: rgba(232,160,32,0.07);
+      color: var(--amber);
+      border: 1px solid rgba(232,160,32,0.22);
+    }
+    .flow-db-pill {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.08em;
+      padding: 0.25rem 0.65rem;
+      border: 1px solid rgba(232,160,32,0.2);
+      color: rgba(240,237,230,0.55);
+      background: rgba(240,237,230,0.02);
+    }
+    .flow-source-pill {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      padding: 0.3rem 0.8rem;
+    }
+  </style>
 
   <!-- ─── KAFKA ─── -->
   <section id="kafka">
