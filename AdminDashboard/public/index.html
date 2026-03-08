@@ -133,22 +133,31 @@
       line-height: 1.5;
     }
 
+    /* ── SCROLLBARS (Always Visible) ── */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border3) var(--bg1);
+    }
+
     ::-webkit-scrollbar {
-      width: 4px;
-      height: 4px;
+      width: 8px;
+      height: 8px;
     }
 
     ::-webkit-scrollbar-track {
-      background: transparent;
+      background: var(--bg1);
+      border-left: 1px solid var(--border);
     }
 
     ::-webkit-scrollbar-thumb {
-      background: var(--border3);
-      border-radius: 2px;
+      background: var(--text4);
+      border-radius: 4px;
+      border: 2px solid var(--bg1);
+      /* Padding effect */
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: var(--text4);
+      background: var(--text3);
     }
 
     /* ── LAYOUT ── */
@@ -386,6 +395,7 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      min-height: 0;
     }
 
     .view {
@@ -393,6 +403,7 @@
       flex: 1;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
     }
 
     .view.active {
@@ -455,6 +466,7 @@
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      min-height: 0;
     }
 
     /* ── BUTTONS ── */
@@ -1385,6 +1397,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
     }
 
     .queue-hdr {
@@ -1514,6 +1527,7 @@
     .queue-list {
       flex: 1;
       overflow-y: auto;
+      min-height: 0;
     }
 
     .qjob {
@@ -2053,6 +2067,10 @@
       <div class="nav-item" data-view="rss" title="RSS & Newspapers">
         <div class="nav-ico">📰</div>
         <div class="nav-lbl">News</div>
+      </div>
+      <div class="nav-item" data-view="preprocessing" title="Data Preprocessing">
+        <div class="nav-ico">🧠</div>
+        <div class="nav-lbl">Preprocess</div>
       </div>
     </nav>
 
@@ -3221,7 +3239,9 @@
                 </div>
                 <div class="flex-row" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                   <button class="btn btn-outline btn-sm" onclick="dbTest()">⟲ Test Connection</button>
-                  <button class="btn btn-sm" id="btn-open-prisma" style="display:none;background:var(--purple2);color:var(--purple);border:1px solid var(--purple3);" onclick="dbOpenPrisma()">🎚️ Open Advanced Explorer</button>
+                  <button class="btn btn-sm" id="btn-open-prisma"
+                    style="display:none;background:var(--purple2);color:var(--purple);border:1px solid var(--purple3);"
+                    onclick="dbOpenPrisma()">🎚️ Open Advanced Explorer</button>
                   <span style="font-family:var(--mono);font-size:0.5rem;" id="db-test-status"></span>
                 </div>
 
@@ -3324,7 +3344,8 @@
                 <div class="card-title"><span class="icon">💎</span> Prisma Studio</div>
                 <button class="btn btn-xs btn-outline" onclick="dbClosePrisma()">× Close Explorer</button>
               </div>
-              <div class="card-body" style="padding:0;height:600px;overflow:hidden;background:#fff;border-radius:0 0 var(--radius) var(--radius);">
+              <div class="card-body"
+                style="padding:0;height:600px;overflow:hidden;background:#fff;border-radius:0 0 var(--radius) var(--radius);">
                 <iframe id="db-prisma-iframe" src="about:blank" style="width:100%;height:100%;border:none;"></iframe>
               </div>
             </div>
@@ -3456,6 +3477,46 @@
         </div>
       </div>
 
+      <!-- ██ PREPROCESSING ██ -->
+      <div class="view" id="v-preprocessing">
+        <div class="vhdr">
+          <div class="vhdr-left">
+            <div class="vhdr-title"><span class="src-icon">🧠</span> Preprocessing & Data Visualization</div>
+            <div class="vhdr-sub">View collected outputs from DataCollected folder, refine and interact with extracted
+              data</div>
+          </div>
+          <div class="vhdr-actions">
+            <button class="btn btn-outline btn-sm" onclick="loadDataCollectedFolder()">⟲ Refresh Data</button>
+          </div>
+        </div>
+        <div class="vscroll" style="flex-direction:row; padding:0; overflow:hidden;">
+          <!-- Left Sidebar for Folders/Files -->
+          <div
+            style="width:260px; border-right:1px solid var(--border); background:var(--bg2); display:flex; flex-direction:column; overflow:hidden;">
+            <div
+              style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); font-weight:600; font-family:var(--mono); font-size:0.6rem; letter-spacing:0.05em; color:var(--text3); text-transform:uppercase;">
+              Files in DataCollected</div>
+            <div id="data-col-tree"
+              style="flex:1; overflow-y:auto; padding:0.5rem; font-family:var(--mono); font-size:0.75rem; color:var(--text2);">
+              <div style="color:var(--text4); padding:0.5rem;">Loading data...</div>
+            </div>
+          </div>
+          <!-- Right Content Area -->
+          <div style="flex:1; display:flex; flex-direction:column; background:var(--bg); overflow:hidden;">
+            <div id="data-col-hdr"
+              style="padding:0.6rem 1rem; border-bottom:1px solid var(--border); font-family:var(--mono); font-size:0.75rem; color:var(--text); background:var(--bg1);">
+              Select a file to view its contents
+            </div>
+            <div id="data-col-content-wrapper"
+              style="flex:1; overflow:hidden; display:flex; flex-direction:column; position:relative;">
+              <textarea id="data-col-preview"
+                style="flex:1; width:100%; height:100%; border:none; resize:none; padding:1rem; font-family:var(--mono); font-size:0.8rem; line-height:1.5; color:var(--text2); background:transparent;"
+                readonly></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </main>
 
     <!-- ══════════════════════════════════════
@@ -3561,6 +3622,12 @@
         item.classList.add('active');
         const v = document.getElementById('v-' + item.dataset.view);
         if (v) v.classList.add('active');
+
+        if (item.dataset.view === 'preprocessing') {
+          if (typeof loadDataCollectedFolder === 'function') {
+            loadDataCollectedFolder();
+          }
+        }
       });
     });
 
@@ -5095,6 +5162,83 @@
 
     // Initialize Saved Queries
     setTimeout(dbLoadSavedQueries, 500);
+
+    /* ═══════════════════════════════════════════════
+       PREPROCESSING FUNCTIONS
+    ═══════════════════════════════════════════════ */
+    async function loadDataCollectedFolder() {
+      const treeEl = document.getElementById('data-col-tree');
+      if (!treeEl) return;
+
+      treeEl.innerHTML = '<div style="color:var(--text4); padding:0.5rem;">Loading data...</div>';
+
+      try {
+        const res = await fetch('/api/fs/datacollected');
+        const data = await res.json();
+
+        if (!data.files || data.files.length === 0) {
+          treeEl.innerHTML = '<div style="color:var(--text4); padding:0.5rem;">No files found in DataCollected folder.</div>';
+          return;
+        }
+
+        // Group by folder
+        const grouped = {};
+        data.files.forEach(f => {
+          const parts = f.path.split('/');
+          const folderName = parts.length > 1 ? parts[0] : 'root';
+          if (!grouped[folderName]) grouped[folderName] = [];
+          grouped[folderName].push(f);
+        });
+
+        // Render
+        let html = '';
+        for (const [folder, files] of Object.entries(grouped)) {
+          html += `<div style="margin-bottom:0.75rem;">
+                    <div style="font-weight:600; color:var(--text); margin-bottom:0.2rem; cursor:pointer;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none';">📁 ${folder}</div>
+                    <div style="padding-left:1rem;">
+                        ${files.map(f => {
+            const kb = (f.size / 1024).toFixed(1);
+            return `<div style="padding:0.2rem 0; cursor:pointer; color:var(--text2);" 
+                                      onmouseover="this.style.color='var(--cyan)'" 
+                                      onmouseout="this.style.color='var(--text2)'"
+                                      onclick="openDataCollectedFile('${f.path}')" title="${f.name}">
+                                    📄 ${f.name} <span style="font-size:0.6rem; color:var(--text4); margin-left:4px;">(${kb} KB)</span>
+                                  </div>`;
+          }).join('')}
+                    </div>
+                </div>`;
+        }
+        treeEl.innerHTML = html;
+
+      } catch (e) {
+        treeEl.innerHTML = `<div style="color:var(--red); padding:0.5rem;">Error loading data: ${e.message}</div>`;
+      }
+    }
+
+    async function openDataCollectedFile(path) {
+      const hdr = document.getElementById('data-col-hdr');
+      const preview = document.getElementById('data-col-preview');
+      if (!hdr || !preview) return;
+
+      hdr.textContent = `Loading: ${path}...`;
+      preview.value = 'Loading contents...';
+
+      try {
+        const res = await fetch(`/api/fs/datacollected/file?path=${encodeURIComponent(path)}`);
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to load file');
+        }
+
+        const content = await res.text();
+        hdr.innerHTML = `Viewing: <strong>${path}</strong>`;
+        preview.value = content;
+
+      } catch (e) {
+        hdr.textContent = `Error: ${path}`;
+        preview.value = `Error loading file: ${e.message}`;
+      }
+    }
 
     /* ═══════════════════════════════════════════════
        KAGGLE

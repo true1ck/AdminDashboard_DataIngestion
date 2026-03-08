@@ -376,10 +376,10 @@ app.post('/api/proxy/twitter-ingest', upload.single('file'), async (req, res) =>
         fd.append('file', fs.createReadStream(req.file.path), req.file.originalname);
         if (req.body.meta) fd.append('meta', req.body.meta);
 
-        const r = await fetch(`${TWITTER_URL}/api/process-twitter`, { 
-            method: 'POST', 
-            body: fd, 
-            headers: fd.getHeaders() 
+        const r = await fetch(`${TWITTER_URL}/api/process-twitter`, {
+            method: 'POST',
+            body: fd,
+            headers: fd.getHeaders()
         });
         const data = await r.json();
 
@@ -432,6 +432,73 @@ app.post('/api/save_local_file', async (req, res) => {
     }
 });
 
+// List DataCollected contents
+app.get('/api/fs/datacollected', async (req, res) => {
+    try {
+        const rootDir = path.join(__dirname, '..', 'DataCollected');
+        if (!fs.existsSync(rootDir)) {
+            return res.json({ files: [] });
+        }
+
+        const filesList = [];
+
+        function scanDir(dir, relPath = '') {
+            try {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (entry.name.startsWith('.')) continue; // skip hidden
+
+                    const fullPath = path.join(dir, entry.name);
+                    const itemRelPath = path.join(relPath, entry.name);
+
+                    if (entry.isDirectory()) {
+                        scanDir(fullPath, itemRelPath);
+                    } else if (entry.isFile()) {
+                        const stats = fs.statSync(fullPath);
+                        filesList.push({
+                            name: entry.name,
+                            path: itemRelPath,
+                            size: stats.size,
+                            modified: stats.mtime
+                        });
+                    }
+                }
+            } catch (e) { }
+        }
+
+        scanDir(rootDir);
+        res.json({ files: filesList });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Read file from DataCollected
+app.get('/api/fs/datacollected/file', async (req, res) => {
+    try {
+        const filePath = req.query.path;
+        if (!filePath) return res.status(400).json({ error: 'Missing path' });
+
+        const rootDir = path.join(__dirname, '..', 'DataCollected');
+        const targetPath = path.join(rootDir, filePath);
+
+        // Security check - prevent escaping directory
+        if (!targetPath.startsWith(path.resolve(rootDir))) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        if (!fs.existsSync(targetPath)) {
+            return res.status(404).json({ error: 'File not found' });
+        }
+
+        // Return raw file contents
+        const content = fs.readFileSync(targetPath, 'utf8');
+        res.send(content);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Helper function for proxying requests with file uploads
 async function proxyRequest(req, res, targetUrl, targetPath) {
     try {
@@ -465,12 +532,12 @@ async function proxyRequest(req, res, targetUrl, targetPath) {
 
 // Proxy: Twitter Ingestion Processor (refactored to use proxyRequest)
 app.all('/api/proxy/twitter-ingest', upload.single('file'), (req, res) => {
-  proxyRequest(req, res, TWITTER_URL, '/api/process-twitter');
+    proxyRequest(req, res, TWITTER_URL, '/api/process-twitter');
 });
 
 // Proxy: Facebook Ingestion Processor
 app.all('/api/proxy/facebook-ingest', upload.single('file'), (req, res) => {
-  proxyRequest(req, res, FACEBOOK_URL, '/api/process-facebook');
+    proxyRequest(req, res, FACEBOOK_URL, '/api/process-facebook');
 });
 
 
@@ -498,7 +565,7 @@ function autoQuotePgQuery(sql, tables = []) {
     if (!sql) return sql;
     let modified = sql;
     const targetList = tables.length > 0 ? tables : knownTables;
-    
+
     targetList.forEach(tableName => {
         const regex = new RegExp(`(?<!["'\\w])${tableName}(?!["'\\w])`, 'gi');
         modified = modified.replace(regex, `"${tableName}"`);
@@ -516,7 +583,7 @@ app.post('/api/db/query', async (req, res) => {
 
     const { Client } = require('pg');
     const client = new Client({ connectionString: dbUrl });
-    
+
     try {
         await client.connect();
 
@@ -539,7 +606,7 @@ app.post('/api/db/query', async (req, res) => {
     } catch (err) {
         console.error(`[DB Query] Error: ${err.message}`);
         res.json({ ok: false, error: `Postgres query failed: ${err.message}` });
-        try { await client.end(); } catch (e) {}
+        try { await client.end(); } catch (e) { }
     }
 });
 
@@ -549,7 +616,7 @@ let prismaStudioProcess = null;
 app.post('/api/db/test-connection', async (req, res) => {
     const { host, port, dbName, user, password } = req.body;
     const dbUrl = `postgresql://${user}:${password}@${host}:${port}/${dbName}`;
-    
+
     const { Client } = require('pg');
     const client = new Client({ connectionString: dbUrl });
 
@@ -563,7 +630,7 @@ app.post('/api/db/test-connection', async (req, res) => {
         const prismaDir = path.join(__dirname, '..', 'NetaBoardV5', 'backend');
         if (fs.existsSync(prismaDir)) {
             console.log(`[DB Test] Prisma environment detected at ${prismaDir}. Attempting to launch Studio...`);
-            
+
             // Kill existing
             if (prismaStudioProcess) {
                 try { process.kill(-prismaStudioProcess.pid); } catch (e) { prismaStudioProcess.kill(); }
@@ -582,14 +649,14 @@ app.post('/api/db/test-connection', async (req, res) => {
             });
             prismaStudioProcess.on('exit', () => { prismaStudioProcess = null; });
             prismaStudioProcess.on('error', () => { prismaStudioProcess = null; });
-            
+
             // Give it a moment to boot
             await new Promise(r => setTimeout(r, 2000));
             prismaStudioUrl = 'http://localhost:5555';
         }
 
-        res.json({ 
-            ok: true, 
+        res.json({
+            ok: true,
             tables: knownTables,
             prismaStudioUrl,
             message: `Connected successfully. Discovered ${knownTables.length} tables.${prismaStudioUrl ? ' Prisma Studio ready.' : ''}`
@@ -597,7 +664,7 @@ app.post('/api/db/test-connection', async (req, res) => {
     } catch (err) {
         console.error(`[DB Test] Error: ${err.message}`);
         res.json({ ok: false, error: err.message });
-        try { await client.end(); } catch (e) {}
+        try { await client.end(); } catch (e) { }
     }
 });
 
@@ -641,20 +708,20 @@ let sessionSavedQueries = [];
 let nextQueryId = 1;
 
 app.get('/api/db/saved-queries', async (req, res) => {
-    try { 
-        res.json(sessionSavedQueries); 
+    try {
+        res.json(sessionSavedQueries);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/db/saved-queries', async (req, res) => {
-    try { 
-        const newQuery = { 
-            ...req.body, 
-            id: nextQueryId++, 
-            created_at: new Date().toISOString() 
+    try {
+        const newQuery = {
+            ...req.body,
+            id: nextQueryId++,
+            created_at: new Date().toISOString()
         };
         sessionSavedQueries.unshift(newQuery);
-        res.json(newQuery); 
+        res.json(newQuery);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -717,7 +784,7 @@ async function runImport(jobId, config) {
         else if (batch && batch.length) baseName = `Batch_Import_${batch.length}_Queries`;
         else if (table) baseName = `Table_${table}`;
         else if (query) baseName = `Query_Result`;
-        
+
         const safeName = baseName.replace(/[^a-z0-9_\-]/gi, '_');
         const outputPath = path.join(DATA_COLLECTED_DIR, `${safeName}_${jobId}.txt`);
         const fileStream = fs.createWriteStream(outputPath);
@@ -738,7 +805,7 @@ async function runImport(jobId, config) {
         for (const t of tasks) {
             const tableName = t.table ? `"${t.table}"` : null;
             let countSql = t.query ? `SELECT COUNT(*) as cnt FROM (${t.query}) as sub` : `SELECT COUNT(*) as cnt FROM ${tableName}`;
-            
+
             countSql = autoQuotePgQuery(countSql);
 
             const res = await pClient.query(countSql);
@@ -756,13 +823,13 @@ async function runImport(jobId, config) {
         for (const t of tasks) {
             const tableName = t.table ? `"${t.table}"` : null;
             let sql = t.query || `SELECT * FROM ${tableName}`;
-            
+
             sql = autoQuotePgQuery(sql);
 
             fileStream.write(`\n## SECTION: ${t.name}\n`);
             if (t.query) fileStream.write(`### SQL: ${t.query}\n`);
             fileStream.write(`${'='.repeat(20)}\n\n`);
-            
+
             const res = await pClient.query(sql);
             const rows = res.rows;
 
@@ -770,7 +837,7 @@ async function runImport(jobId, config) {
                 const contentBlock = Object.entries(row)
                     .map(([k, v]) => `- **${k}**: ${v}`)
                     .join('\n');
-                
+
                 const payload = {
                     source: `DB_IMPORT:${t.name}`,
                     title: `${t.name} — Entry #${globalIdx + 1}`,
@@ -793,7 +860,7 @@ async function runImport(jobId, config) {
                 globalIdx++;
                 state.processed = globalIdx;
                 state.progress = Math.round((globalIdx / totalRows) * 100);
-                
+
                 if (globalIdx % 10 === 0) {
                     await db.updateJob(jobId, { progress: state.progress, itemsProcessed: globalIdx });
                 }
@@ -802,7 +869,7 @@ async function runImport(jobId, config) {
 
         fileStream.end();
         if (pClient) await pClient.end();
-        
+
         state.status = 'done';
         await db.updateJob(jobId, { status: 'done', progress: 100, itemsProcessed: totalRows });
         console.log(`${logPrefix} Successfully saved to ${outputPath}`);
