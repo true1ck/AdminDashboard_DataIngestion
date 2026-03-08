@@ -1596,3 +1596,150 @@ async function openDataCollectedFile(path) {
         preview.value = `Error loading file: ${e.message}`;
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  MYDATABASE ENGINE
+//  Prisma Studio embed + live SQLite query runner
+// ═══════════════════════════════════════════════════════════════
+
+let mydbLastResults = [];
+
+async function mydbCheckStatus() {
+    const dot = document.getElementById('mydb-status-dot');
+    const txt = document.getElementById('mydb-status-txt');
+    const prismaDot = document.getElementById('mydb-prisma-dot');
+    if (!dot) return;
+    try {
+        await fetch('http://localhost:5555', { signal: AbortSignal.timeout(2000), mode: 'no-cors' });
+        dot.style.background = 'var(--green)';
+        dot.style.boxShadow = '0 0 6px var(--green)';
+        if (txt) txt.textContent = '✓ Prisma Studio connected — SQLite dev.db';
+        if (prismaDot) { prismaDot.style.background = 'var(--green)'; prismaDot.style.boxShadow = '0 0 6px var(--green)'; }
+    } catch (_) {
+        dot.style.background = 'var(--red)';
+        dot.style.boxShadow = '0 0 6px var(--red)';
+        if (txt) txt.textContent = '✗ Prisma Studio offline — run ./start_all.sh';
+        if (prismaDot) { prismaDot.style.background = 'var(--red)'; prismaDot.style.boxShadow = '0 0 6px var(--red)'; }
+    }
+}
+
+async function mydbLoadTables() {
+    const listEl = document.getElementById('mydb-table-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div style="color:var(--text4);font-size:0.52rem;padding:0.5rem;">Loading...</div>';
+    try {
+        const res = await fetch('/api/mydb/tables');
+        const data = await res.json();
+        if (!data.tables || !data.tables.length) {
+            listEl.innerHTML = '<div style="color:var(--text4);font-size:0.52rem;padding:0.5rem;">No tables found</div>';
+            return;
+        }
+        listEl.innerHTML = data.tables.map(t => `
+            <button class="btn btn-xs btn-outline"
+              style="text-align:left;justify-content:flex-start;font-family:var(--mono);font-size:0.55rem;padding:0.35rem 0.5rem;"
+              onclick="mydbSelectTable('${t.name}')">
+              <span style="color:var(--cyan);margin-right:0.35rem;">▸</span>${t.name}
+              <span style="margin-left:auto;color:var(--text4);font-size:0.44rem;">${t.count} rows</span>
+            </button>`).join('');
+    } catch (e) {
+        listEl.innerHTML = `<div style="color:var(--red);font-size:0.52rem;padding:0.5rem;">Error: ${e.message}</div>`;
+    }
+}
+
+function mydbSelectTable(name) {
+    mydbSetQuery(`SELECT * FROM "${name}" LIMIT 50;`);
+    mydbRunQuery();
+}
+
+function mydbSetQuery(sql) {
+    const el = document.getElementById('mydb-query-input');
+    if (el) el.value = sql;
+}
+
+function mydbClearQuery() {
+    const el = document.getElementById('mydb-query-input');
+    if (el) el.value = '';
+    const rc = document.getElementById('mydb-results-card');
+    if (rc) rc.style.display = 'none';
+    const qs = document.getElementById('mydb-query-status');
+    if (qs) qs.textContent = '';
+    const qc = document.getElementById('mydb-row-count');
+    if (qc) qc.textContent = '';
+    mydbLastResults = [];
+}
+
+async function mydbRunQuery() {
+    const input = document.getElementById('mydb-query-input');
+    const statusEl = document.getElementById('mydb-query-status');
+    const countEl = document.getElementById('mydb-row-count');
+    const resultsCard = document.getElementById('mydb-results-card');
+    if (!input) return;
+    const sql = input.value.trim();
+    if (!sql) { if (statusEl) statusEl.textContent = 'No query entered.'; return; }
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--amber);">⟳ Running...</span>';
+    if (countEl) countEl.textContent = '';
+    try {
+        const res = await fetch('/api/mydb/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sql })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Query failed');
+        mydbLastResults = data.rows || [];
+        mydbRenderResults(mydbLastResults);
+        if (statusEl) statusEl.innerHTML = `<span style="color:var(--green);">✓ Done in ${data.ms}ms</span>`;
+        if (countEl) countEl.textContent = `${mydbLastResults.length} row${mydbLastResults.length !== 1 ? 's' : ''}`;
+        if (resultsCard) resultsCard.style.display = mydbLastResults.length > 0 ? 'block' : 'none';
+    } catch (e) {
+        if (statusEl) statusEl.innerHTML = `<span style="color:var(--red);">✗ ${e.message}</span>`;
+        if (resultsCard) resultsCard.style.display = 'none';
+    }
+}
+
+function mydbRenderResults(rows) {
+    const thead = document.getElementById('mydb-results-thead');
+    const tbody = document.getElementById('mydb-results-tbody');
+    if (!thead || !tbody || !rows.length) return;
+    const cols = Object.keys(rows[0]);
+    thead.innerHTML = '<tr>' + cols.map(c =>
+        `<th style="padding:0.4rem 0.65rem;border-bottom:1px solid var(--border);color:var(--cyan);font-weight:600;white-space:nowrap;text-align:left;">${c}</th>`
+    ).join('') + '</tr>';
+    tbody.innerHTML = rows.map((row, i) =>
+        `<tr style="background:${i % 2 === 0 ? 'var(--bg2)' : 'var(--bg1)'};" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${i % 2 === 0 ? 'var(--bg2)' : 'var(--bg1)'}'">` +
+        cols.map(c => {
+            const raw = row[c] == null ? '' : String(row[c]);
+            const display = raw.length > 80 ? raw.substring(0, 80) + '…' : raw;
+            const cell = raw === '' ? '<span style="color:var(--text4);">NULL</span>' : display;
+            return `<td style="padding:0.4rem 0.65rem;border-bottom:1px solid var(--border2);color:var(--text2);white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis;" title="${raw.replace(/"/g, '&quot;')}">${cell}</td>`;
+        }).join('') + '</tr>'
+    ).join('');
+}
+
+function mydbExportCSV() {
+    if (!mydbLastResults.length) return;
+    const cols = Object.keys(mydbLastResults[0]);
+    const csv = [cols.join(','), ...mydbLastResults.map(row =>
+        cols.map(c => `"${String(row[c] ?? '').replace(/"/g, '""')}"`).join(',')
+    )].join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `query_results_${Date.now()}.csv`;
+    a.click();
+}
+
+function mydbReloadIframe() {
+    const iframe = document.getElementById('mydb-prisma-iframe');
+    if (iframe) { iframe.src = 'about:blank'; setTimeout(() => { iframe.src = 'http://localhost:5555'; }, 100); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            if (item.dataset.view === 'mydb') {
+                mydbCheckStatus();
+                mydbLoadTables();
+            }
+        });
+    });
+});

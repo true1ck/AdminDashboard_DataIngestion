@@ -1000,6 +1000,69 @@ async function runImport(jobId, config) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  MYDATABASE API — Direct SQLite query engine for the MyDB tab
+// ═══════════════════════════════════════════════════════════════
+const MYDB_PATH = path.join(__dirname, '..', 'NetaBoardV5', 'backend', 'prisma', 'dev.db');
+
+function getMyDb() {
+    try {
+        const Database = require('better-sqlite3');
+        return new Database(MYDB_PATH, { readonly: false });
+    } catch (e) {
+        return null;
+    }
+}
+
+// List all tables with row counts
+app.get('/api/mydb/tables', (req, res) => {
+    const db = getMyDb();
+    if (!db) return res.status(500).json({ error: 'better-sqlite3 not available. Run: cd AdminDashboard && npm install better-sqlite3' });
+    try {
+        const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all();
+        const result = tables.map(t => {
+            try {
+                const row = db.prepare(`SELECT COUNT(*) as cnt FROM "${t.name}"`).get();
+                return { name: t.name, count: row.cnt };
+            } catch (_) { return { name: t.name, count: '?' }; }
+        });
+        db.close();
+        res.json({ tables: result });
+    } catch (e) {
+        db.close();
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Run arbitrary SQL query
+app.post('/api/mydb/query', (req, res) => {
+    const { sql } = req.body || {};
+    if (!sql || typeof sql !== 'string') return res.status(400).json({ error: 'sql is required' });
+    // Block dangerous statements
+    const upper = sql.trim().toUpperCase();
+    if (/^\s*(DROP|TRUNCATE|ATTACH|DETACH|PRAGMA\s+key)\b/.test(upper)) {
+        return res.status(403).json({ error: 'DROP, TRUNCATE, ATTACH and PRAGMA key are not allowed.' });
+    }
+    const db = getMyDb();
+    if (!db) return res.status(500).json({ error: 'better-sqlite3 not available. Run: cd AdminDashboard && npm install better-sqlite3' });
+    try {
+        const start = Date.now();
+        let rows;
+        if (/^\s*(SELECT|EXPLAIN|WITH)\b/i.test(sql)) {
+            rows = db.prepare(sql).all();
+        } else {
+            const info = db.prepare(sql).run();
+            rows = [{ affected_rows: info.changes, last_insert_id: info.lastInsertRowid }];
+        }
+        const ms = Date.now() - start;
+        db.close();
+        res.json({ rows, ms, count: rows.length });
+    } catch (e) {
+        db.close();
+        res.status(400).json({ error: e.message });
+    }
+});
+
 // ── Serve index.html for all routes (SPA fallback) ──
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

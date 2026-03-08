@@ -98,14 +98,22 @@ echo -e "\n${GREEN}[7/7]${RESET} ${BOLD}NetaBoard Frontend${RESET} → http://lo
 open_tab "NetaBoard Frontend :5180" \
   "cd '${BASE}/NetaBoardV5' && npm install --silent && npm run dev"
 
+# 8. Prisma Studio (DB Viewer)
+echo -e "\n${GREEN}[8/8]${RESET} ${BOLD}Prisma Studio (DB Viewer)${RESET} → http://localhost:5555"
+open_tab "Prisma Studio :5555" \
+  "cd '${BASE}/NetaBoardV5/backend' && npx prisma studio --port 5555 --browser none"
+wait_for_url "http://localhost:5555" "Prisma Studio"
+
 echo ""
 echo -e "${BOLD}${CYAN}All services launched!${RESET}"
 echo ""
 echo -e "  ${CYAN}●${RESET} Admin Dashboard → ${YELLOW}http://localhost:4000${RESET}"
 echo -e "  ${CYAN}●${RESET} NetaBoard App   → ${YELLOW}http://localhost:5180${RESET}"
+echo -e "  ${CYAN}●${RESET} DB Viewer       → ${YELLOW}http://localhost:5555${RESET}"
 echo ""
 
 # Give frontend a couple seconds to boot up
 sleep 3
 open "http://localhost:4000"
 open "http://localhost:5180"
+open "http://localhost:5555"
