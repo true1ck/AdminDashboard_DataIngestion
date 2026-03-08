@@ -64,51 +64,35 @@
       --radius: 6px;
     }
 
-    /* Light Theme Overlay */
-    [data-theme="light"] {
-      --bg: #f8f9fa;
+    body.light-mode {
+      --bg: #f5f7fa;
       --bg1: #ffffff;
-      --bg2: #f1f3f5;
-      --bg3: #e9ecef;
-      --bg4: #dee2e6;
-      --bg5: #ced4da;
+      --bg2: #f0f2f5;
+      --bg3: #e4e7eb;
+      --bg4: #d1d5db;
+      --bg5: #9ca3af;
 
-      --cyan: #0088cc;
-      --cyan2: rgba(0, 136, 204, 0.10);
-      --cyan3: rgba(0, 136, 204, 0.18);
-      --cyan4: rgba(0, 136, 204, 0.04);
-
-      --amber: #e67700;
-      --amber2: rgba(230, 119, 0, 0.10);
-      --amber3: rgba(230, 119, 0, 0.18);
-
-      --green: #0ca678;
-      --green2: rgba(12, 166, 120, 0.10);
-      --green3: rgba(12, 166, 120, 0.18);
-
-      --red: #e03131;
-      --red2: rgba(224, 49, 49, 0.10);
-      --red3: rgba(224, 49, 49, 0.18);
-
-      --purple: #845ef7;
-      --purple2: rgba(132, 94, 247, 0.10);
-      --purple3: rgba(132, 94, 247, 0.18);
-
-      --blue: #228be6;
-      --blue2: rgba(34, 139, 230, 0.10);
-      --blue3: rgba(34, 139, 230, 0.18);
-
-      --pink: #d6336c;
-      --pink2: rgba(214, 51, 108, 0.10);
+      --text: #1a1c21;
+      --text2: rgba(26, 28, 33, 0.75);
+      --text3: rgba(26, 28, 33, 0.45);
+      --text4: rgba(26, 28, 33, 0.25);
 
       --border: rgba(0, 0, 0, 0.08);
-      --border2: rgba(0, 0, 0, 0.14);
-      --border3: rgba(0, 0, 0, 0.22);
+      --border2: rgba(0, 0, 0, 0.12);
+      --border3: rgba(0, 0, 0, 0.20);
 
-      --text: #1a1e23;
-      --text2: rgba(26, 30, 35, 0.75);
-      --text3: rgba(26, 30, 35, 0.55);
-      --text4: rgba(26, 30, 35, 0.35);
+      --cyan2: rgba(0, 150, 199, 0.08);
+      --cyan3: rgba(0, 150, 199, 0.15);
+      --cyan4: rgba(0, 150, 199, 0.03);
+
+      --amber2: rgba(217, 119, 6, 0.08);
+      --amber3: rgba(217, 119, 6, 0.15);
+
+      --green2: rgba(5, 150, 105, 0.08);
+      --green3: rgba(5, 150, 105, 0.15);
+
+      --red2: rgba(220, 38, 38, 0.08);
+      --red3: rgba(220, 38, 38, 0.15);
     }
 
     *,
@@ -2145,6 +2129,9 @@
 
         <div class="tb-divider"></div>
         <div class="live-dot"></div>
+        <button id="theme-toggle" class="btn btn-xs btn-outline"
+          style="border:none; background:transparent; font-size:1.1rem; padding:0 0.5rem; cursor:pointer;"
+          onclick="toggleTheme()" title="Toggle Light/Dark Mode">🌓</button>
         <div class="tb-clock" id="clock">00:00:00</div>
         <button id="theme-toggle" class="btn btn-outline btn-xs"
           style="margin-left:8px; border-radius:15px; padding:0.2rem 0.5rem;" title="Toggle Light/Dark Mode"
@@ -4231,6 +4218,24 @@ SELECT * FROM Archetype WHERE name LIKE '%BJP%';">SELECT * FROM SocialItem ORDER
     (function tick() {
       document.getElementById('clock').textContent = new Date().toTimeString().slice(0, 8);
       setTimeout(tick, 1000);
+    })();
+
+    /* ═══════════════════════════════════════════════
+       THEME TOGGLE (LIGHT/DARK)
+    ═══════════════════════════════════════════════ */
+    function toggleTheme() {
+      const body = document.body;
+      const isLight = body.classList.toggle('light-mode');
+      localStorage.setItem('nb-theme', isLight ? 'light' : 'dark');
+      qLog('info', `Theme switched to ${isLight ? 'Light' : 'Dark'} mode`);
+    }
+
+    // Load theme on startup
+    (function () {
+      const savedTheme = localStorage.getItem('nb-theme');
+      if (savedTheme === 'light') {
+        document.body.classList.add('light-mode');
+      }
     })();
 
     async function checkServiceHealth(id, url) {
